@@ -29,6 +29,7 @@ import { readKimiUsage } from "./kimi-usage.js";
 
 const execFileAsync = execHostFile;
 const USAGE_FETCH_TIMEOUT_MS = 15_000;
+const KIMI_AUTH_INITIALIZE_TIMEOUT_MS = 15_000;
 const CURSOR_DASHBOARD_URL =
   "https://api2.cursor.sh/aiserver.v1.DashboardService";
 const CURSOR_KEYCHAIN_ACCOUNT = "cursor-user";
@@ -204,7 +205,7 @@ async function kimiAuthStatus(command: string, env: NodeJS.ProcessEnv) {
     await requestAcpInitialize(connection, {
       parameterizedModelPicker: false,
       fsAccess: false,
-      timeoutMs: 5_000,
+      timeoutMs: KIMI_AUTH_INITIALIZE_TIMEOUT_MS,
     });
     await connection.request({
       method: "authenticate",

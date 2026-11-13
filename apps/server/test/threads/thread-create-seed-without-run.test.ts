@@ -10,7 +10,7 @@ import {
   turnRequestEventDataSchema,
   type PermissionMode,
 } from "@bb/domain";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { ApiError } from "../../src/errors.js";
 import { createThreadFromRequest } from "../../src/services/threads/thread-create.js";
 import { buildExecutionOptions } from "../../src/services/threads/thread-commands.js";

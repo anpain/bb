@@ -69,6 +69,81 @@ export default function plugin() {
         "../../../src/services/ai/ai-service-registry.ts",
       ),
     ).href;
+    const script = `
+import pino from "pino";
+import { upsertInstalledPlugin } from "@bb/db";
+import { createMigratedConnection } from "@bb/db/testing";
+import { createPluginService } from ${JSON.stringify(runtimeUrl)};
+import { createAiServiceRegistry } from ${JSON.stringify(aiRegistryUrl)};
+const progress = (phase) => process.stderr.write(JSON.stringify({ phase, uptimeSeconds: process.uptime() }) + "\\n");
+progress("imports-ready");
+const [rootDir, dataDir] = process.argv.slice(1);
+const db = createMigratedConnection();
+progress("database-ready");
+upsertInstalledPlugin(db, {
+  id: "native-externals",
+  source: "git:github.com/acme/bb-plugin-native-externals@v1",
+  rootDir,
+  version: "0.1.0",
+  enabled: true,
+  provenance: { kind: "direct" },
+  sourceIntent: {
+    kind: "git",
+    url: "https://github.com/acme/bb-plugin-native-externals",
+    subdirectory: null,
+    selector: { kind: "ref", ref: "v1", refKind: "branch" }
+  },
+  exactResolution: { kind: "git", commit: "test-commit" },
+  updateState: {
+    lastCheckAt: null,
+    availableCompatibleVersion: null,
+    newestIncompatibleVersion: null,
+    statusDetail: null
+  },
+  activeArtifactId: null
+});
+const service = createPluginService({
+  aiServices: createAiServiceRegistry(),
+  db,
+  hub: {
+    getDaemonSessionIdForHost: () => null,
+    notifyPluginChanged: () => {}, onWatchedTargets: () => () => {}, notifyPluginSignal: () => 0,
+    notifySystem: () => {}
+  },
+  logger: pino({ enabled: false }),
+  dataDir,
+  appVersion: "0.9.0",
+  loadTimeoutMs: 2000
+});
+progress("service-ready");
+await service.reload("native-externals");
+progress("reload-complete");
+const entry = service.list().find((plugin) => plugin.id === "native-externals");
+const result = {
+  status: entry?.status,
+  statusDetail: entry?.statusDetail,
+  types: globalThis.__nativeExternalTypes
+};
+await service.stop();
+progress("stop-complete");
+process.stdout.write(JSON.stringify(result));
+`;
+
+    const startedAt = performance.now();
+    const execution = run(
+      process.execPath,
+      [
+        "--conditions=source",
+        "--import",
+        "tsx",
+        "--input-type=module",
+        "--eval",
+        script,
+        rootDir,
+        join(workDir, "data"),
+      ],
+      { cwd: resolve(import.meta.dirname, "../../..") },
+    );
     let progressOutput = "";
     execution.child.stderr?.on("data", (chunk: Buffer | string) => {
       progressOutput += chunk.toString();
@@ -131,6 +206,50 @@ export default function plugin(bb: BbPluginApi) {
         "../../../src/services/ai/ai-service-registry.ts",
       ),
     ).href;
+    const script = `
+import pino from "pino";
+import { createMigratedConnection } from "@bb/db/testing";
+import { createPluginService } from ${JSON.stringify(serviceUrl)};
+import { createAiServiceRegistry } from ${JSON.stringify(aiRegistryUrl)};
+const [rootDir, dataDir] = process.argv.slice(1);
+const db = createMigratedConnection();
+const service = createPluginService({
+  aiServices: createAiServiceRegistry(),
+  db,
+  hub: {
+    getDaemonSessionIdForHost: () => null,
+    notifyPluginChanged: () => {}, onWatchedTargets: () => () => {}, notifyPluginSignal: () => 0,
+    notifySystem: () => {}
+  },
+  logger: pino({ enabled: false }),
+  dataDir,
+  appVersion: "0.9.0",
+  loadTimeoutMs: 2000
+});
+const entry = await service.installPath(rootDir);
+const result = {
+  status: entry.status,
+  statusDetail: entry.statusDetail,
+  value: globalThis.__nativeSourceResult
+};
+await service.stop();
+process.stdout.write(JSON.stringify(result));
+`;
+
+    const { stdout } = await run(
+      process.execPath,
+      [
+        "--conditions=source",
+        "--import",
+        "tsx",
+        "--input-type=module",
+        "--eval",
+        script,
+        rootDir,
+        join(workDir, "data"),
+      ],
+      { cwd: resolve(import.meta.dirname, "../../..") },
+    );
 
     expect(JSON.parse(stdout)).toEqual({
       status: "running",
@@ -200,6 +319,54 @@ export default function plugin(bb: BbPluginApi) {
         "../../../src/services/ai/ai-service-registry.ts",
       ),
     ).href;
+    const script = `
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import pino from "pino";
+import { createMigratedConnection } from "@bb/db/testing";
+import { createPluginService } from ${JSON.stringify(serviceUrl)};
+import { createAiServiceRegistry } from ${JSON.stringify(aiRegistryUrl)};
+const [importedDir, importerDir, dataDir] = process.argv.slice(1);
+const db = createMigratedConnection();
+const service = createPluginService({
+  aiServices: createAiServiceRegistry(),
+  db,
+  hub: {
+    getDaemonSessionIdForHost: () => null,
+    notifyPluginChanged: () => {}, onWatchedTargets: () => () => {}, notifyPluginSignal: () => 0,
+    notifySystem: () => {}
+  },
+  logger: pino({ enabled: false }),
+  dataDir,
+  appVersion: "0.9.0",
+  loadTimeoutMs: 2000
+});
+await service.installPath(importedDir);
+await service.installPath(importerDir);
+const read = globalThis.__readImportedPlugin;
+const before = await read();
+await writeFile(join(importedDir, "shared.js"), 'export const value = "after";\\n');
+await service.reload("imported");
+const after = await read();
+await service.stop();
+process.stdout.write(JSON.stringify({ before, after }));
+`;
+
+    const { stdout } = await run(
+      process.execPath,
+      [
+        "--conditions=source",
+        "--import",
+        "tsx",
+        "--input-type=module",
+        "--eval",
+        script,
+        importedDir,
+        importerDir,
+        join(workDir, "data"),
+      ],
+      { cwd: resolve(import.meta.dirname, "../../..") },
+    );
 
     expect(JSON.parse(stdout)).toEqual({ before: "before", after: "after" });
   });

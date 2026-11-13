@@ -2911,6 +2911,16 @@ describe("public thread data routes", () => {
           .where(eq(events.threadId, thread.id))
           .all(),
       ).toEqual([]);
+    });
+  });
+
+  it("queues send requests whose senderThreadId is in another project", async () => {
+    await withTestHarness(async (harness) => {
+      const { thread } = seedThreadFixture(harness, {
+        thread: {
+          status: "active",
+        },
+      });
       const { host: otherHost } = seedHostSession(harness.deps, {
         id: "host-cross-project-sender",
       });

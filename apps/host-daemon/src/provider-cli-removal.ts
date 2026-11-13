@@ -102,10 +102,11 @@ export async function providerCliRemovalCommand(
       }
     }
     if (process.platform === "win32") return null;
+    const executableName = path.basename(status.executableName);
     const nativeName =
-      status.executableName === "cursor-agent"
+      executableName === "cursor-agent"
         ? "cursor-agent"
-        : status.executableName === "claude"
+        : executableName === "claude"
           ? "claude"
           : null;
     if (nativeName === null) return null;

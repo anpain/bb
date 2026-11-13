@@ -76,15 +76,15 @@ describe("provider CLI removal", () => {
     }
   });
 
-  it.skipIf(process.platform === "win32")(
-    "removes native Cursor binaries and launchers while retaining credentials",
-    async () => {
+  it.skipIf(process.platform === "win32").each(["cursor-agent", "claude"])(
+    "removes native %s binaries when the provider reports an absolute executable name",
+    async (name) => {
       const home = await mkdtemp(
         path.join(os.tmpdir(), "bb-cli-native-remove-"),
       );
       try {
-        const root = path.join(home, ".local", "share", "cursor-agent");
-        const executable = path.join(root, "versions", "test", "cursor-agent");
+        const root = path.join(home, ".local", "share", name);
+        const executable = path.join(root, "versions", "test", name);
         const bin = path.join(home, ".local", "bin");
         const credentials = path.join(home, ".cursor", "auth.json");
         await mkdir(path.dirname(executable), { recursive: true });
@@ -92,12 +92,12 @@ describe("provider CLI removal", () => {
         await mkdir(path.dirname(credentials), { recursive: true });
         await writeFile(executable, "");
         await writeFile(credentials, "credential sentinel");
-        await symlink(executable, path.join(bin, "cursor-agent"));
-        await symlink(executable, path.join(bin, "agent"));
+        await symlink(executable, path.join(bin, name));
+        if (name === "cursor-agent") await symlink(executable, path.join(bin, "agent"));
         const plan = await providerCliRemovalCommand(
           status({
-            executableName: "cursor-agent",
-            executablePath: path.join(bin, "cursor-agent"),
+            executableName: path.join(bin, name),
+            executablePath: path.join(bin, name),
           }),
           home,
         );
@@ -106,7 +106,7 @@ describe("provider CLI removal", () => {
         await expect(readFile(executable)).rejects.toMatchObject({
           code: "ENOENT",
         });
-        await expect(readFile(path.join(bin, "agent"))).rejects.toMatchObject({
+        await expect(readFile(path.join(bin, name))).rejects.toMatchObject({
           code: "ENOENT",
         });
         expect(await readFile(credentials, "utf8")).toBe("credential sentinel");

@@ -60,9 +60,12 @@ interface CreateTurnSubmitCommandArgs {
 }
 
 interface CreateRouterArgs {
+  dataDir?: string;
   logger?: CommandRouterOptions["logger"];
   resolveInteractiveRequest?: CommandRouterOptions["resolveInteractiveRequest"];
   runtimeManager?: RuntimeManager;
+  providerHealth?: CommandRouterOptions["providerHealth"];
+  listModels?: CommandRouterOptions["listModels"];
 }
 
 let nextClientRequestIdValue = 1;
@@ -80,11 +83,15 @@ function createRouter(
   args: CreateRouterArgs = {},
 ): CommandRouter {
   return new CommandRouter({
-    dataDir: "/tmp/bb-router-test-data",
+    dataDir: args.dataDir ?? "/tmp/bb-router-test-data",
     eventSink: noopEventSink,
     fetchProjectAttachment: unexpectedProjectAttachmentFetch,
     fetchPluginHostArtifact: fetchDispatchTestArtifact,
     ...unexpectedProviderMaintenance,
+    ...(args.providerHealth === undefined
+      ? {}
+      : { providerHealth: args.providerHealth }),
+    ...(args.listModels === undefined ? {} : { listModels: args.listModels }),
     logger: {
       debug: () => undefined,
       warn: () => undefined,
@@ -214,6 +221,79 @@ async function runRouterCommand({
 }
 
 describe("CommandRouter", () => {
+  it("limits provider checks across RPC types and drops a cancelled queued check", async () => {
+    const harness = createHarness({ workspacePath: "/tmp/env-router" });
+    const dataDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), "bb-provider-probes-"),
+    );
+    const modelCheck = createDeferredPromise<void>();
+    const healthCheck = createDeferredPromise<void>();
+    const listModels = vi.fn(async () => {
+      await modelCheck.promise;
+      return { models: [], selectedOnlyModels: [] };
+    });
+    const providerHealth = vi.fn(
+      async ({ providerId }: { providerId: string }) => {
+        if (providerId === "first-health") await healthCheck.promise;
+        return { supported: false as const };
+      },
+    );
+    const router = createRouter(harness, {
+      dataDir,
+      listModels,
+      providerHealth,
+    });
+    const requestHealth = (providerId: string) =>
+      router.handleOnlineRpcRequest({
+        type: "host-rpc.request",
+        requestId: providerId,
+        command: {
+          type: "provider.health",
+          providerId,
+          bridgeLaunch: DISPATCH_TEST_BRIDGE_LAUNCH,
+        },
+      });
+    const models = router.handleOnlineRpcRequest({
+      type: "host-rpc.request",
+      requestId: "models",
+      command: {
+        type: "provider.list_models",
+        providerId: "models",
+        bridgeLaunch: DISPATCH_TEST_BRIDGE_LAUNCH,
+        contributedEnv: [],
+      },
+    });
+    const first = requestHealth("first-health");
+    const cancelled = requestHealth("cancelled-health");
+    const next = requestHealth("next-health");
+
+    try {
+      await vi.waitFor(() => {
+        expect(listModels).toHaveBeenCalledTimes(1);
+        expect(providerHealth).toHaveBeenCalledTimes(1);
+      });
+      router.cancelOnlineRpcRequest({
+        type: "host-rpc.cancel",
+        requestId: "cancelled-health",
+      });
+      await expect(cancelled).resolves.toMatchObject({
+        ok: false,
+        errorCode: "cancelled",
+      });
+      expect(providerHealth).toHaveBeenCalledTimes(1);
+      modelCheck.resolve();
+      await expect(next).resolves.toMatchObject({ ok: true });
+      expect(
+        providerHealth.mock.calls.map(([{ providerId }]) => providerId),
+      ).toEqual(["first-health", "next-health"]);
+    } finally {
+      modelCheck.resolve();
+      healthCheck.resolve();
+      await Promise.allSettled([models, first, cancelled, next]);
+      await fs.rm(dataDir, { force: true, recursive: true });
+    }
+  });
+
   it("does not warn for expected provision cancellation RPC failures", async () => {
     const harness = createHarness({ workspacePath: "/tmp/env-router" });
     const logger = {

@@ -368,6 +368,17 @@ describe("consumer-specific config", () => {
     ).toThrow("BB_SETUP_GUIDE_VARIANT must be one of control, new");
   });
 
+  it("leaves provider prewarming off unless explicitly enabled", () => {
+    expect(
+      loadServerConfig({ env: createServerRuntimeEnv({}) }).BB_PROVIDER_PREWARM,
+    ).toBe(false);
+    expect(
+      loadServerConfig({
+        env: createServerRuntimeEnv({ BB_PROVIDER_PREWARM: "1" }),
+      }).BB_PROVIDER_PREWARM,
+    ).toBe(true);
+  });
+
   it("carries the launcher's server launch id only when it is set", () => {
     expect(
       loadServerConfig({

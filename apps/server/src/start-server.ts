@@ -467,11 +467,11 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     walCheckpointer,
   };
   const providerModelCatalogPrewarm =
-    pendingServerMove === null
+    pendingServerMove === null && serverConfig.BB_PROVIDER_PREWARM
       ? installProviderModelCatalogPrewarm(sweepDeps)
       : null;
   const providerCliStatusPrewarm =
-    pendingServerMove === null
+    pendingServerMove === null && serverConfig.BB_PROVIDER_PREWARM
       ? installProviderCliStatusPrewarm(sweepDeps)
       : null;
   if (pendingServerMove === null) {

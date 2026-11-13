@@ -30,6 +30,7 @@ import {
   BB_APP_UPDATE_MODE_ENV,
   BB_CLI_LAUNCHER_ENV,
   BB_PERF_DIAGNOSTICS_ENV,
+  BB_PROVIDER_PREWARM_ENV,
   BB_QUERY_PLAN_AUDIT_ENV,
   BB_SKIP_ONBOARDING_ENV,
   BB_SETUP_GUIDE_VARIANT_ENV,
@@ -68,6 +69,7 @@ export interface ServerConfig
   BB_APP_UPDATE_MODE?: AppUpdateMode;
   BB_CLI_LAUNCHER?: string;
   BB_PERF_DIAGNOSTICS: boolean;
+  BB_PROVIDER_PREWARM: boolean;
   BB_QUERY_PLAN_AUDIT: boolean;
   BB_SKIP_ONBOARDING: boolean;
   BB_SETUP_GUIDE_VARIANT?: SetupGuideVariant;
@@ -170,6 +172,12 @@ export function loadServerConfig(
       definition: BB_PERF_DIAGNOSTICS_ENV,
       env: loader.env,
       defaultValue: false,
+    }),
+    BB_PROVIDER_PREWARM: readEnvVarWithDefault({
+      context: loader.context,
+      defaultValue: false,
+      definition: BB_PROVIDER_PREWARM_ENV,
+      env: loader.env,
     }),
     BB_QUERY_PLAN_AUDIT: readEnvVarWithDefault({
       context: loader.context,

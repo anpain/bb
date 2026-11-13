@@ -4,6 +4,7 @@ import type {
   SystemProvidersQuery,
 } from "@bb/server-contract";
 import type { ProviderInfo } from "@bb/domain";
+import { createAsyncTtlMemo, type AsyncTtlMemo } from "@bb/async-cache";
 import type { AppDeps } from "../../types.js";
 import { COMMAND_TIMEOUT_MS } from "../../constants.js";
 import {
@@ -20,6 +21,11 @@ import { resolveBridgeLaunchForProviderId } from "./provider-bridge-launch.js";
 import { mapProviderMaintenanceRequests } from "./provider-maintenance-concurrency.js";
 import { resolvePluginProviderEnvHealth } from "../plugins/plugin-agent-contributions.js";
 import { isSuspendedHostUnavailableError } from "../lib/lifecycle-api-errors.js";
+
+const pendingProviderStates = new WeakMap<
+  AppDeps["db"],
+  AsyncTtlMemo<string, SystemProviderStatesResponse>
+>();
 
 function guidedSignIn(deps: AppDeps, providerId: string): boolean {
   return deps.providerRegistry.get(providerId)?.guidedSignIn ?? false;
@@ -131,6 +137,25 @@ export async function getProviderStates(
     query.environmentId === undefined
       ? undefined
       : (requireEnvironment(deps.db, query.environmentId).path ?? undefined);
+  let pending = pendingProviderStates.get(deps.db);
+  if (pending === undefined) {
+    pending = createAsyncTtlMemo({ ttlMs: 0 });
+    pendingProviderStates.set(deps.db, pending);
+  }
+  const key = JSON.stringify([
+    hostId,
+    cwd,
+    deps.hub.getDaemonSessionIdForHost(hostId),
+    deps.providerRegistry.getRegistrationRevision(),
+  ]);
+  return pending.run(key, () => readProviderStates(deps, hostId, cwd));
+}
+
+async function readProviderStates(
+  deps: AppDeps,
+  hostId: string,
+  cwd: string | undefined,
+): Promise<SystemProviderStatesResponse> {
   const providers = await listSystemProviderInfos(deps, { hostId });
   try {
     requireConnectedHostSession(deps, hostId);

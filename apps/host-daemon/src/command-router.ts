@@ -25,7 +25,10 @@ import {
   getErrorCode,
   type CommandDispatchOptions,
 } from "./command-dispatch.js";
-import { isExpectedOnlineRpcFailureError } from "./command-dispatch-support.js";
+import {
+  ExpectedCommandDispatchError,
+  isExpectedOnlineRpcFailureError,
+} from "./command-dispatch-support.js";
 import { roundDurationMs } from "@bb/process-utils";
 import type { HostDaemonLogger } from "./logger.js";
 import { RuntimeManager } from "./runtime-manager.js";
@@ -86,6 +89,14 @@ export interface CommandRouterOptions {
 }
 
 const HOST_COMMAND_LIFECYCLE_LOG_THRESHOLD_MS = 1_000;
+const PROVIDER_PROBE_CONCURRENCY = 2;
+const PROVIDER_PROBE_COMMANDS = new Set<HostDaemonOnlineRpcCommand["type"]>([
+  "provider.health",
+  "provider.list_models",
+  "provider.list_commands",
+  "provider.installation.status",
+  "provider.usage",
+]);
 
 function elapsedMs(startedAtMs: number): number {
   return performance.now() - startedAtMs;
@@ -97,6 +108,8 @@ export class CommandRouter {
   private readonly threadUnarchiveBarriers = new Map<string, Promise<void>>();
   private readonly threadLaneTails = new Map<string, Promise<void>>();
   private readonly threadTurnLaneTails = new Map<string, Promise<void>>();
+  private activeProviderProbes = 0;
+  private readonly queuedProviderProbes = new Set<() => void>();
   private readonly onlineRpcAbortControllers = new Map<
     string,
     AbortController
@@ -177,6 +190,46 @@ export class CommandRouter {
     return this.executeOnlineRpcCommand(command, signal);
   }
 
+  private async runProviderProbe<T>(
+    signal: AbortSignal,
+    probe: () => Promise<T>,
+  ): Promise<T> {
+    const cancelled = () =>
+      new ExpectedCommandDispatchError(
+        "cancelled",
+        "Provider check was cancelled",
+      );
+    if (signal.aborted) throw cancelled();
+    if (this.activeProviderProbes < PROVIDER_PROBE_CONCURRENCY) {
+      this.activeProviderProbes += 1;
+    } else {
+      await new Promise<void>((resolve, reject) => {
+        const start = () => {
+          signal.removeEventListener("abort", cancel);
+          resolve();
+        };
+        const cancel = () => {
+          this.queuedProviderProbes.delete(start);
+          reject(cancelled());
+        };
+        this.queuedProviderProbes.add(start);
+        signal.addEventListener("abort", cancel, { once: true });
+      });
+    }
+    try {
+      if (signal.aborted) throw cancelled();
+      return await probe();
+    } finally {
+      const next = this.queuedProviderProbes.values().next().value;
+      if (next === undefined) {
+        this.activeProviderProbes -= 1;
+      } else {
+        this.queuedProviderProbes.delete(next);
+        next();
+      }
+    }
+  }
+
   private executeOnlineRpcCommand(
     command: HostDaemonOnlineRpcCommand,
     signal: AbortSignal,
@@ -201,23 +254,18 @@ export class CommandRouter {
       return this.options.pluginHostManager.dispose(command);
     }
     const environmentLaneMode = hostDaemonEnvironmentLaneForCommand(command);
+    const dispatch = () =>
+      dispatchOnlineRpcCommand(command, this.createDispatchOptions(), signal);
     const result =
       environmentLaneMode && "environmentId" in command
         ? this.runInEnvironmentLane(
             command.environmentId,
             environmentLaneMode,
-            () =>
-              dispatchOnlineRpcCommand(
-                command,
-                this.createDispatchOptions(),
-                signal,
-              ),
+            dispatch,
           )
-        : dispatchOnlineRpcCommand(
-            command,
-            this.createDispatchOptions(),
-            signal,
-          );
+        : PROVIDER_PROBE_COMMANDS.has(command.type)
+          ? this.runProviderProbe(signal, dispatch)
+          : dispatch();
     return result.then((value) =>
       parseHostDaemonOnlineRpcResultForCommand(command, value),
     );

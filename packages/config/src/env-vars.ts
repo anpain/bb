@@ -311,6 +311,13 @@ export const BB_QUERY_PLAN_AUDIT_ENV = defineEnvVar<boolean>({
   parse: parseBooleanEnvValue,
 });
 
+export const BB_PROVIDER_PREWARM_ENV = defineEnvVar<boolean>({
+  description:
+    "Preload provider model catalogs and CLI update status when a machine connects. Requires restart.",
+  name: "BB_PROVIDER_PREWARM",
+  parse: parseBooleanEnvValue,
+});
+
 export const BB_SKIP_ONBOARDING_ENV = defineEnvVar<boolean>({
   description:
     "Mark first-run setup as completed at server startup so the setup screen is skipped. Settings can still replay it.",

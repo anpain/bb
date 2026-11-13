@@ -1,5 +1,6 @@
 import type { ProviderHealth } from "@bb/host-daemon-contract";
 import { updateHost } from "@bb/db";
+import { createDeferredPromise } from "@bb/test-helpers";
 import { describe, expect, it, vi } from "vitest";
 import { getProviderStates } from "../../src/services/system/provider-states.js";
 import { setPluginAgentContributions } from "../../src/services/plugins/plugin-agent-contributions.js";
@@ -32,6 +33,7 @@ const INSTALLED_ONLY_PROVIDER_IDS = new Set([
   "acp-omp",
   "acp-grok",
   "acp-hermes-agent",
+  "acp-kimi",
 ]);
 
 function healthForInstalledOnlyProvider(
@@ -45,6 +47,66 @@ function healthForInstalledOnlyProvider(
 }
 
 describe("getProviderStates", () => {
+  it("shares overlapping probes and reads fresh account status after they finish", async () => {
+    await withTestHarness(async (harness) => {
+      const { host, session } = seedHostSession(harness.deps);
+      const firstCheck = createDeferredPromise<void>();
+      let signedIn = false;
+      const responder = registerHostRpcResponder(harness, {
+        hostId: host.id,
+        sessionId: session.id,
+        handle: async (request) => {
+          if (request.command.type !== "provider.health") {
+            throw new Error(`Unexpected command ${request.command.type}`);
+          }
+          const id = request.command.providerId;
+          if (id === "codex") await firstCheck.promise;
+          const health = healthForInstalledOnlyProvider(id, new Set());
+          return {
+            ok: true,
+            result: {
+              supported: true,
+              health:
+                id === "codex" && !signedIn
+                  ? { ...health, status: "unauthenticated" }
+                  : health,
+            },
+          };
+        },
+      });
+      const codexChecks = () =>
+        responder.requests.filter(
+          ({ command }) =>
+            command.type === "provider.health" &&
+            command.providerId === "codex",
+        );
+      const query = { hostId: host.id };
+      const first = getProviderStates(harness.deps, query);
+      try {
+        await vi.waitFor(() => expect(codexChecks()).toHaveLength(1));
+        const overlapping = getProviderStates(harness.deps, query);
+        firstCheck.resolve();
+        const [initial, shared] = await Promise.all([first, overlapping]);
+        expect(shared).toEqual(initial);
+        expect(
+          initial.providers.find(({ providerId }) => providerId === "codex")
+            ?.status,
+        ).toBe("unauthenticated");
+        expect(codexChecks()).toHaveLength(1);
+        signedIn = true;
+        const updated = await getProviderStates(harness.deps, query);
+        expect(
+          updated.providers.find(({ providerId }) => providerId === "codex")
+            ?.status,
+        ).toBe("ready");
+        expect(codexChecks()).toHaveLength(2);
+      } finally {
+        firstCheck.resolve();
+        await first;
+      }
+    });
+  });
+
   it("reports paused readiness without probing a suspended host", async () => {
     await withTestHarness(async (harness) => {
       const host = seedHost(harness.deps, {
@@ -230,7 +292,11 @@ describe("getProviderStates", () => {
             .filter((provider) => provider.internal_DO_NOT_USE_guidedSignIn)
             .map((provider) => provider.providerId)
             .sort(),
-        ).toStrictEqual(["acp-cursor", "claude-code", "codex"]);
+        ).toStrictEqual(
+          hostId === host.id
+            ? ["acp-cursor", "acp-kimi", "claude-code", "codex"]
+            : ["acp-cursor", "claude-code", "codex"],
+        );
         expect(
           result.providers.find((provider) => provider.providerId === "pi")
             ?.internal_DO_NOT_USE_guidedSignIn,
@@ -413,7 +479,9 @@ describe("getProviderStates", () => {
 
       expect(result.providers[0]?.providerId).toBe("codex");
       expect(primaryCalls).toBe(0);
-      expect(healthCwds.filter((cwd) => cwd === undefined)).toHaveLength(4);
+      expect(healthCwds.filter((cwd) => cwd === undefined)).toHaveLength(
+        INSTALLED_ONLY_PROVIDER_IDS.size,
+      );
       expect(healthCwds.filter((cwd) => cwd !== undefined)).toEqual(
         Array(4).fill(environment.path),
       );

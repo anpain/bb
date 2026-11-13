@@ -8,6 +8,25 @@ These builds are unsigned. Windows SmartScreen may warn before installation. The
 
 Version checks use this fork's release feeds. Automatic installation remains disabled; download and install updates manually.
 
+## Connect to your Linux server
+
+The **Build fork Linux server** workflow produces the `bb-server-linux-x64` artifact. Extract its `bb-app-*.tgz` and install the package into the service user's home directory with Node.js 22.19 or newer.
+
+```bash
+npm install --prefix "$HOME/bb-runtime" --no-audit --no-fund /path/to/bb-app-0.49.0.tgz
+KIMI_DISABLE_TELEMETRY=1 DO_NOT_TRACK=1 \
+  "$HOME/bb-runtime/node_modules/.bin/bb-app" \
+  --data-dir "$HOME/data" --server-bind-host 127.0.0.1 --no-in-app-updates
+```
+
+Install Kimi Code on the server and sign in as the same Linux user that runs bb. Run `KIMI_DISABLE_TELEMETRY=1 kimi acp --login` and complete the device login in your browser. On Windows, forward the bb port over SSH.
+
+```powershell
+ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:48886:127.0.0.1:38886 user@host
+```
+
+In bb desktop, use **Desktop Settings → Server → Add Server** and enter `http://127.0.0.1:48886`. Use a server worktree for each task and fetch its Git branch on Windows when you need to run the result locally.
+
 ## Verification on 2026-11-13
 
 - macOS ARM64 packaging and the packaged renderer/preload startup smoke passed.

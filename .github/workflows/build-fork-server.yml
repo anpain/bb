@@ -1,0 +1,50 @@
+name: Build fork Linux server
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [privacy-kimi]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-linux-server-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TURBO_TELEMETRY_DISABLED: "1"
+  DO_NOT_TRACK: "1"
+
+jobs:
+  linux:
+    if: github.repository == 'anpain/bb'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.19.0"
+      - name: Install pnpm
+        run: npm install --global pnpm@9.15.0 --ignore-scripts
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Check server types
+        run: pnpm exec turbo run typecheck --filter=@bb/server --output-logs=new-only
+      - name: Test server routes
+        run: >-
+          pnpm exec turbo run test --filter=@bb/server --output-logs=new-only --
+          test/system/telemetry-events.test.ts
+          test/system/general-settings.test.ts
+          test/system/setup-guide.test.ts
+      - name: Build and verify the Linux package
+        run: pnpm exec turbo run smoke:tarball --filter=bb-app --output-logs=new-only
+      - name: Pack server
+        working-directory: packages/bb-app
+        run: npm pack --pack-destination "$RUNNER_TEMP"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bb-server-linux-x64
+          path: ${{ runner.temp }}/bb-app-*.tgz
+          if-no-files-found: error

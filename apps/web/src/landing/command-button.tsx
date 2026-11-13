@@ -6,17 +6,14 @@ export function CommandButton({
   command,
   label,
   size,
-  onCopy,
 }: {
   command: string;
   label: string;
   size: "hero" | "compact";
-  onCopy: (copied: boolean) => void;
 }) {
   const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
   const copy = async () => {
     const copied = await copyPlainText(command);
-    onCopy(copied);
     setStatus(copied ? "copied" : "failed");
     setTimeout(() => setStatus("idle"), 1500);
   };

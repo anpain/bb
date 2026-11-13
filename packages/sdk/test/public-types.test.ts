@@ -371,7 +371,6 @@ type ExpectedSystemKey =
   | "experimental_setAppUpdateAuto"
   | "experimental_cliCommand"
   | "experimental_installCliCommand"
-  | "experimental_recordTelemetryEvent"
   | "experimental_removeCliCommand"
   | "experimental_scheduleAppUpdate"
   | "reloadConfig"

@@ -242,7 +242,11 @@ describe("@bb/sdk", () => {
       startedAt: 1,
     };
     const replies: Array<() => Response> = [
-      () => jsonResponse({ body: { job: { ...base, state: "running" } }, status: 202 }),
+      () =>
+        jsonResponse({
+          body: { job: { ...base, state: "running" } },
+          status: 202,
+        }),
       () => {
         throw new TypeError("Load failed");
       },
@@ -268,7 +272,8 @@ describe("@bb/sdk", () => {
         fetch: async (input, init) => {
           urls.push(`${init?.method ?? "GET"} ${String(input)}`);
           const reply = replies.shift();
-          if (reply === undefined) throw new Error("No queued SDK test response");
+          if (reply === undefined)
+            throw new Error("No queued SDK test response");
           return reply();
         },
         runtime: "node",
@@ -368,32 +373,6 @@ describe("@bb/sdk", () => {
       sdk.threads.list({ signal: controller.signal }),
     ).resolves.toEqual([]);
     expect(receivedSignal).toBe(controller.signal);
-  });
-
-  it("sends telemetry as a keepalive request only when asked", async () => {
-    const keepalives: Array<boolean | undefined> = [];
-    const fetch: FetchImplementation = async (_input, init) => {
-      keepalives.push(init?.keepalive);
-      return jsonResponse({ body: { ok: true } });
-    };
-    const sdk = createBbSdk({
-      transport: createHttpTransport({
-        baseUrl: "http://bb.test",
-        fetch,
-        runtime: "node",
-      }),
-    });
-    const event = {
-      name: "onboarding_left",
-      properties: { step: "projects", entry: "first_run" },
-    } as const;
-
-    await sdk.system.experimental_recordTelemetryEvent(event);
-    await sdk.system.experimental_recordTelemetryEvent(event, {
-      keepalive: true,
-    });
-
-    expect(keepalives).toEqual([undefined, true]);
   });
 
   it("forwards thread read action abort signals to fetch", async () => {

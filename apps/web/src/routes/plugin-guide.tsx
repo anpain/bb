@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback } from "react";
 
 import blogCss from "../blog/blog.css?url";
-import { useInitAnalytics } from "../landing/analytics";
 import { pageMeta, siteHeadLinks } from "../landing/page-head";
 import { SiteFooter, SiteNav } from "../landing/site-chrome";
 import { LazyPluginGuide } from "../plugin-guide/lazy-plugin-guide";
@@ -32,7 +31,6 @@ export const Route = createFileRoute("/plugin-guide")({
 });
 
 function PluginGuideRoute() {
-  useInitAnalytics();
   const { slide } = Route.useSearch();
   const navigate = Route.useNavigate();
   const onSlideChange = useCallback(

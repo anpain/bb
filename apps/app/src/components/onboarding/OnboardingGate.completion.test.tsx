@@ -25,7 +25,6 @@ import { createAppQueryClient } from "@/lib/query-client";
 import { sdk } from "@/lib/sdk";
 import { makeSystemConfig } from "@/test/fixtures/system-config";
 import { OnboardingGate } from "./OnboardingGate";
-import { recordTelemetryEvent } from "./onboarding-telemetry";
 
 const guide = vi.hoisted(
   (): { mounts: number; variant: "control" | "new" } => ({
@@ -51,7 +50,6 @@ vi.mock("@/hooks/queries/setup-guide-requests", () => ({
     Promise.resolve({ variant: guide.variant }),
   ),
 }));
-vi.mock("./onboarding-telemetry", () => ({ recordTelemetryEvent: vi.fn() }));
 vi.mock("@/hooks/useRealtimeSubscription", () => ({
   useHostListRealtimeSubscription: () => undefined,
   useSystemRealtimeSubscription: () => undefined,
@@ -273,28 +271,6 @@ describe.each(["control", "new"] as const)(
       expect(server.completedAt).not.toBeNull();
       expect(guideButton()).toBeNull();
       expect(screen.getByText("Replay setup guide")).toBeTruthy();
-    });
-
-    it("records a failed completion save from the last step", async () => {
-      const queryClient = createTestQueryClient();
-      renderGate(queryClient);
-      await screen.findByText("Start using bb");
-      server.failSaves = true;
-
-      await closeGuide();
-      expect(recordTelemetryEvent).not.toHaveBeenCalled();
-      await settle(server.saveReplies);
-
-      expect(recordTelemetryEvent).toHaveBeenCalledExactlyOnceWith({
-        name: "onboarding_operation",
-        properties: {
-          entry: "first_run",
-          step: "devices",
-          operation: "finish",
-          outcome: "failed",
-          failure_reason: "other",
-        },
-      });
     });
   },
 );

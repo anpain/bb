@@ -26,7 +26,7 @@ export function createDesktopReleaseInfo(
     channel,
     iconFileName: nightly ? "icon-nightly.png" : "icon.png",
     releaseTag,
-    updateReleaseBaseUrl: `https://github.com/yarxhe/bb/releases/download/${releaseTag}/`,
+    updateReleaseBaseUrl: `https://github.com/anpain/bb/releases/download/${releaseTag}/`,
   };
 }
 

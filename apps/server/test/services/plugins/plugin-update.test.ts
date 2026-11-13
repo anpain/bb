@@ -53,7 +53,6 @@ import {
   type PluginService,
 } from "../../../src/services/plugins/plugin-service.js";
 import { testLogger } from "../../helpers/test-app.js";
-import { createNoopTelemetryService } from "../../../src/services/system/telemetry.js";
 import {
   SERVER_MOVE_FROZEN_RETRY_MS,
   setServerMoveFrozen,
@@ -156,7 +155,6 @@ async function createPluginUpdateFixture(
   let materializationCount = 0;
   const service = createPluginService({
     aiServices: createAiServiceRegistry(),
-    telemetry: createNoopTelemetryService(),
     db,
     hub: {
       getDaemonSessionIdForHost: () => null,
@@ -254,7 +252,6 @@ describe("plugin update scheduling", () => {
     const scheduled: number[] = [];
     const emptyService = createPluginService({
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db: emptyDb,
       hub: {
         getDaemonSessionIdForHost: () => null,
@@ -289,7 +286,6 @@ describe("plugin update scheduling", () => {
     const notifySystem = vi.fn();
     const frozenService = createPluginService({
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db: frozenDb,
       hub: {
         getDaemonSessionIdForHost: () => null,
@@ -409,7 +405,6 @@ describe("plugin update scheduling", () => {
       scheduled = [];
       service = createPluginService({
         aiServices: createAiServiceRegistry(),
-        telemetry: createNoopTelemetryService(),
         db: schedulingDb,
         hub: {
           getDaemonSessionIdForHost: () => null,
@@ -851,7 +846,6 @@ describe("plugin update service and routes", () => {
     service = createPluginService({
       bundledPlugins: [],
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db,
       hub: {
         getDaemonSessionIdForHost: () => null,
@@ -957,7 +951,6 @@ describe("plugin update service and routes", () => {
     service = createPluginService({
       bundledPlugins: [],
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db,
       hub: {
         getDaemonSessionIdForHost: () => null,
@@ -998,7 +991,6 @@ describe("plugin update service and routes", () => {
     service = createPluginService({
       bundledPlugins: [],
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db,
       hub: {
         getDaemonSessionIdForHost: () => null,
@@ -1110,7 +1102,6 @@ describe("plugin update service and routes", () => {
       createPluginService({
         bundledPlugins: [],
         aiServices: createAiServiceRegistry(),
-        telemetry: createNoopTelemetryService(),
         db,
         hub: {
           getDaemonSessionIdForHost: () => null,

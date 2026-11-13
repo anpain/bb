@@ -7,7 +7,6 @@ import type { ReactNode } from "react";
 
 import changelogMd from "../../../../CHANGELOG.md?raw";
 import { RELEASE_META } from "../../../../changelog-metadata";
-import { useInitAnalytics } from "../landing/analytics";
 import {
   parseChangelog,
   type ChangelogBlock,
@@ -36,7 +35,6 @@ export const Route = createFileRoute("/changelog")({
 });
 
 function ChangelogRoute() {
-  useInitAnalytics();
   return <ChangelogPage />;
 }
 

@@ -38,8 +38,6 @@ describe("marketing download", () => {
     const response = await handleDownload(
       "macos",
       new Request("https://getbb.app/download/macos?placement=hero"),
-      {},
-      vi.fn(),
     );
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -68,8 +66,6 @@ describe("marketing download", () => {
     const response = await handleDownload(
       "linux",
       new Request("https://getbb.app/download/linux?placement=hero"),
-      {},
-      vi.fn(),
     );
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -82,7 +78,7 @@ describe("marketing download", () => {
     );
   });
 
-  it("resumes a partial download without counting it again", async () => {
+  it("resumes a partial download", async () => {
     const fetchMock = stubReleaseFetch(
       ["bb-0.0.26-arm64.dmg"],
       () =>
@@ -91,15 +87,12 @@ describe("marketing download", () => {
           status: 206,
         }),
     );
-    const waitUntil = vi.fn<(promise: Promise<void>) => void>();
 
     const response = await handleDownload(
       "macos",
       new Request("https://getbb.app/download/macos", {
         headers: { range: "bytes=100-" },
       }),
-      { LANDING_POSTHOG_KEY: "phc_test" },
-      waitUntil,
     );
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -108,7 +101,6 @@ describe("marketing download", () => {
     );
     expect(response.status).toBe(206);
     expect(response.headers.get("Content-Range")).toBe("bytes 100-103/104");
-    expect(waitUntil).not.toHaveBeenCalled();
   });
 
   it("restarts a resume whose If-Range no longer matches the installer", async () => {
@@ -127,8 +119,6 @@ describe("marketing download", () => {
       new Request("https://getbb.app/download/macos", {
         headers: { range: "bytes=100-", "if-range": '"old"' },
       }),
-      {},
-      vi.fn(),
     );
 
     expect(response.status).toBe(200);
@@ -151,8 +141,6 @@ describe("marketing download", () => {
       new Request("https://getbb.app/download/macos", {
         headers: { range: "bytes=100-", "if-range": '"same"' },
       }),
-      {},
-      vi.fn(),
     );
 
     expect(response.status).toBe(206);
@@ -168,8 +156,6 @@ describe("marketing download", () => {
     const response = await handleDownload(
       "macos",
       new Request("https://getbb.app/download/macos"),
-      {},
-      vi.fn(),
     );
 
     expect(response.status).toBe(302);
@@ -185,8 +171,6 @@ describe("marketing download", () => {
     const response = await handleDownload(
       "windows",
       new Request("https://getbb.app/download/windows?placement=hero"),
-      {},
-      vi.fn(),
     );
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -205,8 +189,6 @@ describe("marketing download", () => {
     const response = await handleDownload(
       "linux",
       new Request("https://getbb.app/download/linux"),
-      {},
-      vi.fn(),
     );
 
     expect(response.headers.get("Location")).toBe(DOWNLOAD_FALLBACK_URL);
@@ -218,181 +200,10 @@ describe("marketing download", () => {
     const response = await handleDownload(
       "macos",
       new Request("https://getbb.app/download/macos"),
-      {},
-      vi.fn(),
     );
 
     expect(response.status).toBe(302);
     expect(response.headers.get("Location")).toBe(DOWNLOAD_FALLBACK_URL);
-  });
-
-  it.each([undefined, "1"])(
-    "tracks downloads while respecting Sec-GPC %s",
-    async (gpc) => {
-      const fetchMock = vi.fn(
-        async (..._args: Parameters<typeof fetch>) => new Response("{}"),
-      );
-      vi.stubGlobal("fetch", fetchMock);
-      const waitUntil = vi.fn<(promise: Promise<void>) => void>();
-
-      await handleDownload(
-        "linux",
-        new Request(
-          "https://getbb.app/download/linux?placement=nav&utm_campaign=x&gclid=abc&gbraid=gb&wbraid=wb",
-          {
-            headers: {
-              referer:
-                "https://getbb.app/?utm_source=google&gclid=ref&gbraid=ref-gb&wbraid=ref-wb",
-              ...(gpc ? { "Sec-GPC": gpc } : {}),
-            },
-          },
-        ),
-        { LANDING_POSTHOG_KEY: "phc_test" },
-        waitUntil,
-      );
-
-      expect(waitUntil).toHaveBeenCalledTimes(1);
-      await waitUntil.mock.calls[0]?.[0];
-      const captureCall = fetchMock.mock.calls.find(
-        ([url]) => typeof url === "string" && url.includes("posthog"),
-      );
-      expect(captureCall).toBeTruthy();
-      const body = JSON.parse(String(captureCall?.[1]?.body)) as {
-        event: string;
-        properties: {
-          download_target: string;
-          placement: string;
-          utm_campaign?: string;
-          gclid?: string;
-          gbraid?: string;
-          wbraid?: string;
-          utm_source?: string;
-          $current_url: string;
-          $referrer?: string;
-        };
-      };
-      expect(body.event).toBe("landing_download_linux_clicked");
-      expect(body.properties.download_target).toBe("linux");
-      expect(body.properties.placement).toBe("nav");
-      expect(body.properties.utm_campaign).toBe("x");
-      expect(body.properties.utm_source).toBe("google");
-      for (const [name, value, referrerValue] of [
-        ["gclid", "abc", "ref"],
-        ["gbraid", "gb", "ref-gb"],
-        ["wbraid", "wb", "ref-wb"],
-      ] as const) {
-        expect(body.properties[name]).toBe(gpc === "1" ? undefined : value);
-        expect(
-          new URL(body.properties.$current_url).searchParams.get(name),
-        ).toBe(gpc === "1" ? null : value);
-        expect(
-          new URL(body.properties.$referrer ?? "").searchParams.get(name),
-        ).toBe(gpc === "1" ? null : referrerValue);
-      }
-    },
-  );
-});
-
-describe("download visit attribution", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
-  });
-
-  const VISITOR_ID = "019a0000-0000-7000-8000-000000000001";
-  const SESSION_ID = "019a0000-0000-7000-8000-000000000002";
-
-  type CapturedEvent = {
-    distinct_id: string;
-    properties: Record<string, string | undefined>;
-  };
-
-  async function captureDownload(
-    query: string,
-    headers: Record<string, string> = {},
-  ): Promise<CapturedEvent> {
-    const fetchMock = vi.fn(
-      async (..._args: Parameters<typeof fetch>) => new Response("{}"),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-    vi.spyOn(crypto, "randomUUID").mockReturnValue(
-      "00000000-0000-4000-8000-00000000ffff",
-    );
-    const waitUntil = vi.fn<(promise: Promise<void>) => void>();
-    await handleDownload(
-      "macos",
-      new Request(`https://getbb.app/download/macos?${query}`, { headers }),
-      { LANDING_POSTHOG_KEY: "phc_test" },
-      waitUntil,
-    );
-    await waitUntil.mock.calls[0]?.[0];
-    const captureCall = fetchMock.mock.calls.find(([url]) =>
-      String(url).includes("posthog"),
-    );
-    return JSON.parse(String(captureCall?.[1]?.body)) as CapturedEvent;
-  }
-
-  it("joins the download to the visitor, session and first touch", async () => {
-    const event = await captureDownload(
-      new URLSearchParams({
-        placement: "hero",
-        visitor_id: VISITOR_ID,
-        session_id: SESSION_ID,
-        first_page: "/compare/cursor-alternative",
-        first_referrer: "https://www.google.com/search?q=bb",
-      }).toString(),
-      { referer: "https://getbb.app/compare/cursor-alternative" },
-    );
-
-    expect(event.distinct_id).toBe(VISITOR_ID);
-    expect(event.properties).toEqual({
-      $current_url: "https://getbb.app/download/macos?placement=hero",
-      $referrer: "https://getbb.app/compare/cursor-alternative",
-      $session_id: SESSION_ID,
-      download_target: "macos",
-      first_page: "/compare/cursor-alternative",
-      first_referrer: "https://www.google.com",
-      placement: "hero",
-      tracking_source: "landing_worker_redirect",
-    });
-  });
-
-  it("falls back to a random id when the visit is absent", async () => {
-    const event = await captureDownload("placement=nav");
-
-    expect(event.distinct_id).toBe("00000000-0000-4000-8000-00000000ffff");
-    expect(event.properties.$session_id).toBeUndefined();
-    expect(event.properties.first_page).toBeUndefined();
-    expect(event.properties.first_referrer).toBeUndefined();
-  });
-
-  it("keeps the /download page placement", async () => {
-    const event = await captureDownload("placement=download_page");
-
-    expect(event.properties.placement).toBe("download_page");
-  });
-
-  it.each([
-    ["visitor_id", `${VISITOR_ID}x`],
-    ["visitor_id", "user@example.com"],
-    ["session_id", "<script>"],
-    ["first_page", "//evil.example/path"],
-    ["first_page", "https://evil.example/"],
-    ["first_page", "/a?b=c"],
-    ["first_referrer", "javascript:alert(1)"],
-    ["first_referrer", "not a url"],
-  ])("drops an invalid %s of %s", async (name, value) => {
-    const event = await captureDownload(
-      new URLSearchParams({ [name]: value }).toString(),
-    );
-
-    expect(event.distinct_id).toBe("00000000-0000-4000-8000-00000000ffff");
-    expect(event.properties.$session_id).toBeUndefined();
-    expect(event.properties.first_page).toBeUndefined();
-    expect(event.properties.first_referrer).toBeUndefined();
-    expect(event.properties.$current_url).toBe(
-      "https://getbb.app/download/macos",
-    );
   });
 });
 

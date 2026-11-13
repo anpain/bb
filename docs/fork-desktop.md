@@ -1,6 +1,6 @@
 # Fork desktop builds
 
-This fork publishes desktop artifacts at <https://github.com/yarxhe/bb/releases/tag/desktop-latest>.
+This fork publishes desktop artifacts at <https://github.com/anpain/bb/releases/tag/desktop-latest>.
 
 The **Build fork Windows** GitHub Actions workflow builds the x64 NSIS installer on `windows-2025`, starts the packaged application to verify its renderer and preload, then uploads the installer and Windows update metadata. It can be run manually on the desired branch. Publication does not run if packaging or startup verification fails.
 

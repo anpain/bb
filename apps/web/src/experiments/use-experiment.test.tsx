@@ -1,38 +1,18 @@
 // @vitest-environment jsdom
 
 import { act } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ExperimentBootstrap } from "./flags";
 
-const posthog = vi.hoisted(() => ({
-  init: vi.fn(),
-  register: vi.fn(),
-  capture: vi.fn(),
-  getFeatureFlag: vi.fn(),
-  get_distinct_id: vi.fn(() => "client-id"),
-  get_session_id: vi.fn(() => "client-session"),
-}));
-
-vi.mock("posthog-js", () => ({ default: posthog }));
-
-const SERVER_ID = "0199f0a1-2b3c-7d4e-8f90-a1b2c3d4e5f6";
-
-function exposures() {
-  return posthog.capture.mock.calls
-    .filter(([event]) => event === "$feature_flag_called")
-    .map(([, properties]) => properties);
-}
-
 async function loadModules() {
-  const [router, client, server, experiments, analytics] = await Promise.all([
+  const [router, client, server, experiments] = await Promise.all([
     import("@tanstack/react-router"),
     import("react-dom/client"),
     import("react-dom/server"),
     import("./use-experiment"),
-    import("../landing/analytics"),
   ]);
-  return { router, client, server, experiments, analytics };
+  return { router, client, server, experiments };
 }
 
 type Modules = Awaited<ReturnType<typeof loadModules>>;
@@ -41,11 +21,9 @@ function createProbeRouter(
   modules: Modules,
   serverExperiments: ExperimentBootstrap | null,
 ) {
-  const { router, experiments, analytics } = modules;
+  const { router, experiments } = modules;
   function Probe() {
     const variant = experiments.useExperiment("homepage-qa-check");
-    experiments.useExperimentExposure("homepage-qa-check", "desktop");
-    analytics.useInitAnalytics();
     return (
       <main data-qa-check={variant === "test" ? variant : undefined}>
         {variant}
@@ -111,192 +89,24 @@ function bootstrap(
   featureFlags: Record<string, string>,
   preview = false,
 ): ExperimentBootstrap {
-  return { distinctID: SERVER_ID, featureFlags, preview };
-}
-
-function matchTouch(touch: boolean) {
-  vi.stubGlobal(
-    "matchMedia",
-    vi.fn(() => ({ matches: touch })),
-  );
+  return { distinctID: null, featureFlags, preview };
 }
 
 describe("server-rendered experiments", () => {
-  beforeEach(() => {
-    vi.resetModules();
-    vi.stubEnv("VITE_POSTHOG_KEY", "phc_test");
-    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-    matchTouch(false);
-  });
-
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
-    for (const mock of Object.values(posthog)) {
-      mock.mockClear();
-    }
-    history.replaceState(null, "", "/");
     document.body.replaceChildren();
   });
 
-  it("hydrates the server arm and exposes it once after bb_internal", async () => {
-    history.replaceState(null, "", "/?bb_internal=1");
+  it("hydrates the selected variant", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const modules = await loadModules();
-    const experiments = bootstrap({ "homepage-qa-check": "test" });
+    const experiments = bootstrap({ "homepage-qa-check": "test" }, true);
     const html = await serverRender(modules, experiments);
     expect(html).toContain('<main data-qa-check="test">test</main>');
     const { container, errors } = await hydratePage(modules, experiments, html);
     expect(errors).toEqual([]);
     expect(container.innerHTML).toBe(html);
-    await vi.waitFor(() => expect(exposures()).toHaveLength(1));
-    expect(posthog.init).toHaveBeenCalledWith(
-      "phc_test",
-      expect.objectContaining({
-        bootstrap: {
-          distinctID: SERVER_ID,
-          isIdentifiedID: false,
-          featureFlags: { "homepage-qa-check": "test" },
-        },
-      }),
-    );
-    expect(posthog.register).toHaveBeenCalledWith({ internal_user: true });
-    expect(posthog.register.mock.invocationCallOrder[0]).toBeLessThan(
-      posthog.capture.mock.invocationCallOrder[0] ?? 0,
-    );
-    expect(exposures()).toEqual([
-      { $feature_flag: "homepage-qa-check", $feature_flag_response: "test" },
-    ]);
-  });
-
-  it("renders control and exposes it", async () => {
-    const modules = await loadModules();
-    const experiments = bootstrap({ "homepage-qa-check": "control" });
-    const html = await serverRender(modules, experiments);
-    expect(html).toContain("<main>control</main>");
-    const { errors } = await hydratePage(modules, experiments, html);
-    expect(errors).toEqual([]);
-    await vi.waitFor(() =>
-      expect(exposures()).toEqual([
-        {
-          $feature_flag: "homepage-qa-check",
-          $feature_flag_response: "control",
-        },
-      ]),
-    );
-  });
-
-  it("exposes the rendered arm even when posthog-js later holds another value", async () => {
-    posthog.getFeatureFlag.mockReturnValue("control");
-    const modules = await loadModules();
-    const experiments = bootstrap({ "homepage-qa-check": "test" });
-    const html = await serverRender(modules, experiments);
-    expect(html).toContain('data-qa-check="test"');
-    await hydratePage(modules, experiments, html);
-    await vi.waitFor(() => expect(exposures()).toHaveLength(1));
-    expect(exposures()).toEqual([
-      { $feature_flag: "homepage-qa-check", $feature_flag_response: "test" },
-    ]);
-    expect(posthog.getFeatureFlag).not.toHaveBeenCalled();
-    posthog.getFeatureFlag.mockReset();
-  });
-
-  it("renders an unknown variant as control and exposes nothing", async () => {
-    const modules = await loadModules();
-    const experiments = bootstrap({ "homepage-qa-check": "holdout-7" });
-    const html = await serverRender(modules, experiments);
-    expect(html).toContain("<main>control</main>");
-    await hydratePage(modules, experiments, html);
-    await vi.waitFor(() => expect(posthog.init).toHaveBeenCalled());
-    expect(exposures()).toEqual([]);
-  });
-
-  it("renders control and exposes nothing without an active flag", async () => {
-    const modules = await loadModules();
-    const experiments = bootstrap({});
-    const html = await serverRender(modules, experiments);
-    expect(html).toContain("<main>control</main>");
-    await hydratePage(modules, experiments, html);
-    await vi.waitFor(() => expect(posthog.init).toHaveBeenCalled());
-    expect(exposures()).toEqual([]);
-  });
-
-  it("renders a forced preview without exposure or bootstrapped flags", async () => {
-    const modules = await loadModules();
-    const experiments = bootstrap({ "homepage-qa-check": "test" }, true);
-    const html = await serverRender(modules, experiments);
-    expect(html).toContain('data-qa-check="test"');
-    const { errors } = await hydratePage(modules, experiments, html);
-    expect(errors).toEqual([]);
-    await vi.waitFor(() => expect(posthog.init).toHaveBeenCalled());
-    expect(posthog.init.mock.calls[0]?.[1].bootstrap.featureFlags).toEqual({});
-    expect(exposures()).toEqual([]);
-  });
-
-  it("renders control without a server bootstrap", async () => {
-    const modules = await loadModules();
-    const html = await serverRender(modules, bootstrap({}));
-    const { container } = await hydratePage(modules, null, html);
-    expect(container.textContent).toBe("control");
-    await vi.waitFor(() => expect(posthog.init).toHaveBeenCalled());
-    expect(posthog.init.mock.calls[0]?.[1]).not.toHaveProperty("bootstrap");
-    expect(exposures()).toEqual([]);
-  });
-
-  it.each([
-    ["desktop", false, 1],
-    ["desktop", true, 0],
-    ["touch", true, 1],
-    ["touch", false, 0],
-    ["all", true, 1],
-  ] as const)(
-    "counts a %s-only exposure on touch=%s %i times",
-    async (devices, touch, calls) => {
-      matchTouch(touch);
-      const { analytics } = await loadModules();
-      analytics.exposeExperiment("homepage-qa-check", "test", devices);
-      analytics.exposeExperiment("homepage-qa-check", "test", devices);
-      analytics.initAnalytics(bootstrap({ "homepage-qa-check": "test" }));
-      await vi.waitFor(() => expect(posthog.init).toHaveBeenCalled());
-      expect(exposures()).toHaveLength(calls);
-    },
-  );
-});
-
-describe("early download clicks", () => {
-  beforeEach(() => {
-    vi.resetModules();
-    vi.stubEnv("VITE_POSTHOG_KEY", "phc_test");
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    for (const mock of Object.values(posthog)) {
-      mock.mockClear();
-    }
-    sessionStorage.clear();
-    document.body.replaceChildren();
-  });
-
-  it("carry the server-rendered ID until posthog-js loads", async () => {
-    const { analytics } = await loadModules();
-    const { carryUtmToDownloadLinks } = await import("../landing/download-utm");
-    expect(analytics.readVisitIds()).toBeNull();
-    analytics.initAnalytics(bootstrap({}));
-    const stop = carryUtmToDownloadLinks(analytics.readVisitIds);
-    const link = document.createElement("a");
-    link.href = "/download/macos?placement=hero";
-    link.addEventListener("click", (event) => event.preventDefault());
-    document.body.appendChild(link);
-    link.click();
-    expect(new URL(link.href).searchParams.get("visitor_id")).toBe(SERVER_ID);
-    expect(new URL(link.href).searchParams.has("session_id")).toBe(false);
-    await vi.waitFor(() => expect(posthog.init).toHaveBeenCalled());
-    link.click();
-    expect(new URL(link.href).searchParams.get("visitor_id")).toBe("client-id");
-    expect(new URL(link.href).searchParams.get("session_id")).toBe(
-      "client-session",
-    );
-    stop();
   });
 });

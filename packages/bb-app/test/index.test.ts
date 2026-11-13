@@ -165,10 +165,8 @@ const startupOnlyManagedEnvCases: StartupOnlyManagedEnvCase[] = [
   { key: "BB_INHERITED_SKILLS_ROOTS", value: "/tmp/bb-skills" },
   { key: "BB_LOG_LEVEL", value: "debug" },
   { key: "BB_MANAGED_DEV_BUILTIN_PLUGIN_HOT_RELOAD", value: "1" },
-  { key: "BB_POSTHOG_API_KEY", value: "test-posthog-key" },
   { key: "BB_SERVER_BIND_HOST", value: "127.0.0.1" },
   { key: "BB_SERVER_PORT", value: "48886" },
-  { key: "BB_TELEMETRY", value: "false" },
 ];
 
 const packageMetadataSchema = z.object({
@@ -1679,7 +1677,7 @@ describe("bb-app launcher", () => {
 
       expect(output).toContain("Reloaded running bb server config.");
       expect(output).toContain(
-        "Startup-only settings currently configured (BB_FF_PLACEHOLDER, BB_LOG_LEVEL, BB_SERVER_BIND_HOST, BB_SERVER_PORT, BB_TELEMETRY) apply on the next full bb-app restart.",
+        "Startup-only settings currently configured (BB_FF_PLACEHOLDER, BB_LOG_LEVEL, BB_SERVER_BIND_HOST, BB_SERVER_PORT) apply on the next full bb-app restart.",
       );
     } finally {
       await server.close();

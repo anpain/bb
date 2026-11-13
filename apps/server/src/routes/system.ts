@@ -1,5 +1,3 @@
-import { withReportedProviderId } from "../services/system/provider-telemetry.js";
-import { rememberPluginRecommendation } from "../services/plugins/plugin-use-telemetry.js";
 import { createMobileAppReleaseService } from "../services/install/mobile-app-releases.js";
 import {
   setMachineEnvironmentVariable,
@@ -341,7 +339,6 @@ export function registerSystemRoutes(
           : diagnosticValue,
     });
     setAppSettings(deps.db, updatedSettings);
-    deps.telemetry.setEnabled(false);
     deps.hub.notifySystem(["config-changed"]);
     return context.json(compatibleGeneralSettings());
   });
@@ -349,27 +346,6 @@ export function registerSystemRoutes(
   get(routes.setupGuide, async (context) => {
     const { guide } = await deps.setupGuideExperiment.resolve();
     return context.json({ variant: guide.variant });
-  });
-
-  post(routes.recordTelemetryEvent, async (context, payload) => {
-    if (
-      payload.name === "recommendation" &&
-      payload.properties.action === "selected"
-    ) {
-      rememberPluginRecommendation(
-        deps,
-        payload.properties.resource_id,
-        payload.properties.recommendation_id,
-      );
-    }
-    if (payload.name === "onboarding_exposed") {
-      await deps.setupGuideExperiment.recordExposure(payload.properties.entry);
-      return context.json({ ok: true });
-    }
-    deps.telemetry.capture(
-      await deps.setupGuideExperiment.annotate(withReportedProviderId(payload)),
-    );
-    return context.json({ ok: true });
   });
 
   put(routes.keyboardSettings, (context, payload) => {

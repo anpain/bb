@@ -3,21 +3,12 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 
 import { copyPlainText } from "../lib/copy-plain-text";
-import { trackLandingEvent } from "./analytics";
 import type { CtaPlacement } from "./site";
 import { SITE_TITLE } from "./site";
 
-export function SendToComputerButton({
-  placement,
-}: {
-  placement: CtaPlacement;
-}) {
+export function SendToComputerButton(_props: { placement: CtaPlacement }) {
   const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
   const send = async () => {
-    trackLandingEvent({
-      name: "landing_send_to_computer_clicked",
-      properties: { placement },
-    });
     const url = window.location.href;
     if (typeof navigator.share === "function") {
       try {

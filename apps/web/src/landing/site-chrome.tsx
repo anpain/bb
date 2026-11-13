@@ -11,10 +11,7 @@ import {
   type ReactNode,
 } from "react";
 
-import {
-  useExperiment,
-  useExperimentExposure,
-} from "../experiments/use-experiment";
+import { useExperiment } from "../experiments/use-experiment";
 import { DASHBOARD_PATH } from "../lib/connect-return-to";
 import {
   compareLinks,
@@ -228,7 +225,6 @@ export function SiteNav({
 }) {
   const platform = useDesktopPlatform();
   const newHeader = useExperiment("homepage-download-path") === "test";
-  useExperimentExposure("homepage-download-path", "desktop");
   return (
     <nav className={newHeader ? "nav nav-sticky nav-centered" : "nav"}>
       <a className="logo" href="/" aria-label="bb">

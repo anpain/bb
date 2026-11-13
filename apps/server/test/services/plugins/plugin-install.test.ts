@@ -44,7 +44,6 @@ import {
 import { createAiServiceRegistry } from "../../../src/services/ai/ai-service-registry.js";
 import { createPluginService } from "../../../src/services/plugins/plugin-service.js";
 import { testLogger } from "../../helpers/test-app.js";
-import { createNoopTelemetryService } from "../../../src/services/system/telemetry.js";
 
 const logger = testLogger as unknown as Logger;
 const run = promisify(execFile);
@@ -422,7 +421,6 @@ async function createPluginInstallFixture() {
   const counters = { materializationCount: 0 };
   const service = createPluginService({
     aiServices: createAiServiceRegistry(),
-    telemetry: createNoopTelemetryService(),
     db,
     hub: {
       getDaemonSessionIdForHost: () => null,
@@ -1130,7 +1128,6 @@ describe("plugin install flows", () => {
 
       service = fixture.service = createPluginService({
         aiServices: createAiServiceRegistry(),
-        telemetry: createNoopTelemetryService(),
         db,
         hub: {
           getDaemonSessionIdForHost: () => null,
@@ -1236,7 +1233,6 @@ describe("plugin install flows", () => {
       await writeFile(join(`${entry.rootDir}.promoting`, "partial"), "copy");
       service = fixture.service = createPluginService({
         aiServices: createAiServiceRegistry(),
-        telemetry: createNoopTelemetryService(),
         db,
         hub: {
           getDaemonSessionIdForHost: () => null,

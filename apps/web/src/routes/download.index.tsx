@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { useInitAnalytics } from "../landing/analytics";
 import { DOWNLOAD_PAGE_TITLE, DownloadPage } from "../landing/download-page";
 import { pageMeta, siteHeadLinks } from "../landing/page-head";
 import { DOWNLOAD_PAGE_PATH } from "../landing/site";
@@ -17,6 +16,5 @@ export const Route = createFileRoute("/download/")({
 });
 
 function DownloadRoute() {
-  useInitAnalytics();
   return <DownloadPage />;
 }

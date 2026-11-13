@@ -24,7 +24,6 @@ import {
 import { groupHostDaemonEvents } from "@bb/host-daemon-contract";
 import { createDeferredPromise } from "@bb/test-helpers";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { TelemetryService } from "../../src/services/system/telemetry.js";
 import * as queuedDispatch from "../../src/services/threads/queued-message-dispatch.js";
 import * as threadEvents from "../../src/services/threads/thread-events.js";
 import * as threadCommands from "../../src/services/threads/thread-commands.js";
@@ -135,12 +134,6 @@ function seedColdIdleThreadFixture(
   });
 
   return { environment, sessionId: session.id, thread };
-}
-
-function installTelemetryCaptureSpy(harness: TestAppHarness) {
-  const capture = vi.fn<TelemetryService["capture"]>();
-  harness.deps.telemetry = { ...harness.deps.telemetry, capture };
-  return capture;
 }
 
 function parseThreadMessages(
@@ -281,118 +274,6 @@ describe("queued message auto-send notification", () => {
           runtime: { displayStatus: "active" },
         });
       }
-    });
-  });
-});
-
-describe("user message telemetry", () => {
-  it("captures direct user sends", async () => {
-    await withTestHarness(async (harness) => {
-      const capture = installTelemetryCaptureSpy(harness);
-      const { environment, thread } = seedColdIdleThreadFixture({
-        harness,
-        value: 5,
-      });
-
-      await sendThreadMessage(harness.deps, {
-        originPluginId: null,
-        environment,
-        payload: {
-          input: textInput("telemetry user send"),
-          mode: "start",
-          model: "gpt-5",
-          permissionMode: "full",
-          reasoningLevel: "medium",
-          serviceTier: "default",
-        },
-        thread,
-        trigger: "user",
-      });
-
-      expect(
-        threadEvents.getLastExecutionOptions(harness.deps, thread.id),
-      ).toMatchObject({ model: "gpt-5", reasoningLevel: "medium" });
-      expect(capture).toHaveBeenCalledWith({
-        name: "user_message_sent",
-        properties: {
-          initiator: "user",
-          is_child_thread: false,
-          message_source: "thread_send",
-          provider: "codex",
-        },
-      });
-    });
-  });
-
-  it("labels a send from the automations plugin as automation when initiator telemetry is on", async () => {
-    await withTestHarness(async (harness) => {
-      const capture = installTelemetryCaptureSpy(harness);
-      harness.deps.config.featureFlags = {
-        ...harness.deps.config.featureFlags,
-        initiatorTelemetry: true,
-      };
-      const { environment, thread } = seedColdIdleThreadFixture({
-        harness,
-        value: 7,
-      });
-
-      await sendThreadMessage(harness.deps, {
-        originPluginId: null,
-        environment,
-        payload: {
-          input: textInput("automation run into an existing thread"),
-          mode: "start",
-          model: "gpt-5",
-          permissionMode: "full",
-          reasoningLevel: "medium",
-          serviceTier: "default",
-          originPluginId: "automations",
-        },
-        thread,
-        trigger: "user",
-      });
-
-      expect(capture).toHaveBeenCalledWith({
-        name: "user_message_sent",
-        properties: {
-          is_child_thread: false,
-          message_source: "thread_send",
-          provider: "codex",
-          initiator: "automation",
-        },
-      });
-    });
-  });
-
-  it("does not capture agent-originated sends", async () => {
-    await withTestHarness(async (harness) => {
-      const capture = installTelemetryCaptureSpy(harness);
-      const { environment, thread } = seedColdIdleThreadFixture({
-        harness,
-        value: 6,
-      });
-      const senderThread = seedThread(harness.deps, {
-        environmentId: environment.id,
-        projectId: thread.projectId,
-      });
-
-      await sendThreadMessage(harness.deps, {
-        originPluginId: null,
-        environment,
-        payload: {
-          input: textInput("telemetry agent send"),
-          mode: "start",
-          model: "gpt-5",
-          permissionMode: "full",
-          reasoningLevel: "medium",
-          senderThreadId: senderThread.id,
-          serviceTier: "default",
-        },
-        thread,
-        trigger: "user",
-      });
-
-      expect(capture).not.toHaveBeenCalled();
     });
   });
 });

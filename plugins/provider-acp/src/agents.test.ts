@@ -318,6 +318,7 @@ describe("acpProviderDeclaration", () => {
       acpLaunchSpec: {
         command: "kimi",
         args: ["acp"],
+        env: { KIMI_DISABLE_TELEMETRY: "1", DO_NOT_TRACK: "1" },
       },
     });
     expect(byId.get("acp-cursor")?.experimental_bridgeOptions).toMatchObject({

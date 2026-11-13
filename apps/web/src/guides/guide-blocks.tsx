@@ -20,7 +20,6 @@ import {
 
 import { LightboxImage } from "../blog/lightbox";
 import { brandProse } from "../compare/compare-page";
-import { trackLandingEvent } from "../landing/analytics";
 import type { GuideShot } from "./guide-types";
 import { copyPlainText } from "../lib/copy-plain-text";
 
@@ -145,10 +144,6 @@ export function CopyPromptButton() {
       className="gd-inline-copy"
       onClick={() => {
         void copy();
-        trackLandingEvent({
-          name: "guide_prompt_copied",
-          properties: { guide, placement: "step" },
-        });
       }}
     >
       <HugeiconsIcon

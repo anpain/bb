@@ -4,7 +4,6 @@ import AppleIcon from "@hugeicons/core-free-icons/AppleIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { ReactNode } from "react";
 
-import { trackLandingEvent } from "./analytics";
 import { CommandButton } from "./command-button";
 import {
   DesktopDownloadButton,
@@ -57,12 +56,6 @@ function RowAction({ kind }: { kind: DownloadKind }) {
           command={CLI_COMMAND}
           label={`Copy install command: ${CLI_COMMAND}`}
           size="compact"
-          onCopy={() =>
-            trackLandingEvent({
-              name: "landing_cli_command_copied",
-              properties: { placement: PLACEMENT, command: CLI_COMMAND },
-            })
-          }
         />
       );
     case "ios":

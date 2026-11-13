@@ -39,7 +39,6 @@ import {
   type PluginRuntimeStatus,
   type PluginSourceSelection,
 } from "@bb/server-contract";
-import type { TelemetryEvent } from "../system/telemetry.js";
 import { resolveSelectedSubdirectory } from "./collection-manifest.js";
 import {
   isCommitSha,
@@ -69,46 +68,6 @@ import {
 } from "./update-resolver.js";
 
 const PRESERVED_SOURCE_DIRECTORY_NAME = "preserved-source";
-
-export function isPublicPluginProvenance(
-  kind: PluginProvenance["kind"],
-  marketplace: string | null,
-): boolean {
-  return (
-    kind === "builtin" ||
-    (kind === "catalog" &&
-      (marketplace === CURATED_PLUGIN_MARKETPLACE_NAME ||
-        marketplace === BUNDLED_MARKETPLACE_NAME))
-  );
-}
-
-export function pluginInstalledTelemetryEvent(
-  pluginId: string,
-  provenance: PluginProvenance,
-  sourceIntent: PluginSourceIntent,
-  isFreshInstall: boolean,
-): Extract<TelemetryEvent, { name: "plugin_installed" }> {
-  const isPublic = isPublicPluginProvenance(
-    provenance.kind,
-    provenance.kind === "catalog" ? provenance.marketplace : null,
-  );
-  const publicCatalogEntryId =
-    isPublic && provenance.kind === "catalog" ? provenance.entryId : null;
-  return {
-    name: "plugin_installed",
-    properties: {
-      plugin_id: isPublic ? pluginId : null,
-      provenance: provenance.kind,
-      marketplace:
-        isPublic && provenance.kind === "catalog"
-          ? provenance.marketplace
-          : null,
-      source_kind: sourceIntent.kind,
-      is_fresh_install: isFreshInstall,
-      entry_id: publicCatalogEntryId,
-    },
-  };
-}
 
 interface PluginRegistrationContext {
   deps: PluginServiceDeps;
@@ -447,14 +406,6 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
     if (isFreshInstall) await runInstallHandlers(manifest.id);
     const entry = list().find((p) => p.id === manifest.id);
     if (!entry) throw new Error(`plugin ${manifest.id} missing after install`);
-    deps.telemetry.capture(
-      pluginInstalledTelemetryEvent(
-        manifest.id,
-        args.provenance,
-        args.sourceIntent,
-        isFreshInstall,
-      ),
-    );
     return entry;
   }
 

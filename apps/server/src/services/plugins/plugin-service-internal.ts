@@ -18,7 +18,6 @@ import type {
   PluginRuntimeStatus,
 } from "@bb/server-contract";
 import type { ServerLogger } from "../../types.js";
-import type { TelemetryService } from "../system/telemetry.js";
 import type { NotificationHub } from "../../ws/hub.js";
 import type {
   BundledPluginRegistration,
@@ -111,7 +110,6 @@ export interface PluginServiceDeps {
   >;
   logger: ServerLogger;
   walCheckpointer?: Pick<WalCheckpointer, "attach" | "detach">;
-  telemetry: TelemetryService;
   pendingInteractions?: Pick<
     import("../interactions/pending-interactions.js").PendingInteractionLifecycle,
     | "requestPluginInteraction"

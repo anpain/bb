@@ -88,11 +88,7 @@ docs, start with
 
 ### Telemetry
 
-This fork permanently disables bb app and server telemetry, including anonymous
-usage events, telemetry-disabled events, and telemetry feature-flag requests.
-Saved settings and environment variables cannot re-enable telemetry. The legacy
-`BB_TELEMETRY`, `BB_POSTHOG_API_KEY`, and `telemetryEnabled` inputs are accepted
-for compatibility but have no enabling effect.
+This fork removes product telemetry from the desktop app, CLI, server, and website. Local diagnostic logs and conversation history remain available. Provider sign-in and model requests use the selected provider. The Kimi adapter launches the CLI with anonymous telemetry disabled.
 
 ## Development
 

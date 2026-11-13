@@ -129,7 +129,7 @@ export const KNOWN_ACP_AGENTS: readonly AcpAgentDefinition[] = [
       displayName: "Kimi Code",
       command: "kimi",
       args: ["acp"],
-      env: {},
+      env: { KIMI_DISABLE_TELEMETRY: "1", DO_NOT_TRACK: "1" },
     },
     nativeRootsResolver: resolveNoNativeRoots,
   },

@@ -5,7 +5,6 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 import { PostBlocks, PostHeader, PostLede } from "../blog/post-body";
 import { getPost } from "../blog/posts";
 import { stripMarkdown } from "../blog/parse-post";
-import { useInitAnalytics } from "../landing/analytics";
 import { SubscribeSection } from "../landing/cta";
 import { pageMeta, siteHeadLinks } from "../landing/page-head";
 import { SiteFooter, SiteNav } from "../landing/site-chrome";
@@ -42,7 +41,6 @@ export const Route = createFileRoute("/blog_/$slug")({
 
 function BlogPostRoute() {
   const { post } = Route.useLoaderData();
-  useInitAnalytics();
 
   return (
     <div className="wrap">

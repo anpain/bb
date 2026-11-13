@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { useInitAnalytics } from "../landing/analytics";
 import { pageMeta, siteHeadLinks } from "../landing/page-head";
 import { SiteFooter, SiteNav } from "../landing/site-chrome";
 import blogCss from "../blog/blog.css?url";
@@ -43,8 +42,6 @@ export const Route = createFileRoute("/brand")({
 });
 
 function BrandRoute() {
-  useInitAnalytics();
-
   return (
     <div className="wrap">
       <SiteNav />

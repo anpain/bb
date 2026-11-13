@@ -105,7 +105,7 @@ describe("hero window first frame", () => {
   });
 
   it.each(["control", "test"])(
-    "leaves the %s arm's exposure to the hero test, which counts it when the hero renders",
+    "keeps the %s arm unmounted while the interactive chunk loads",
     async (arm) => {
       delayChunk();
       vi.resetModules();
@@ -113,11 +113,6 @@ describe("hero window first frame", () => {
         await chunk.ready;
         return importOriginal();
       });
-      const exposeExperiment = vi.fn();
-      vi.doMock("./analytics", async (importOriginal) => ({
-        ...(await importOriginal<typeof import("./analytics")>()),
-        exposeExperiment,
-      }));
       const observed: IntersectionObserverCallback[] = [];
       vi.stubGlobal(
         "IntersectionObserver",
@@ -148,7 +143,6 @@ describe("hero window first frame", () => {
           </ExperimentsProvider>,
         );
       });
-      expect(exposeExperiment).not.toHaveBeenCalled();
       await act(async () => {
         for (const callback of observed) {
           callback(
@@ -158,7 +152,6 @@ describe("hero window first frame", () => {
         }
       });
       expect(container.querySelector(".rhb-stage")).toBeNull();
-      expect(exposeExperiment).not.toHaveBeenCalled();
       await act(async () => root.unmount());
     },
   );

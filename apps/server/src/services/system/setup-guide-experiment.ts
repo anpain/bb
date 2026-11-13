@@ -3,11 +3,9 @@ import { join } from "node:path";
 import { z } from "zod";
 import {
   setupGuideVariantSchema,
-  type RecordTelemetryEventRequest,
   type SetupGuideVariant,
 } from "@bb/server-contract";
 import type { ServerLogger } from "../../types.js";
-import type { TelemetryEvent } from "./telemetry.js";
 
 export const SETUP_GUIDE_ASSIGNMENT_FILE_NAME = "setup-guide-assignment.json";
 
@@ -24,8 +22,6 @@ export interface SetupGuideAssignments {
 
 export interface SetupGuideExperiment {
   resolve(): Promise<SetupGuideAssignments>;
-  recordExposure(entry: "first_run" | "replay"): Promise<void>;
-  annotate(event: RecordTelemetryEventRequest): Promise<TelemetryEvent>;
 }
 
 interface CreateSetupGuideExperimentArgs {
@@ -97,7 +93,5 @@ export async function createSetupGuideExperiment(
 
   return {
     resolve: async () => assignments,
-    recordExposure: async () => {},
-    annotate: async (event) => event,
   };
 }

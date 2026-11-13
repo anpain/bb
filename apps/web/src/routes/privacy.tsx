@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { useInitAnalytics } from "../landing/analytics";
 import { pageMeta, siteHeadLinks } from "../landing/page-head";
 import { SiteFooter, SiteNav } from "../landing/site-chrome";
 import blogCss from "../blog/blog.css?url";
@@ -21,8 +20,6 @@ export const Route = createFileRoute("/privacy")({
 });
 
 function PrivacyRoute() {
-  useInitAnalytics();
-
   return (
     <div className="wrap">
       <SiteNav />
@@ -191,24 +188,6 @@ function PrivacyRoute() {
           </p>
 
           <h2>3. This website</h2>
-
-          <p>
-            The marketing pages use PostHog to measure how people find bb.
-            Automatic event capture is off. The pages send page views, the
-            referrer and any campaign parameters in the URL, and a small set of
-            named events, such as a click on a download link or a copy of the
-            install command.
-          </p>
-
-          <p>
-            When you click a download link, the link carries the random visitor
-            and session IDs that PostHog gave your browser, the first page you
-            opened on this site in that tab, and the site that sent you to it.
-            We record the download under that visitor ID, so it joins the page
-            views from the same visit and we can count which pages and searches
-            lead to downloads. If your browser sends Global Privacy Control, we
-            drop Google ad click IDs from these records.
-          </p>
 
           <p>
             If you give us your email address to follow releases, we keep it to

@@ -1,6 +1,5 @@
 import type { ReactElement } from "react";
 
-import { useInitAnalytics } from "./analytics";
 import { ProviderChips, useScrollReveal } from "./landing-visuals";
 import { SiteFooter, SiteNav } from "./site-chrome";
 import {
@@ -50,7 +49,6 @@ export function landingPageHead(page: LandingPage) {
 }
 
 export function LandingTemplate({ page }: { page: LandingPage }) {
-  useInitAnalytics();
   useScrollReveal();
 
   return (

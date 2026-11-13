@@ -80,7 +80,6 @@ import {
   MOCK_WAIT_DONE_LEAD_S,
   MOCK_WORKING_AFTER_PROMPT_S,
 } from "./app-mock-parts";
-import { trackLandingEvent } from "./analytics";
 import { CommandButton } from "./command-button";
 import { DownloadLink, GitHubLink } from "./cta";
 import { useDesktopPlatform } from "./desktop-platform";
@@ -151,12 +150,6 @@ export function InstallOptions({ placement }: { placement: CtaPlacement }) {
               command={CLI_COMMAND}
               label={`Copy browser install command: ${CLI_COMMAND}`}
               size="hero"
-              onCopy={() =>
-                trackLandingEvent({
-                  name: "landing_cli_command_copied",
-                  properties: { placement, command: CLI_COMMAND },
-                })
-              }
             />
             <span className="install-note">
               {platform !== "windows" && (

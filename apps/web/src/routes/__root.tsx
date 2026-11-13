@@ -11,8 +11,6 @@ import {
   useExperiment,
   experimentsBeforeLoad,
 } from "../experiments/use-experiment";
-import { readVisitIds } from "../landing/analytics";
-import { carryUtmToDownloadLinks } from "../landing/download-utm";
 import { canonicalHref } from "../lib/canonical";
 import { THEME_INIT, watchSystemTheme } from "../lib/theme";
 
@@ -76,7 +74,6 @@ function SiteBody({ children }: { children: React.ReactNode }) {
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   useEffect(() => watchSystemTheme(), []);
-  useEffect(() => carryUtmToDownloadLinks(readVisitIds), []);
   const canonical = useRouterState({
     select: (state) => canonicalHref(state.matches),
   });

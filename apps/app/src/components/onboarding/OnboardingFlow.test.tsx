@@ -23,7 +23,6 @@ import { APP_OVERLAY_LAYER } from "@/components/ui/app-overlay-layers";
 import { hostsQueryOptions } from "@/hooks/queries/host-queries";
 import { pluginCatalogSearchQueryKey } from "@/hooks/queries/query-keys";
 import type { OnboardingStepId } from "./onboarding-model";
-import { recordTelemetryEvent } from "./onboarding-telemetry";
 import { OnboardingFlow } from "./OnboardingFlow";
 
 const sdkCalls = vi.hoisted(() => [] as string[]);
@@ -51,33 +50,12 @@ vi.mock("@/hooks/useRealtimeSubscription", async (importOriginal) => {
     Object.keys(actual).map((name) => [name, () => undefined]),
   );
 });
-vi.mock("./onboarding-telemetry", () => ({ recordTelemetryEvent: vi.fn() }));
 
 const router: { navigate: NavigateFunction | null } = { navigate: null };
 
 function NavigateProbe() {
   router.navigate = useNavigate();
   return null;
-}
-
-function finishedOutcomes(): unknown[] {
-  return vi
-    .mocked(recordTelemetryEvent)
-    .mock.calls.flatMap(([event]) =>
-      event.name === "onboarding_finished" ? [event.properties.outcome] : [],
-    );
-}
-
-function agentLoadFailures(): unknown[] {
-  return vi
-    .mocked(recordTelemetryEvent)
-    .mock.calls.flatMap(([event]) =>
-      event.name === "onboarding_operation" &&
-      event.properties.step === "agent" &&
-      event.properties.operation === "load"
-        ? [event.properties.failure_reason]
-        : [],
-    );
 }
 
 function renderFlow({
@@ -194,11 +172,9 @@ describe("OnboardingFlow", () => {
     setClosing(false);
 
     expect(onClose).toHaveBeenCalledTimes(1);
-    expect(finishedOutcomes()).toEqual(["completed"]);
     button(/Start using bb/u);
     fireEvent.click(button(/Start using bb/u));
     expect(onClose).toHaveBeenCalledTimes(2);
-    expect(finishedOutcomes()).toEqual(["completed", "completed"]);
   });
 
   it("still closes the open guide as skipped when the user navigates away", () => {
@@ -210,7 +186,6 @@ describe("OnboardingFlow", () => {
     });
 
     expect(onClose).toHaveBeenCalledTimes(1);
-    expect(finishedOutcomes()).toEqual(["skipped"]);
   });
 
   it.each([
@@ -250,7 +225,6 @@ describe("OnboardingFlow", () => {
       screen.getByText("Provider readiness could not be checked."),
     ).toBeTruthy();
     expect(button(/Continue/u).disabled).toBe(false);
-    expect(agentLoadFailures()).toEqual(["timed_out"]);
 
     const requestsBeforeRetry = providerStateRequests();
     fireEvent.click(button(/^Retry$/u));
@@ -263,7 +237,6 @@ describe("OnboardingFlow", () => {
     });
     expect(button(/^Retry$/u)).toBeTruthy();
     expect(button(/Continue/u).disabled).toBe(false);
-    expect(agentLoadFailures()).toEqual(["timed_out", "timed_out"]);
   });
 
   it.each([

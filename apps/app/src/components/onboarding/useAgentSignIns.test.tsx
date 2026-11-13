@@ -7,21 +7,15 @@ import {
   useQuery,
 } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
-import { BbHttpError } from "@bb/sdk/browser";
 import type { SystemProviderState } from "@bb/server-contract";
 import { useCallback, type ReactNode } from "react";
 import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { makeTerminalSession } from "@/test/fixtures/terminal-sessions";
-import { recordTelemetryEvent } from "./onboarding-telemetry";
 import {
   useAgentSignIns,
   type AgentSignInTerminals,
   type RefetchProviderStates,
 } from "./useAgentSignIns";
-
-vi.mock("./onboarding-telemetry", () => ({
-  recordTelemetryEvent: vi.fn(),
-}));
 
 function provider(
   providerId: string,
@@ -70,7 +64,7 @@ function renderSignIns(
     (props: { states: SystemProviderState[]; statesSettledAt: number }) =>
       useAgentSignIns({
         redesign: concurrent,
-        entry: "first_run",
+
         hostId,
         states: props.states,
         statesSettledAt: props.statesSettledAt,
@@ -85,14 +79,6 @@ function renderSignIns(
 
 function settledAfterNow(): number {
   return Date.now() + 1;
-}
-
-function recordedOutcomes(): unknown[] {
-  return vi
-    .mocked(recordTelemetryEvent)
-    .mock.calls.flatMap(([event]) =>
-      event.name === "onboarding_sign_in" ? [event.properties.outcome] : [],
-    );
 }
 
 afterEach(() => {
@@ -247,136 +233,6 @@ describe("useAgentSignIns", () => {
     expect([...result.current.failedProviderIds]).toEqual(["codex"]);
   });
 
-  describe.each([
-    ["the redesign", true],
-    ["today's guide", false],
-  ] as const)("telemetry in %s", (_variant, concurrent) => {
-    function recorded() {
-      return vi
-        .mocked(recordTelemetryEvent)
-        .mock.calls.map(([event]) => event.properties);
-    }
-
-    it("names the agent and records a non-zero exit as a failed command", async () => {
-      const states = [provider("codex"), provider("claude-code")];
-      const { result, rerender } = renderSignIns(concurrent, states);
-      await act(async () => {
-        await result.current.start("codex");
-      });
-      act(() => result.current.handleExit("codex", 1));
-      rerender({ states, statesSettledAt: settledAfterNow() });
-
-      expect(recorded()).toEqual([
-        { entry: "first_run", outcome: "started", resource_id: "codex" },
-        {
-          entry: "first_run",
-          outcome: "failed",
-          resource_id: "codex",
-          failure_reason: "command_failed",
-          failure_detail: "exit_nonzero",
-          exit_code: 1,
-        },
-      ]);
-    });
-
-    it.each([
-      {
-        exitCode: 127,
-        detail: { failure_detail: "not_found", exit_code: 127 },
-      },
-      { exitCode: null, detail: { failure_detail: "signal" } },
-    ])(
-      "classifies a sign-in exit of $exitCode without sending output",
-      async ({ exitCode, detail }) => {
-        const states = [provider("codex")];
-        const { result, rerender } = renderSignIns(concurrent, states);
-        await act(async () => {
-          await result.current.start("codex");
-        });
-        act(() => result.current.handleExit("codex", exitCode));
-        rerender({ states, statesSettledAt: settledAfterNow() });
-
-        expect(recorded().at(-1)).toEqual({
-          entry: "first_run",
-          outcome: "failed",
-          resource_id: "codex",
-          failure_reason: "command_failed",
-          ...detail,
-        });
-      },
-    );
-
-    it("records a sign-in the agent reported as failed", async () => {
-      const states = [provider("codex")];
-      const { result } = renderSignIns(concurrent, states);
-      await act(async () => {
-        await result.current.start("codex");
-      });
-      act(() => result.current.fail("codex"));
-
-      expect(recorded().at(-1)).toEqual({
-        entry: "first_run",
-        outcome: "failed",
-        resource_id: "codex",
-        failure_reason: "command_failed",
-        failure_detail: "login_failed",
-      });
-    });
-
-    it("records why the sign-in terminal could not be created", async () => {
-      const { result, terminals } = renderSignIns(concurrent);
-      vi.mocked(terminals.create).mockRejectedValueOnce(
-        new BbHttpError({
-          body: null,
-          code: "host_unavailable",
-          message: "Host is not connected",
-          status: 502,
-        }),
-      );
-      await act(async () => {
-        await result.current.start("codex");
-      });
-
-      expect(recorded()).toEqual([
-        { entry: "first_run", outcome: "started", resource_id: "codex" },
-        {
-          entry: "first_run",
-          outcome: "failed",
-          resource_id: "codex",
-          failure_reason: "host_unavailable",
-        },
-      ]);
-    });
-
-    it.each([
-      ["no_host", null, [provider("codex")]],
-      ["not_found", "host_1", []],
-      ["unsupported", "host_1", [provider("codex", { loginCommand: null })]],
-    ] as const)(
-      "records a sign-in that could not start as %s",
-      async (failureReason, hostId, states) => {
-        const { result, terminals } = renderSignIns(
-          concurrent,
-          [...states],
-          hostId,
-        );
-        await act(async () => {
-          await result.current.start("codex");
-        });
-
-        expect(terminals.create).not.toHaveBeenCalled();
-        expect(recorded()).toEqual([
-          {
-            entry: "first_run",
-            outcome: "failed",
-            resource_id: "codex",
-            failure_reason: failureReason,
-          },
-        ]);
-      },
-    );
-  });
-
   it("shows the failed state when the sign-in exits cleanly before the agent is ready", async () => {
     const states = [provider("pi")];
     const { result, rerender, terminals, refetchStates } = renderSignIns(
@@ -416,7 +272,6 @@ describe("useAgentSignIns", () => {
 
     expect(result.current.signIns.size).toBe(0);
     expect(result.current.failedProviderIds.size).toBe(0);
-    expect(recordedOutcomes()).toEqual(["started", "ready"]);
   });
 
   it("shows no failure when the user cancels with X as the sign-in exits", async () => {
@@ -432,40 +287,6 @@ describe("useAgentSignIns", () => {
 
     expect(result.current.signIns.size).toBe(0);
     expect(result.current.failedProviderIds.size).toBe(0);
-    expect(recordedOutcomes()).toEqual(["started", "cancelled"]);
-  });
-
-  describe.each([
-    ["the redesign", true],
-    ["today's guide", false],
-  ] as const)("an exited sign-in in %s", (_variant, redesign) => {
-    it.each([
-      [0, true, "ready"],
-      [1, true, "ready"],
-      [null, true, "ready"],
-      [0, false, "exited"],
-      [1, false, "failed"],
-      [null, false, "failed"],
-    ] as const)(
-      "exiting with %s when the agent is ready=%s records %s once a fresh state lands",
-      async (exitCode, ready, outcome) => {
-        const { result, rerender } = renderSignIns(redesign, [
-          provider("codex"),
-        ]);
-        await act(async () => {
-          await result.current.start("codex");
-        });
-
-        act(() => result.current.handleExit("codex", exitCode));
-        expect(recordedOutcomes()).toEqual(["started"]);
-        rerender({
-          states: [provider("codex", ready ? { status: "ready" } : {})],
-          statesSettledAt: settledAfterNow(),
-        });
-
-        expect(recordedOutcomes()).toEqual(["started", outcome]);
-      },
-    );
   });
 
   it("keeps today's failed row after a non-zero exit even when the agent turns out ready", async () => {
@@ -483,7 +304,6 @@ describe("useAgentSignIns", () => {
     });
 
     expect([...result.current.failedProviderIds]).toEqual(["codex"]);
-    expect(recordedOutcomes()).toEqual(["started", "ready"]);
   });
 
   it.each([
@@ -548,7 +368,7 @@ describe("useAgentSignIns", () => {
         );
         return useAgentSignIns({
           redesign: true,
-          entry: "first_run",
+
           hostId: "host_1",
           states: query.data,
           statesSettledAt: Math.max(query.dataUpdatedAt, query.errorUpdatedAt),
@@ -576,7 +396,6 @@ describe("useAgentSignIns", () => {
     });
 
     expect(result.current.signIns.size).toBe(0);
-    expect(recordedOutcomes()).toEqual(["started", "ready"]);
     expect(server.aborts).toBe(0);
     expect(server.fetches).toBe(fetchesBeforeExit + 1);
     await act(async () => {

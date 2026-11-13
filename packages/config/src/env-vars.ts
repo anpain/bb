@@ -297,13 +297,6 @@ export const BB_CONNECT_GATE_KEYS_URL_ENV = defineEnvVar<string>({
   parse: parseRequiredUrlEnvValue,
 });
 
-export const BB_POSTHOG_API_KEY_ENV = defineEnvVar<string>({
-  description:
-    "Legacy PostHog project API key. Accepted for compatibility but ignored; bb telemetry is permanently disabled.",
-  name: "BB_POSTHOG_API_KEY",
-  parse: parseStringEnvValue,
-});
-
 export const BB_PERF_DIAGNOSTICS_ENV = defineEnvVar<boolean>({
   description:
     "Permit server performance diagnostics when the performanceDiagnostics experiment is on. Requires restart.",
@@ -332,24 +325,10 @@ export const BB_SETUP_GUIDE_VARIANT_ENV = defineEnvVar<SetupGuideVariant>({
   parse: parseSetupGuideVariantEnvValue,
 });
 
-export const BB_TELEMETRY_ENV = defineEnvVar<boolean>({
-  description:
-    "Legacy anonymous usage telemetry switch. Accepted for compatibility but ignored; telemetry is permanently disabled.",
-  name: "BB_TELEMETRY",
-  parse: parseBooleanEnvValue,
-});
-
 export const BB_FF_PLACEHOLDER_ENV = defineEnvVar<boolean>({
   description:
     "Permanent placeholder feature flag. Non-functional keep-alive so the flag system has at least one entry; do not gate behavior on it.",
   name: "BB_FF_PLACEHOLDER",
-  parse: parseBooleanEnvValue,
-});
-
-export const BB_FF_INITIATOR_TELEMETRY_ENV = defineEnvVar<boolean>({
-  description:
-    "Legacy anonymous telemetry feature flag. Accepted for compatibility but ignored; telemetry is permanently disabled.",
-  name: "BB_FF_INITIATOR_TELEMETRY",
   parse: parseBooleanEnvValue,
 });
 
@@ -450,15 +429,11 @@ export const DEFAULT_BB_APP_SURFACE = APP_SURFACE_WEB;
 export const DEFAULT_BB_APP_URL = "";
 export const DEFAULT_BB_SERVER_BIND_HOST: ServerBindHost = BB_LOOPBACK_HOST;
 export const DEFAULT_BB_EXTERNAL_URL = "";
-export const DEFAULT_BB_POSTHOG_API_KEY = "";
-export const DEFAULT_BB_TELEMETRY = false;
 export const DEFAULT_BB_DEV_APP_HOST = "";
 export const DEFAULT_BB_MARKETPLACE_URL =
   "https://getbb.app/marketplace/v2/marketplace.json";
 export const DEFAULT_BB_CONNECT_GATE_KEYS_URL =
   "https://getbb.app/.well-known/bb-connect-gate-keys.json";
 export const DEFAULT_BB_FF_PLACEHOLDER = defaultFeatureFlags.placeholder;
-export const DEFAULT_BB_FF_INITIATOR_TELEMETRY =
-  defaultFeatureFlags.initiatorTelemetry;
 export const DEFAULT_BB_FF_TIMELINE_WINDOW_EVENT_BUDGET =
   defaultFeatureFlags.timelineWindowEventBudget;

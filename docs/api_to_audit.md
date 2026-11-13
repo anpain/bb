@@ -4387,25 +4387,6 @@ change, catalog-range adoption, and npm range changes have been exercised on
 released builds, and once a later decision on following non-breaking catalog
 range widenings automatically is made.
 
-## `PluginBbSdk.system.experimental_recordTelemetryEvent`
-
-Posts one product event to `POST /api/v1/system/telemetry/events`. In this fork
-the telemetry service is permanently disabled, so the route performs only local
-compatibility behavior and recommendation bookkeeping; no event, feature-flag
-request, exposure, or telemetry-disabled notification leaves the server. The
-schema remains a strict allow-list of setup-guide, new-thread-submit,
-plugin-creation-started, and release-notes events; anything else is a 400.
-
-App callers use `recordTelemetryEvent` in
-`apps/app/src/components/onboarding/onboarding-telemetry.ts`; `bb plugin new`
-uses the same SDK method. A selected setup-guide plugin recommendation still
-stores its `recommendation_id` in server-owned settings until the plugin's next
-use, disable, or uninstall. The optional `{ keepalive: true }` argument retains
-its request behavior for page-unload callers.
-
-Stabilize after deciding whether third-party plugins may use this compatibility
-route at all and, if so, how they are namespaced and rate limited.
-
 ## `PluginBbSdk.system.experimental_cliCommand`, `experimental_installCliCommand`, and `experimental_removeCliCommand`
 
 `experimental_cliCommand()` reports whether `bb` is on PATH on the server's

@@ -3,16 +3,15 @@ import {
   defaultStreamHandler,
 } from "@tanstack/react-start/server";
 
-import { NO_EXPERIMENTS, type ExperimentBootstrap } from "./experiments/flags";
 import {
-  resolveExperiments,
-  withExperimentHeaders,
-} from "./experiments/server";
+  NO_EXPERIMENTS,
+  parseForcedFlags,
+  type ExperimentBootstrap,
+} from "./experiments/flags";
 import {
   marketplaceHtmlCacheControl,
   marketplaceResponseStatus,
 } from "./marketplace/marketplace-response-status.js";
-import { getEnv } from "./server/env";
 
 const handleRequest = createStartHandler(async (context) => {
   const pathname = new URL(context.request.url).pathname;
@@ -39,18 +38,25 @@ const handleRequest = createStartHandler(async (context) => {
 
 export default {
   async fetch(request: Request): Promise<Response> {
-    const resolution = await resolveExperiments(request, {
-      postHogKey: import.meta.env.VITE_POSTHOG_KEY,
-      postHogHost:
-        import.meta.env.VITE_POSTHOG_HOST ?? "https://us.i.posthog.com",
-      baseDomain: getEnv().BASE_DOMAIN,
-      fetch: (input, init) => fetch(input, init),
-      log: (entry) => console.log(JSON.stringify(entry)),
-    });
+    const flags =
+      request.method === "GET"
+        ? parseForcedFlags(new URL(request.url).searchParams)
+        : null;
+    const experiments =
+      flags === null
+        ? NO_EXPERIMENTS
+        : { distinctID: null, featureFlags: flags, preview: true };
     const response = await handleRequest(request, {
-      context: { experiments: resolution?.bootstrap ?? NO_EXPERIMENTS },
+      context: { experiments },
     });
-    return withExperimentHeaders(response, resolution);
+    if (flags === null) return response;
+    const headers = new Headers(response.headers);
+    headers.set("cache-control", "private, no-cache");
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
   },
 };
 

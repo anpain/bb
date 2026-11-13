@@ -14,7 +14,6 @@ import haisfieldAvatar from "../assets/testimonials/rob-haisfield.jpg";
 import sunartoAvatar from "../assets/testimonials/scott-sunarto.jpg";
 import swairAvatar from "../assets/testimonials/swair.jpg";
 import tossellAvatar from "../assets/testimonials/ben-tossell.jpg";
-import { trackLandingEvent } from "./analytics";
 
 export type TestimonialSource = "x" | "github" | "blog";
 
@@ -184,12 +183,6 @@ function TestimonialCard({ t }: { t: Testimonial }) {
           target="_blank"
           rel="noopener noreferrer"
           aria-label={`${t.author}: read the post`}
-          onClick={() =>
-            trackLandingEvent({
-              name: "landing_testimonial_clicked",
-              properties: { source: t.source },
-            })
-          }
         />
         <blockquote className="tm-quote">
           <QuoteText text={t.quote} />

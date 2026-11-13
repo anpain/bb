@@ -279,7 +279,7 @@ export function ReleaseNotesPanel({
           <ExternalLink
             href={getReleaseNotesUrl(notesVersion)}
             className={FOOTER_LINK_CLASS_NAME}
-            onOpen={() => openReleaseNotesOnWeb(version, notesVersion)}
+            onOpen={() => openReleaseNotesOnWeb(notesVersion)}
           >
             Full changelog
             <Icon aria-hidden name="ExternalLink" className="size-3" />
@@ -288,7 +288,7 @@ export function ReleaseNotesPanel({
           <ExternalLink
             href={getSourceCompareUrl(sourceUpdate)}
             className={FOOTER_LINK_CLASS_NAME}
-            onOpen={() => openSourceCompareOnWeb(version, sourceUpdate)}
+            onOpen={() => openSourceCompareOnWeb(sourceUpdate)}
           >
             Compare on GitHub
             <Icon aria-hidden name="ExternalLink" className="size-3" />

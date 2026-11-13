@@ -12,16 +12,6 @@ import { invalidateHostProviderCliStatus } from "@/hooks/cache-owners/provider-c
 import { invalidateSystemExecutionOptions } from "@/hooks/cache-owners/system-cache-effects";
 import { asHttpError, getHttpErrorMessage } from "@/lib/http-error";
 import { sdk } from "@/lib/sdk";
-import type { OnboardingFailureDetail } from "@bb/server-contract";
-import { classifyProviderCliInstallFailure } from "@/components/provider-cli/provider-cli-install-failure";
-import {
-  operationFailureReason,
-  type OperationFailureReason,
-} from "@/components/onboarding/onboarding-model";
-import {
-  recordTelemetryEvent,
-  type OnboardingEntry,
-} from "@/components/onboarding/onboarding-telemetry";
 
 type ProviderCliInstallCompletedEvent = Extract<
   ProviderCliInstallEvent,
@@ -39,7 +29,6 @@ const PROVIDER_CLI_FAILURE_LOG_TRUNCATION_MARKER =
 interface ProviderCliInstallJob {
   hostId: string;
   issue: ProviderCliActionableIssue;
-  onboardingEntry?: OnboardingEntry;
   serverJobId?: string;
 }
 
@@ -269,37 +258,9 @@ function showProviderCliInstallFailureToast(args: {
 }
 
 function runInstall(job: ProviderCliInstallJob): void {
-  const { hostId, issue, onboardingEntry } = job;
+  const { hostId, issue } = job;
   const { action, provider } = issue;
   const jobKey = providerCliJobKey(hostId, provider);
-  const recordOutcome = (
-    outcome: "started" | "succeeded" | "failed",
-    failure?: {
-      reason: OperationFailureReason | "command_failed";
-      detail?: OnboardingFailureDetail;
-      exitCode?: number;
-    },
-  ) => {
-    if (onboardingEntry === undefined) return;
-    recordTelemetryEvent({
-      name: "onboarding_operation",
-      properties: {
-        entry: onboardingEntry,
-        step: "agent",
-        operation: action.kind,
-        outcome,
-        resource_id: provider,
-        ...(failure === undefined ? {} : { failure_reason: failure.reason }),
-        ...(failure?.detail === undefined
-          ? {}
-          : { failure_detail: failure.detail }),
-        ...(failure?.exitCode === undefined
-          ? {}
-          : { exit_code: failure.exitCode }),
-      },
-    });
-  };
-  recordOutcome("started");
 
   const failuresByJobKey = new Map(snapshot.failuresByJobKey);
   failuresByJobKey.delete(jobKey);
@@ -335,24 +296,12 @@ function runInstall(job: ProviderCliInstallJob): void {
       }
 
       if (completedEvent?.success) {
-        recordOutcome("succeeded");
         if (queryClient !== null) {
           void invalidateHostProviderCliStatus({ queryClient, hostId });
           void invalidateSystemExecutionOptions({ queryClient, hostId });
         }
         return;
       }
-      const { detail, exitCode } = classifyProviderCliInstallFailure({
-        completed: completedEvent,
-        errorMessage,
-        output: installLogChunks.join(""),
-      });
-      recordOutcome("failed", {
-        reason: "command_failed",
-        detail,
-        ...(exitCode === undefined ? {} : { exitCode }),
-      });
-
       const failureMessage =
         errorMessage ??
         (completedEvent
@@ -368,7 +317,6 @@ function runInstall(job: ProviderCliInstallJob): void {
       });
     })
     .catch((error: unknown) => {
-      recordOutcome("failed", { reason: operationFailureReason(error) });
       const message = error instanceof Error ? error.message : String(error);
       installLogChunks.push(`\n${message}\n`);
       showProviderCliInstallFailureToast({

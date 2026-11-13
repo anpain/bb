@@ -16,8 +16,6 @@ import {
   useState,
 } from "react";
 
-import { trackLandingEvent, useInitAnalytics } from "../landing/analytics.js";
-import { classifyArrivalSource } from "../landing/arrival-source.js";
 import { CommandButton } from "../landing/command-button.js";
 import { SiteFooter, SiteNav } from "../landing/site-chrome.js";
 import {
@@ -245,7 +243,9 @@ function InstallCount({
   if (badge?.kind !== "count") return null;
   const total = badge.installs;
   const formatted =
-    variant === "detail" ? total.toLocaleString("en-US") : formatInstalls(total);
+    variant === "detail"
+      ? total.toLocaleString("en-US")
+      : formatInstalls(total);
   return (
     <span
       className={className}
@@ -709,7 +709,6 @@ function MarketplaceBrowser({
   stats,
   state,
   onStateChange,
-  analyticsAuthor,
   hero,
 }: {
   manifest: MarketplaceV2Manifest;
@@ -717,7 +716,6 @@ function MarketplaceBrowser({
   stats: MarketplaceStats | null;
   state: MarketplaceIndexState;
   onStateChange: (state: MarketplaceIndexState) => void;
-  analyticsAuthor?: string;
   hero: boolean;
 }) {
   const [query, setQuery] = useState("");
@@ -730,10 +728,6 @@ function MarketplaceBrowser({
     options.some((option) => option.id === state.category)
       ? state.category
       : undefined;
-  useMarketplacePageAnalytics(
-    { category: activeCategory, sort: state.sort },
-    analyticsAuthor,
-  );
   const searched = filterMarketplaceEntries(
     manifest,
     collection?.entries ?? entries,
@@ -844,23 +838,6 @@ function MarketplaceBrowser({
   );
 }
 
-function useMarketplacePageAnalytics(
-  state: MarketplaceIndexState,
-  author?: string,
-): void {
-  useInitAnalytics();
-  useEffect(() => {
-    trackLandingEvent({
-      name: "marketplace_page_viewed",
-      properties: {
-        ...(state.category === undefined ? {} : { category: state.category }),
-        sort: state.sort ?? "featured",
-        ...(author === undefined ? {} : { author }),
-      },
-    });
-  }, [author, state.category, state.sort]);
-}
-
 export function PublicMarketplacePage({
   manifest,
   stats,
@@ -942,7 +919,8 @@ function MoreInCategory({
       <div className="marketplace-section-head">
         <div>
           <h2>
-            More in {categoryName}{"\u00a0"}
+            More in {categoryName}
+            {"\u00a0"}
             <span>{entries.length}</span>
           </h2>
           {category?.description === undefined ? null : (
@@ -979,22 +957,7 @@ export function PublicMarketplaceDetailPage({
   entry: MarketplaceV2Entry;
   stats: MarketplaceStats | null;
 }) {
-  useInitAnalytics();
   useEffect(() => {
-    trackLandingEvent({
-      name: "marketplace_plugin_detail_viewed",
-      properties: {
-        plugin_id: entry.id,
-        entry_id: entry.id,
-        arrival_source: classifyArrivalSource({
-          searchParams: new URLSearchParams(window.location.search),
-          referrer: document.referrer,
-          siteOrigin: window.location.origin,
-          isFirstViewInPageLoad:
-            !hasTrackedDetailViewInPageLoad && isInitialDocumentPath(),
-        }),
-      },
-    });
     hasTrackedDetailViewInPageLoad = true;
   }, [entry.id]);
   const categoryDefinition = resolveMarketplaceCategory(manifest, entry);
@@ -1060,7 +1023,6 @@ export function PublicMarketplaceDetailPage({
                 {category}
               </MarketplaceLink>
               <InstallCount entry={entry} stats={stats} variant="detail" />
-
             </div>
           </div>
           <div className="marketplace-detail-install">
@@ -1070,13 +1032,6 @@ export function PublicMarketplaceDetailPage({
                   command={installCommand}
                   label={`Copy ${installCommand}`}
                   size="compact"
-                  onCopy={(copied) => {
-                    if (!copied) return;
-                    trackLandingEvent({
-                      name: "marketplace_install_command_copied",
-                      properties: { plugin_id: entry.id, entry_id: entry.id },
-                    });
-                  }}
                 />
               )}
               <a
@@ -1103,15 +1058,15 @@ export function PublicMarketplaceDetailPage({
               <hr className="marketplace-overview-rule" />
               <div className="marketplace-overview-heading">
                 <h2>Overview</h2>
-              <a
-                className="marketplace-detail-source"
-                href={repository}
-                target="_blank"
-                rel="noreferrer"
-              >
-                View source
-                <HugeiconsIcon icon={LinkSquare02Icon} aria-hidden />
-              </a>
+                <a
+                  className="marketplace-detail-source"
+                  href={repository}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  View source
+                  <HugeiconsIcon icon={LinkSquare02Icon} aria-hidden />
+                </a>
               </div>
               {entry.overview === undefined ? null : (
                 <MarketplaceOverview markdown={entry.overview} />
@@ -1187,7 +1142,6 @@ export function PublicMarketplaceAuthorPage({
           stats={stats}
           state={state}
           onStateChange={onStateChange}
-          analyticsAuthor={author.github}
           hero={false}
         />
       </main>

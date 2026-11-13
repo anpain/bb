@@ -7,7 +7,6 @@ import { useState } from "react";
 
 import blogCss from "../blog/blog.css?url";
 import compareCss from "../compare/compare.css?url";
-import { trackLandingEvent, useInitAnalytics } from "../landing/analytics";
 import { DesktopDownloadButton } from "../landing/cta";
 import { useDesktopPlatform } from "../landing/desktop-platform";
 import { InstallOptions } from "../landing/landing-visuals";
@@ -79,10 +78,6 @@ function CopyForAgent({
       className={`btn gd-copy ${className}`}
       onClick={() => {
         void copy();
-        trackLandingEvent({
-          name: "guide_prompt_copied",
-          properties: { guide, placement },
-        });
       }}
     >
       <HugeiconsIcon
@@ -213,8 +208,6 @@ function FaqList({ items }: { items: GuideFaq[] }) {
 }
 
 export function GuidePage({ guide }: { guide: Guide }) {
-  useInitAnalytics();
-
   return (
     <GuidePromptContext.Provider
       value={{ guide: guide.slug, prompt: guide.agentPrompt }}

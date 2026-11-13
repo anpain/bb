@@ -61,10 +61,6 @@ import {
   type ProviderRegistryService,
 } from "./services/providers/provider-registry.js";
 import type { PluginService } from "./services/plugins/plugin-service.js";
-import {
-  appInstallFromServerConfig,
-  createTelemetryService,
-} from "./services/system/telemetry.js";
 import { createSetupGuideExperiment } from "./services/system/setup-guide-experiment.js";
 import { TerminalSessionLifecycle } from "./services/terminals/terminal-session-lifecycle.js";
 import { createLifecycleDedupers } from "./lifecycle-dedupers.js";
@@ -242,17 +238,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     logger,
   });
 
-  const telemetry = await createTelemetryService({
-    apiKey: serverConfig.BB_POSTHOG_API_KEY,
-    appInstall: appInstallFromServerConfig(serverConfig),
-    appSurface: serverConfig.BB_APP_SURFACE,
-    appVersion: serverConfig.BB_APP_VERSION,
-    dataDir: serverConfig.BB_DATA_DIR,
-    enabled:
-      serverConfig.BB_TELEMETRY && isProduction && pendingServerMove === null,
-    telemetryEnabled: getAppSettings(db).telemetryEnabled,
-    logger,
-  });
   const setupGuideExperiment = await createSetupGuideExperiment({
     dataDir: serverConfig.BB_DATA_DIR,
     logger,
@@ -283,7 +268,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     pluginHostArtifacts,
     aiServices,
     skillTreeRegistry,
-    telemetry,
     terminalSessions,
   });
   pendingInteractions.start();
@@ -315,7 +299,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     pluginHostArtifacts,
     providerRegistry,
     skillTreeRegistry,
-    telemetry,
     terminalSessions,
   };
   const sendHold = createAppUpdateSendHold(sendHoldDeps);
@@ -402,7 +385,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
       providerLiveCommands,
       aiServices,
       skillTreeRegistry,
-      telemetry,
       terminalSessions,
       watchInterests,
       sharedPorts,
@@ -434,7 +416,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
       pluginHostArtifacts,
       aiServices,
       skillTreeRegistry,
-      telemetry,
       terminalSessions,
     },
     { sessions: serverImport.importedDaemonSessions },
@@ -465,7 +446,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     aiServices,
     sharedPorts,
     skillTreeRegistry,
-    telemetry,
     terminalSessions,
   });
 
@@ -483,7 +463,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     skillTreeRegistry,
     pluginSchedules: pluginService,
     plugins: pluginService,
-    telemetry,
     terminalSessions,
     walCheckpointer,
   };
@@ -528,7 +507,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
   });
   let sweepInterval: ReturnType<typeof setInterval> | null = null;
   if (pendingServerMove === null) {
-    telemetry.capture({ name: "app_started" });
     if (serverMoveRun?.kind === "completed") {
       logger.info(
         { moveId: serverMoveRun.run.status.moveId },

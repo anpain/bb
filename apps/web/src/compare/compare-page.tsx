@@ -13,7 +13,6 @@ import {
   type ReactNode,
 } from "react";
 
-import { useInitAnalytics } from "../landing/analytics";
 import {
   Band,
   CustomizeBuild,
@@ -401,7 +400,6 @@ export function PageHero({
 }
 
 export function ComparePage({ comparison }: { comparison: Comparison }) {
-  useInitAnalytics();
   useScrollReveal();
   const { competitor } = comparison;
   const [lead, ...rest] = withPluginsSlot(

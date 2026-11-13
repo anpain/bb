@@ -5,7 +5,6 @@ import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { trackLandingEvent } from "./analytics";
 import { MarketplaceLink } from "./cta";
 import {
   DelegationTree,
@@ -14,8 +13,6 @@ import {
   useCycle,
 } from "./landing-visuals";
 import { useActiveWhileVisible } from "./visibility";
-
-vi.mock("./analytics", () => ({ trackLandingEvent: vi.fn() }));
 
 (
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -399,11 +396,10 @@ describe("DelegationTree", () => {
 
 describe("MarketplaceLink", () => {
   afterEach(() => {
-    vi.mocked(trackLandingEvent).mockClear();
     document.body.replaceChildren();
   });
 
-  it("opens the marketplace and reports its placement", () => {
+  it("opens the marketplace", () => {
     const { host, unmount } = render(
       <MarketplaceLink placement="customize">Browse plugins</MarketplaceLink>,
     );
@@ -411,10 +407,6 @@ describe("MarketplaceLink", () => {
     expect(link.getAttribute("href")).toBe("/marketplace");
     link.addEventListener("click", (event) => event.preventDefault());
     act(() => link.click());
-    expect(trackLandingEvent).toHaveBeenCalledExactlyOnceWith({
-      name: "landing_marketplace_clicked",
-      properties: { placement: "customize" },
-    });
     unmount();
   });
 });

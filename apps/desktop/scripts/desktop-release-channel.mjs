@@ -69,5 +69,5 @@ export function createDesktopReleaseConfig(channel) {
 }
 
 export function createDesktopUpdateReleaseBaseUrl(releaseTag) {
-  return `https://github.com/yarxhe/bb/releases/download/${releaseTag}/`;
+  return `https://github.com/anpain/bb/releases/download/${releaseTag}/`;
 }

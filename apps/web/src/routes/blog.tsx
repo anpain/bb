@@ -5,7 +5,6 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { POSTS } from "../blog/posts";
 import { PostHeader, PostLede } from "../blog/post-body";
-import { useInitAnalytics } from "../landing/analytics";
 import {
   focusSubscribeEmail,
   SUBSCRIBE_EMAIL_ID,
@@ -27,8 +26,6 @@ export const Route = createFileRoute("/blog")({
 });
 
 function BlogIndexRoute() {
-  useInitAnalytics();
-
   return (
     <div className="wrap">
       <SiteNav current="blog" />

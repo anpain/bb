@@ -53,7 +53,6 @@ describe("setup guide experiment", () => {
     const experiment = await create();
 
     await expect(experiment.resolve()).resolves.toEqual(DEFAULTS);
-    await experiment.recordExposure("first_run");
     expect(fetch).not.toHaveBeenCalled();
     await expect(readdir(dataDir)).resolves.toEqual([]);
   });
@@ -77,15 +76,5 @@ describe("setup guide experiment", () => {
     const experiment = await create();
 
     await expect(experiment.resolve()).resolves.toEqual(DEFAULTS);
-  });
-
-  it("leaves telemetry events unchanged", async () => {
-    const experiment = await create();
-    const event = {
-      name: "onboarding_step_reached",
-      properties: { step: "plugins", entry: "first_run" },
-    } as const;
-
-    await expect(experiment.annotate(event)).resolves.toBe(event);
   });
 });

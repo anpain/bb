@@ -198,90 +198,14 @@ describe.sequential("bb plugin new dependency install", () => {
     expect(warnings).not.toContain("progress line");
   });
 
-  it("records plugin_creation_started with the bb server", async () => {
-    const requests: Request[] = [];
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        requests.push(new Request(input, init));
-        return Response.json({ ok: true });
-      }),
-    );
+  it("scaffolds a plugin without contacting the bb server", async () => {
+    const fetch = vi.fn(() => Promise.reject(new TypeError("fetch failed")));
+    vi.stubGlobal("fetch", fetch);
 
-    await runPluginNew(["tracked"]);
-
-    expect(requests).toHaveLength(1);
-    const [request] = requests;
-    expect(request?.method).toBe("POST");
-    expect(request?.url).toBe(
-      "http://localhost/api/v1/system/telemetry/events",
-    );
-    expect(await request?.json()).toEqual({
-      name: "plugin_creation_started",
-      properties: {},
-    });
-  });
-
-  it("stays silent and succeeds when the bb server is unreachable", async () => {
-    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() => Promise.reject(new TypeError("fetch failed"))),
-    );
-
-    await runPluginNew(["untracked"]);
-
-    expect(logged).toContain(
-      "Created bb-plugin-untracked/ (bb-plugin-untracked).",
-    );
-    expect(warned).toEqual([]);
-    expect(errors).not.toHaveBeenCalled();
-  });
-
-  it("does not record plugin_creation_started inside an agent thread", async () => {
-    vi.stubEnv("BB_THREAD_ID", "thr_agent123");
-    const telemetryFetch = vi.fn(async () => Response.json({ ok: true }));
-    vi.stubGlobal("fetch", telemetryFetch);
-
-    await runPluginNew(["agentmade"]);
+    await runPluginNew(["local-plugin"]);
 
     expect(logged).toContain("  bb plugin install .");
-    expect(telemetryFetch).not.toHaveBeenCalled();
-  });
-
-  it("gives up on a bb server that never answers", async () => {
-    let aborted = false;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        (_input: RequestInfo | URL, init?: RequestInit) =>
-          new Promise<Response>((_resolve, reject) => {
-            init?.signal?.addEventListener("abort", () => {
-              aborted = true;
-              reject(init.signal?.reason);
-            });
-          }),
-      ),
-    );
-
-    await runPluginNew(["stalled"]);
-
-    expect(aborted).toBe(true);
-    expect(logged).toContain("  bb plugin install .");
-    expect(warned).toEqual([]);
-  }, 10_000);
-
-  it("does not record plugin_creation_started for an invalid name", async () => {
-    const telemetryFetch = vi.fn(async () => Response.json({ ok: true }));
-    vi.stubGlobal("fetch", telemetryFetch);
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.spyOn(process, "exit").mockImplementation((code) => {
-      throw new Error(`process.exit:${code}`);
-    });
-
-    await expect(runPluginNew(["Invalid"])).rejects.toThrow("process.exit:1");
-
-    expect(telemetryFetch).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("falls back to the manual step when npm is not on PATH", async () => {

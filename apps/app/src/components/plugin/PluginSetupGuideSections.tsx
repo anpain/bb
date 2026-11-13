@@ -13,8 +13,8 @@ export function PluginSetupGuideSections({
 }: {
   pluginId: string;
   onPhone: boolean;
-  onSetupStarted: () => void;
-  onSetupFailed: (
+  onSetupStarted?: () => void;
+  onSetupFailed?: (
     stage: InternalDoNotUseSetupFailureStage,
     detail?: InternalDoNotUseSetupFailureDetail,
   ) => void;
@@ -33,8 +33,8 @@ export function PluginSetupGuideSections({
     >
       <section.component
         onPhone={onPhone}
-        onSetupStarted={onSetupStarted}
-        onSetupFailed={onSetupFailed}
+        onSetupStarted={onSetupStarted ?? (() => {})}
+        onSetupFailed={onSetupFailed ?? (() => {})}
       />
     </PluginSlotMount>
   ));

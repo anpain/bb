@@ -426,8 +426,7 @@ Telemetry
 
 This fork permanently disables anonymous usage telemetry, telemetry-disabled
 events, and telemetry feature-flag requests. Settings → General → Privacy &
-diagnostics reports this state. The legacy `telemetryEnabled`, `BB_TELEMETRY`,
-and `BB_POSTHOG_API_KEY` inputs cannot enable telemetry.
+diagnostics reports this state.
 
 Mobile app downloads
 

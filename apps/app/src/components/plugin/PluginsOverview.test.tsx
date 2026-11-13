@@ -479,11 +479,7 @@ describe("PluginsOverview", () => {
     fireEvent.click(screen.getByRole("button", { name: "New plugin" }));
 
     expect(screen.getByTestId("location-path").textContent).toBe("/");
-    await waitFor(() =>
-      expect(recordedTelemetryEvents()).toEqual([
-        { name: "plugin_creation_started", properties: {} },
-      ]),
-    );
+    expect(recordedTelemetryEvents()).toEqual([]);
   });
 
   it("retains Direct install source filtering when sorting Installed", async () => {

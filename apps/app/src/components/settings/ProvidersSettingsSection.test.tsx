@@ -9,11 +9,16 @@ import {
 } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type { ReactElement } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SystemProviderCatalogEntry } from "@bb/server-contract";
+import type {
+  SystemProviderCatalogEntry,
+  SystemProviderState,
+} from "@bb/server-contract";
 import type { ProviderInfo } from "@bb/domain";
 import { defaultAppSettings } from "@bb/domain";
 import { makeProviderInfo } from "@bb/test-helpers/domain-fixtures";
+import { makeTerminalSession } from "@/test/fixtures/terminal-sessions";
 import {
   ProvidersSettingsSection,
   reorderProviderIds,
@@ -23,11 +28,40 @@ const mocks = vi.hoisted(() => ({
   providers: [] as ProviderInfo[],
   catalog: [] as SystemProviderCatalogEntry[],
   setEnabled: vi.fn(),
+  states: [] as SystemProviderState[],
+  createTerminal: vi.fn(),
+  closeTerminal: vi.fn(),
+  closeAbandoned: vi.fn(),
+  refetchStates: vi.fn(),
+}));
+
+vi.mock("@/hooks/queries/host-queries", async (original) => ({
+  ...(await original<typeof import("@/hooks/queries/host-queries")>()),
+  usePrimaryHost: () => ({
+    id: "host_server",
+    name: "bb VPS",
+    status: "connected",
+  }),
 }));
 
 vi.mock("@/hooks/queries/system-queries", () => ({
   useSystemProviders: () => ({ data: mocks.providers, isPending: false }),
   useSystemProviderCatalog: () => ({ data: mocks.catalog, isPending: false }),
+  useSystemProviderStates: () => ({
+    data: { providers: mocks.states },
+    dataUpdatedAt: Date.now(),
+    errorUpdatedAt: 0,
+    refetch: mocks.refetchStates,
+  }),
+}));
+
+vi.mock("@/components/onboarding/AgentSignInContainer", () => ({
+  AgentSignInContainer: () => null,
+  useAgentSignInTerminals: () => ({
+    create: mocks.createTerminal,
+    close: mocks.closeTerminal,
+    closeAbandoned: mocks.closeAbandoned,
+  }),
 }));
 
 vi.mock("@/hooks/mutations/provider-mutations", () => ({
@@ -35,7 +69,14 @@ vi.mock("@/hooks/mutations/provider-mutations", () => ({
 }));
 
 function render(ui: ReactElement) {
-  return renderView(<MemoryRouter>{ui}</MemoryRouter>);
+  const client = new QueryClient();
+  return renderView(ui, {
+    wrapper: ({ children }) => (
+      <QueryClientProvider client={client}>
+        <MemoryRouter>{children}</MemoryRouter>
+      </QueryClientProvider>
+    ),
+  });
 }
 
 function openActions(name: string) {
@@ -66,10 +107,54 @@ function provider(id: string, displayName: string): ProviderInfo {
 afterEach(() => {
   cleanup();
   mocks.catalog = [];
-  mocks.setEnabled.mockClear();
+  mocks.states = [];
+  vi.clearAllMocks();
 });
 
 describe("ProvidersSettingsSection", () => {
+  it("starts a device sign-in on the server and closes its terminal when ready", async () => {
+    const codex: SystemProviderState = {
+      providerId: "codex",
+      displayName: "Codex",
+      status: "unauthenticated",
+      statusMessage: null,
+      accountEmail: null,
+      planLabel: null,
+      installedVersion: "1.0.0",
+      minimumSupportedVersion: null,
+      canInstall: true,
+      canUpdate: true,
+      loginCommand: "codex login --device-auth",
+      localLoginCommand: "codex login",
+      internal_DO_NOT_USE_guidedSignIn: true,
+      internal_DO_NOT_USE_setupGuidePlanLabel: null,
+    };
+    mocks.states = [codex];
+    mocks.createTerminal.mockResolvedValue(
+      makeTerminalSession({ id: "term_login" }),
+    );
+    const settings = () => (
+      <ProvidersSettingsSection
+        disabled={false}
+        generalSettings={defaultAppSettings}
+        onGeneralSettingsChange={vi.fn()}
+      />
+    );
+    const view = render(settings());
+    fireEvent.click(screen.getByRole("button", { name: "Sign in to Codex" }));
+    await screen.findByRole("button", { name: "Cancel Codex sign-in" });
+    expect(mocks.createTerminal).toHaveBeenCalledWith({
+      hostId: "host_server",
+      title: "Sign in to Codex",
+      command: "codex login --device-auth",
+    });
+    mocks.states = [
+      { ...codex, status: "ready", accountEmail: "user@example.com" },
+    ];
+    view.rerender(settings());
+    await screen.findByText("user@example.com");
+    expect(mocks.closeTerminal).toHaveBeenCalledExactlyOnceWith("term_login");
+  });
   it("shows the server-wide fast tier setting and saves changes", () => {
     mocks.providers = [];
     const onChange = vi.fn();

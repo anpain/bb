@@ -19,6 +19,11 @@ import {
   versionFrom,
 } from "@bb/provider-bridge-protocol/bridge-kit";
 import { z } from "zod";
+import {
+  AcpAgentResponseError,
+  createAcpAgentConnection,
+  requestAcpInitialize,
+} from "./agent-connection.js";
 import { readOpenCodeGoUsage } from "./opencode-usage.js";
 import { readKimiUsage } from "./kimi-usage.js";
 
@@ -132,7 +137,7 @@ function readAccountEmail(): string | null {
 export interface AcpMaintenanceDialect {
   loginCommand: string;
   installer(): { command: string; args: string[]; displayCommand: string };
-  readAccount(): Promise<{ email: string | null } | null>;
+  readAccount(command: string): Promise<{ email: string | null } | null>;
   readUsage(): Promise<ProviderUsageResult>;
 }
 
@@ -142,6 +147,7 @@ function healthResult(args: {
   accountEmail?: string | null;
   installedVersion?: string | null;
   statusMessage?: string | null;
+  loginCommand?: string;
 }): ProviderHealthResult {
   const maintained = args.maintenance !== undefined;
   return {
@@ -155,7 +161,7 @@ function healthResult(args: {
       minimumSupportedVersion: null,
       canInstall: maintained,
       canUpdate: maintained && args.status !== "not_installed",
-      loginCommand: args.maintenance?.loginCommand ?? null,
+      loginCommand: args.loginCommand ?? args.maintenance?.loginCommand ?? null,
     },
   };
 }
@@ -181,9 +187,45 @@ async function readAcpCliVersion(command: string): Promise<string | null> {
   }
 }
 
+async function kimiAuthStatus(command: string, env: NodeJS.ProcessEnv) {
+  const connection = createAcpAgentConnection({
+    command,
+    args: ["acp"],
+    cwd: process.cwd(),
+    env,
+    recordThreadId: null,
+    onNotification: () => {},
+    onRequest: (_method, _params, responder) => {
+      responder.error(-32601, "Unavailable during sign-in status check.");
+    },
+    onExit: () => {},
+  });
+  try {
+    await requestAcpInitialize(connection, {
+      parameterizedModelPicker: false,
+      fsAccess: false,
+      timeoutMs: 5_000,
+    });
+    await connection.request({
+      method: "authenticate",
+      params: { methodId: "login" },
+      resultSchema: z.unknown(),
+      timeoutMs: 5_000,
+    });
+    return "ready";
+  } catch (error) {
+    return error instanceof AcpAgentResponseError && error.code === -32000
+      ? "unauthenticated"
+      : "unknown";
+  } finally {
+    await connection.kill();
+  }
+}
+
 export async function getAcpProviderHealth(args: {
   maintenance: AcpMaintenanceDialect | undefined;
   command: string | null;
+  env?: NodeJS.ProcessEnv;
 }): Promise<ProviderHealthResult> {
   const maintenance = args.maintenance;
   if (args.command === null) {
@@ -197,6 +239,22 @@ export async function getAcpProviderHealth(args: {
     return healthResult({ maintenance, status: "not_installed" });
   }
   const version = await readAcpCliVersion(args.command);
+  if (/^kimi(?:\.(?:exe|cmd|bat))?$/iu.test(path.basename(args.command))) {
+    const status = await kimiAuthStatus(args.command, {
+      ...process.env,
+      ...args.env,
+      KIMI_DISABLE_TELEMETRY: "1",
+      DO_NOT_TRACK: "1",
+    });
+    return healthResult({
+      maintenance,
+      status,
+      installedVersion: version,
+      loginCommand: "kimi acp --login",
+      statusMessage:
+        status === "unknown" ? "Could not check Kimi Code sign-in." : null,
+    });
+  }
   if (maintenance === undefined) {
     return healthResult({
       maintenance,
@@ -205,7 +263,7 @@ export async function getAcpProviderHealth(args: {
     });
   }
   try {
-    const account = await maintenance.readAccount();
+    const account = await maintenance.readAccount(args.command);
     return healthResult({
       maintenance,
       status: account === null ? "unauthenticated" : "ready",
@@ -419,12 +477,37 @@ export async function getAcpProviderUsage(args: {
 export const CURSOR_ACP_MAINTENANCE: AcpMaintenanceDialect = {
   loginCommand: "cursor-agent login",
   installer: () => downloadedInstallerCommand(CURSOR_INSTALL_SCRIPT_URL),
-  readAccount: async () => {
+  readAccount: async (command) => {
+    const status = await readCursorCliAuthStatus(command);
+    if (status !== null) return status ? { email: readAccountEmail() } : null;
     const accessToken = await readAccessToken();
     return accessToken === null ? null : { email: readAccountEmail() };
   },
   readUsage: readCursorUsage,
 };
+
+async function readCursorCliAuthStatus(
+  command: string,
+): Promise<boolean | null> {
+  try {
+    const { stdout } = await execPortableFile(
+      command,
+      ["status", "--format", "json"],
+      {
+        cwd: process.cwd(),
+        env: process.env,
+        maxBuffer: 1024 * 1024,
+        timeout: 5_000,
+      },
+    );
+    const status = z
+      .object({ isAuthenticated: z.boolean() })
+      .safeParse(JSON.parse(stdout));
+    return status.success ? status.data.isAuthenticated : null;
+  } catch {
+    return null;
+  }
+}
 
 async function readCursorUsage(): Promise<ProviderUsageResult> {
   const accessToken = await readAccessToken();

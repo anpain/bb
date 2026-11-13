@@ -38,6 +38,11 @@ jobs:
           test/system/telemetry-events.test.ts
           test/system/general-settings.test.ts
           test/system/setup-guide.test.ts
+      - name: Test provider authentication bridge
+        run: >-
+          pnpm exec turbo run test --filter=@bb/provider-bridge-acp --output-logs=new-only --
+          src/bridge/provider-maintenance.test.ts
+          src/bridge/agent-connection.test.ts
       - name: Build and verify the Linux package
         run: pnpm exec turbo run smoke:tarball --filter=bb-app --output-logs=new-only
       - name: Pack server

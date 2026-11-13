@@ -30,7 +30,96 @@ function cursorMissingInstallationStatus() {
   };
 }
 
+async function withCliFixture(
+  name: string,
+  source: string,
+  run: (command: string) => Promise<void>,
+) {
+  const directory = await mkdtemp(path.join(tmpdir(), "bb-acp-cli-"));
+  try {
+    const script = path.join(directory, "cli.cjs");
+    await writeFile(script, source);
+    const command = path.join(
+      directory,
+      process.platform === "win32" ? `${name}.cmd` : name,
+    );
+    await writeFile(
+      command,
+      process.platform === "win32"
+        ? `@echo off\r\n"${process.execPath}" "%~dp0cli.cjs" %*\r\n`
+        : `#!/bin/sh\nexec '${process.execPath.replaceAll("'", "'\\''")}' '${script.replaceAll("'", "'\\''")}' "$@"\n`,
+      { mode: 0o755 },
+    );
+    await run(command);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+
 describe("ACP provider maintenance", () => {
+  it.each([false, true])(
+    "reads Cursor CLI authentication (%s)",
+    async (authenticated) => {
+      await withCliFixture(
+        "cursor-agent",
+        `console.log(process.argv[2] === "--version" ? "2026.11.11-b912975" : JSON.stringify({ isAuthenticated: ${authenticated} }));`,
+        async (command) => {
+          expect(
+            await getAcpProviderHealth({
+              command,
+              maintenance: CURSOR_ACP_MAINTENANCE,
+            }),
+          ).toMatchObject({
+            health: {
+              status: authenticated ? "ready" : "unauthenticated",
+              loginCommand: "cursor-agent login",
+            },
+          });
+        },
+      );
+    },
+  );
+
+  it.each([
+    [null, "ready"],
+    [-32000, "unauthenticated"],
+    [-32603, "unknown"],
+  ])("maps Kimi ACP authentication %s to %s", async (errorCode, status) => {
+    await withCliFixture(
+      "kimi",
+      `
+        if (process.argv[2] === "--version") {
+          console.log("2.6.0");
+        } else {
+          require("node:readline").createInterface({ input: process.stdin }).on("line", (line) => {
+            const request = JSON.parse(line);
+            const base = { jsonrpc: "2.0", id: request.id };
+            if (request.method === "initialize") {
+              console.log(JSON.stringify({ ...base, result: { protocolVersion: 1 } }));
+            } else {
+              const errorCode = ${errorCode};
+              const result = request.params.methodId !== "login" || process.env.KIMI_DISABLE_TELEMETRY !== "1"
+                ? { error: { code: -32602, message: "Unexpected request" } }
+                : errorCode === null ? { result: {} } : { error: { code: errorCode, message: "Test error" } };
+              console.log(JSON.stringify({ ...base, ...result }));
+            }
+          });
+        }
+      `,
+      async (command) => {
+        expect(
+          await getAcpProviderHealth({ command, maintenance: undefined }),
+        ).toMatchObject({
+          health: {
+            status,
+            installedVersion: "2.6.0",
+            loginCommand: "kimi acp --login",
+          },
+        });
+      },
+    );
+  });
+
   it.each([
     ["2026.03.07-acde123", "2026.03.07-acde123"],
     ["Cursor 2026.03.17-acde123", "2026.03.17-acde123"],

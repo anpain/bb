@@ -70,6 +70,7 @@ export function useAgentSignIns({
   isLocalHost,
   terminals,
   refetchStates,
+  onSignedIn,
 }: {
   redesign: boolean;
   hostId: string | null;
@@ -78,6 +79,7 @@ export function useAgentSignIns({
   isLocalHost: (hostId: string) => boolean;
   terminals: AgentSignInTerminals;
   refetchStates: RefetchProviderStates;
+  onSignedIn?: () => void;
 }) {
   const [signIns, setSignIns] = useState<ReadonlyMap<string, SignInSession>>(
     () => new Map(),
@@ -134,10 +136,14 @@ export function useAgentSignIns({
       const exit = takeExit(providerId);
       if (exit === undefined) return;
       if (!exit.rowOpen) return;
-      if (!ready) setFailedProviderIds((ids) => withKey(ids, providerId));
+      if (ready) {
+        onSignedIn?.();
+      } else {
+        setFailedProviderIds((ids) => withKey(ids, providerId));
+      }
       closeRow(providerId, false);
     },
-    [closeRow, takeExit],
+    [closeRow, onSignedIn, takeExit],
   );
 
   const end = useCallback(
@@ -244,12 +250,16 @@ export function useAgentSignIns({
 
   useEffect(() => {
     for (const providerId of signIns.keys()) {
+      if (!signInsRef.current.has(providerId)) continue;
       const status = states?.find(
         (state) => state.providerId === providerId,
       )?.status;
-      if (status === "ready") end(providerId);
+      if (status === "ready") {
+        end(providerId);
+        onSignedIn?.();
+      }
     }
-  }, [end, signIns, states]);
+  }, [end, onSignedIn, signIns, states]);
 
   const start = async (providerId: string, requestedMethod?: SignInMethod) => {
     const state = states?.find((entry) => entry.providerId === providerId);
@@ -280,13 +290,15 @@ export function useAgentSignIns({
     setStartingProviderIds((ids) => withKey(ids, providerId));
 
     const title = `Sign in to ${state.displayName}`;
-    await terminals.closeAbandoned({ hostId, title });
     let session: TerminalSession;
     try {
+      await terminals.closeAbandoned({ hostId, title });
+      if (requestsRef.current.get(providerId) !== request) return;
       session = await terminals.create({ hostId, title, command });
     } catch {
       if (requestsRef.current.get(providerId) === request) {
         setStartingProviderIds((ids) => withoutKey(ids, providerId));
+        setFailedProviderIds((ids) => withKey(ids, providerId));
       }
 
       return;

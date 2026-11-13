@@ -120,6 +120,7 @@ export const KNOWN_ACP_AGENTS: readonly AcpAgentDefinition[] = [
     displayName: "Kimi Code",
     icon: declaredIcon("registry-kimi"),
     signInCommand: "kimi acp --login",
+    guidedSignIn: true,
     installUrl:
       "https://www.kimi.com/code/docs/en/kimi-code-cli/reference/kimi-acp.html",
     visibility: "installed",

@@ -40,6 +40,7 @@ import {
   SortableSettingsRowList,
   useSortableSettingsRow,
 } from "./sortable-settings-rows";
+import { ProviderAccountsSettings } from "./ProviderAccountsSettings";
 
 function idleTimeoutLabel(minutes: number): string {
   return minutes === 0 ? "ASAP" : `${minutes} minutes`;
@@ -315,6 +316,7 @@ export function ProvidersSettingsSection({
 
   return (
     <>
+      <ProviderAccountsSettings disabled={disabled} />
       <SettingsSection
         title="Providers"
         description="Choose which agents you use in BB. Drag to reorder them in provider pickers."

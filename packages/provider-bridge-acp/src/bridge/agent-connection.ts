@@ -378,10 +378,12 @@ export async function requestAcpInitialize(
     parameterizedModelPicker,
     fsAccess,
     elicitation = false,
+    timeoutMs = ACP_INITIALIZE_TIMEOUT_MS,
   }: {
     parameterizedModelPicker: boolean;
     fsAccess: boolean;
     elicitation?: boolean;
+    timeoutMs?: number;
   },
 ): Promise<AcpAgentCapabilities> {
   const result = await connection.request({
@@ -396,7 +398,7 @@ export async function requestAcpInitialize(
       ),
     },
     resultSchema: z.unknown(),
-    timeoutMs: ACP_INITIALIZE_TIMEOUT_MS,
+    timeoutMs,
   });
   return readAcpAgentCapabilities(result);
 }

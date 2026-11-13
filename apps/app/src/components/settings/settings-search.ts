@@ -115,6 +115,19 @@ export const SETTINGS_SEARCH_INDEX: Record<
   providers: {
     keywords: ["agents", "models"],
     settings: [
+      {
+        title: "Provider accounts",
+        keywords: [
+          "sign in",
+          "login",
+          "oauth",
+          "cursor",
+          "codex",
+          "claude",
+          "kimi",
+          "вход",
+        ],
+      },
       { title: "Agent profiles", keywords: ["aliases", "dispatch", "codex", "kimi", "claude", "opencode", "кодекс", "кими", "клод", "опенкод", "default model"] },
       {
         title: "Allow faster service tiers",

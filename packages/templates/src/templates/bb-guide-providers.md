@@ -64,6 +64,13 @@ Enabling and disabling providers
 Manage agents in Settings → Providers. Install provider plugins in Settings →
 Plugins.
 
+Sign in on the server machine in Settings → Providers → Provider accounts.
+For terminal access, use `bb terminal create --machine <id-or-name> --attach
+--command "<provider login command>"`. SDK clients can read account readiness
+and commands with `system.providerStates({ hostId })`, create a host-scoped
+terminal with `terminals.create()`, and use `terminals.output()` and
+`terminals.input()` to interact with it.
+
   bb provider disable <id>
   bb provider enable <id>
   bb provider list --all

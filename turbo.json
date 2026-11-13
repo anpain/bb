@@ -300,6 +300,11 @@
       "outputs": ["release/**"],
       "passThroughEnv": ["*"]
     },
+    "@bb/desktop#desktop:version-feed": {
+      "cache": false,
+      "outputs": ["release/desktop-version*.json"],
+      "passThroughEnv": ["BB_DESKTOP_RELEASE_CHANNEL"]
+    },
     "@bb/desktop#smoke:packaged": {
       "cache": false,
       "outputs": [],

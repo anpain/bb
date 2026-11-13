@@ -61,6 +61,11 @@ for tool in curl tar xz sha256sum systemctl runuser getent useradd; do
   command -v "$tool" >/dev/null || fail "Missing prerequisite: $tool. See docs/server-deployment.md."
 done
 [[ -d /run/systemd/system ]] || fail "A running systemd instance is required."
+dropins=$(systemctl show "$service.service" --property=DropInPaths --value 2>/dev/null || true)
+[[ -z $dropins ]] || fail "This service has systemd drop-ins. Consolidate them before using this installer; see docs/server-deployment.md."
+for directory in data workspaces runtime packages backups .local .local/bin; do
+  [[ ! -L $prefix/$directory ]] || fail "Managed directory is a symlink: $prefix/$directory"
+done
 
 if [[ -z $node_dir ]]; then
   if [[ -x /opt/bb/node/bin/node ]]; then

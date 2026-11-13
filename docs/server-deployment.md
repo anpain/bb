@@ -79,6 +79,13 @@ For an existing Node 22.19+ installation, pass its **bin directory** with
 for defaults. An existing service user's home must match the prefix. A separate
 instance needs its own user, prefix, service and pair of ports.
 
+The installer refuses existing systemd drop-ins and symlinked managed
+directories. This prevents a legacy `ExecStart` override from silently keeping
+an older runtime active. For a previously hand-written deployment, back up and
+review its unit and overrides first; consolidate required environment values
+into `server.env` before adopting this installer. Keep the existing deployment
+procedure until that migration is reviewed.
+
 ## 3. Connect Windows
 
 In a checkout of this repository on Windows:

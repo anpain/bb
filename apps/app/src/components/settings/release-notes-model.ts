@@ -118,6 +118,8 @@ export function findReleaseEntry(
   bundledEntries: readonly ChangelogEntry[],
 ): ChangelogEntry | null {
   return (
+    fetchedEntries?.find((candidate) => candidate.version === version) ??
+    bundledEntries.find((candidate) => candidate.version === version) ??
     (fetchedEntries === undefined
       ? null
       : findEntryCoveringRelease(version, fetchedEntries)) ??

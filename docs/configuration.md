@@ -1639,3 +1639,12 @@ individual clients; the desktop saves its selection separately.
 Built-in agent profile aliases default to English names. Stored profiles with
 an unchanged legacy default alias list are upgraded when settings are read.
 Edited alias lists and custom profiles remain user configurable.
+
+
+### Reproducible Linux service deployment
+
+The fork's systemd deployment installer and templates live in `scripts/server`.
+See [server-deployment.md](server-deployment.md) for all script options,
+private loopback ports, `server.env`, writable provider installation paths,
+backups and the Windows SSH-tunnel helper. Adding a connection in Desktop
+selects an existing bb server; it does not provision the destination.

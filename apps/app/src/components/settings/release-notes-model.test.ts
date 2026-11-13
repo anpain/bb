@@ -200,6 +200,13 @@ Fetched lede.
 `);
 
 describe("findReleaseEntry", () => {
+  it("keeps exact bundled fork notes while the published branch still has older notes", () => {
+    const bundled = parseChangelog("## 0.49.6\n\nFork notes.\n");
+    const published = parseChangelog("## 0.49.0\n\nOlder notes.\n");
+    expect(findReleaseEntry("0.49.6", published, bundled)?.version).toBe(
+      "0.49.6",
+    );
+  });
   it("prefers the fetched changelog and falls back to the bundled one", () => {
     const bundled = parseChangelog(`## 0.48.0
 

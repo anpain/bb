@@ -1,0 +1,22 @@
+[Unit]
+Description=bb private agent server
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@PREFIX@/workspaces
+Environment=HOME=@PREFIX@
+Environment=PATH=@NODE_DIR@:@PREFIX@/.local/bin:@PREFIX@/tools/node_modules/.bin:/usr/local/bin:/usr/bin:/bin
+Environment=NPM_CONFIG_PREFIX=@PREFIX@/.local
+EnvironmentFile=@PREFIX@/server.env
+ExecStart=@NODE_DIR@/node @PREFIX@/runtime/current/node_modules/bb-app/dist/bb-app.js --data-dir @PREFIX@/data --server-bind-host 127.0.0.1 --server-port @PORT@ --host-daemon-port @DAEMON_PORT@ --no-in-app-updates
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=45
+KillMode=control-group
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

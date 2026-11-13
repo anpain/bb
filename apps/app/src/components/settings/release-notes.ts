@@ -1,11 +1,11 @@
 import { openUrlInExternalBrowser } from "@/lib/url-open-routing";
 import type { SourceUpdateNotes } from "./release-notes-model";
 
-const RELEASE_NOTES_BASE_URL = "https://getbb.app/changelog";
+const RELEASE_NOTES_BASE_URL = "https://github.com/anpain/bb/blob/main/CHANGELOG.md";
 const SOURCE_REPOSITORY_URL = "https://github.com/get-bb/bb";
 
 export function getReleaseNotesUrl(version: string): string {
-  return `${RELEASE_NOTES_BASE_URL}#${version.replaceAll(".", "-")}`;
+  return `${RELEASE_NOTES_BASE_URL}#${version.replaceAll(".", "")}`;
 }
 
 export function getSourceCompareUrl(update: SourceUpdateNotes): string {

@@ -10,30 +10,23 @@ Version checks use this fork's release feeds. Automatic installation remains dis
 
 ## Connect to your Linux server
 
-The **Build fork Linux server** workflow produces the `bb-server-linux-x64` artifact. Extract its `bb-app-*.tgz` and install the package into the service user's home directory with Node.js 22.19 or newer.
+Follow [Deploy this bb fork on a Linux server](server-deployment.md) for package
+downloads, the committed installer and systemd templates, SSH forwarding,
+provider setup, updates and request routing. The installer deploys bb once;
+the desktop does not provision a VPS when an address is added.
 
-```bash
-npm install --prefix "$HOME/bb-runtime" --no-audit --no-fund /path/to/bb-app-0.49.6.tgz
-KIMI_DISABLE_TELEMETRY=1 DO_NOT_TRACK=1 \
-  "$HOME/bb-runtime/node_modules/.bin/bb-app" \
-  --data-dir "$HOME/data" --server-bind-host 127.0.0.1 --no-in-app-updates
-```
+## Release preparation after 0.49.6
 
-Install the provider CLIs on the server and put them on the PATH of the user that runs the bb host daemon. On Windows, forward the bb port over SSH.
-
-```powershell
-ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:48886:127.0.0.1:38886 user@host
-```
-
-In bb desktop, use **Desktop Settings → Server → Add Server** and enter `http://127.0.0.1:48886`. Use a server worktree for each task and fetch its Git branch on Windows when you need to run the result locally.
-
-Open **Settings → Providers → Provider accounts**. Choose **Sign in** next to Codex, Claude Code, Cursor, or Kimi Code, and follow that provider's browser instructions. The login command runs on the server machine and saves the account there. On a headless Linux service set `NO_OPEN_BROWSER=1` in the service environment so Cursor prints its link. Codex may require enabling device code authorization in the OpenAI account first.
-
-For a self-hosted Linux deployment, set `KIMI_DISABLE_TELEMETRY=1` and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` in the daemon environment, and set `analytics.enabled = false` and `feedback.enabled = false` in the daemon user's Codex configuration. Cursor CLI is distributed by Cursor and has its own data handling. Each provider receives the requests required to generate responses.
+The 0.49.6 Linux and Windows artifacts were built from commit `fcfbc89`.
+Subsequent repository work adds per-version changelog entries, deployment
+scripts and documentation, and Plugin SDK compatibility version 0.6.142.
+Those follow-up changes are not present in the earlier 0.49.6 artifacts.
+Windows installer builds remain manual and have not been requested again.
 
 ## Verification on 2026-11-13
 
-- macOS ARM64 packaging and the packaged renderer/preload startup smoke passed.
-- Desktop typechecks/tests and provider usage typechecks/tests passed.
-- Rail icons resolve provider directory metadata by provider ID rather than account ID, with a regression covering missing account logos.
-- Earlier fork work includes telemetry removal, Kimi ACP support, agent profiles, and composer/navigation changes. Build logs are intentionally excluded from Git.
+- 0.49.6 [Linux package checks](https://github.com/anpain/bb/actions/runs/43411050569) and [Windows packaged startup checks](https://github.com/anpain/bb/actions/runs/43411050536) passed before publication.
+- Release-note parsing, selection and Settings UI: 94 targeted tests passed. Plugin SDK compatibility version: one test passed. App TypeScript checking passed.
+- The committed Linux installer was exercised on an isolated systemd instance: automatic Node bootstrap, fresh install, API and primary daemon readiness, and rollback after an injected verification failure all passed. The prior runtime, data and workspace survived; the temporary instance was removed afterward.
+- The PowerShell tunnel helper passed syntax validation. The equivalent OpenSSH tunnel is used for the live server connection.
+- These targeted checks do not constitute a full repository CI run or an interactive test of every provider/account combination.

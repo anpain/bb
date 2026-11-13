@@ -8,7 +8,7 @@
 
 # bb
 
-[![npm version](https://img.shields.io/npm/v/bb-app.svg)](https://www.npmjs.com/package/bb-app)
+[Fork releases](https://github.com/anpain/bb/releases/tag/desktop-latest)
 [![Join Discord](https://img.shields.io/badge/Discord-Join%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/kvBU6tJhcJ)
 
 bb is an agentic IDE that builds itself. It can control, customize, and automate
@@ -26,69 +26,51 @@ or hand off to another agent.
   <img alt="bb desktop app showing a code review thread, dispatch panel, and task board" src="assets/app-screenshot.png" width="800">
 </p>
 
-## Use bb
+## This fork
 
-### Download the desktop app
+This is [anpain/bb](https://github.com/anpain/bb), based on the `privacy-kimi`
+fork. It supports local execution and execution on your Linux server, removes
+bb product telemetry, and adds provider installation and account controls.
+Read the [complete fork changelog for 0.49.0–0.49.6](./CHANGELOG.md#0496).
 
-The recommended way to start using bb is the desktop app:
+## Quick start
 
-**[Download the latest desktop app](https://github.com/get-bb/bb/releases/tag/desktop-latest)**
+- **Windows, local execution:** use the [fork desktop downloads](https://github.com/anpain/bb/releases/tag/desktop-latest), launch bb, and select **Settings → Execution mode → Local on this computer**. Install and sign in to the providers you want under **Settings → Providers**. Native Windows requires [Git for Windows](https://git-scm.com/download/win). Support varies by provider; for Linux-only CLIs use a Linux server or WSL.
+- **Your Linux server:** follow the [server setup guide](./docs/server-deployment.md). The repository includes a systemd installer, service and environment templates, health verification, and a PowerShell SSH-tunnel helper in [`scripts/server`](./scripts/server/).
+- **Switch local/server:** open **Settings → Execution mode**, select a saved server or choose **Add server**. Projects, history, settings and provider accounts belong to the selected server. Switching does not copy files or account credentials.
 
-The desktop app supports macOS on Apple Silicon (arm64). The Linux x64 AppImage
-and the Windows x64 installer are alpha: expect problems, and please report
-them. Intel Mac users should run bb with `npx` instead. Native Windows needs
-[Git for Windows](https://git-scm.com/download/win), which bb uses for Git and
-for environment setup scripts. You can also run bb inside
-[WSL2 (Windows Subsystem for Linux)](https://learn.microsoft.com/windows/wsl/install):
-install WSL2 first, then run the `npx` command below from your WSL2 (Linux)
-shell.
+The desktop does not provision a fresh VPS when you enter an address. Run the
+server installer once, connect over SSH, then use **Providers → Provider
+installation** to install or remove supported CLIs and **Provider accounts** to
+sign in. Account authorization always requires your own confirmation.
 
-Early adopters can install
-**[bb Nightly](https://github.com/get-bb/bb/releases/tag/desktop-nightly)**
-alongside the stable desktop app. It has a separate application identity,
-yellow icon, and auto-update feed.
+### How requests travel
 
-### Or run it anywhere with npx
+In server mode: **bb Desktop/browser → SSH tunnel → your bb server → host daemon
+and provider CLI on that server → model provider**. Responses stream back along
+the same route. File edits and commands run on that server's workspace.
 
-```bash
-npx bb-app@latest
-```
+In local mode: **bb Desktop → embedded local bb server → local host daemon and
+provider CLI → model provider**. Files and commands stay on your computer.
+Cloud providers still require internet. These modes affect bb; they do not
+change Windows routing, the system proxy or VPN.
 
-Then open `http://localhost:38886`.
+A connected server is an execution host, not a server hosting model weights.
+Codex, Claude Code, Cursor and Kimi use their providers' services and your
+accounts. See [connection and request details](./docs/server-deployment.md#connections-and-request-routing).
 
-To control bb from outside bb with the `bb` CLI, open **Settings → General →
-Command line** and choose **Install**. See
-[The bb Command On PATH](./docs/configuration.md#the-bb-command-on-path).
+### Releases and privacy
 
-To run the newest automated build instead:
+Windows installer builds are manual. Linux server builds are available as
+GitHub Actions artifacts. [Deployment and build details](./docs/fork-desktop.md)
+explain how to get the fork's package. `npx bb-app@latest` downloads the upstream
+npm package, not this fork; use this fork's artifacts or build from this source.
 
-```bash
-npx bb-app@nightly
-```
-
-npm 12 and later block dependency install scripts by default. bb needs those
-scripts to build its native add-ons. If your npm version is 12 or later, allow
-the scripts for the install:
-
-```bash
-npx --allow-scripts=better-sqlite3,node-pty,@parcel/watcher bb-app@latest
-```
-
-Or set the policy once for all global installs:
-
-```bash
-npm config set allow-scripts=better-sqlite3,node-pty,@parcel/watcher --location=user
-```
-
-bb uses the provider CLI you already have authenticated.
-
-For install requirements, provider setup, configuration, and package-focused
-docs, start with
-[`packages/bb-app`](./packages/bb-app/README.md).
-
-### Telemetry
-
-This fork removes product telemetry from the desktop app, CLI, server, and website. Local diagnostic logs and conversation history remain available. Provider sign-in and model requests use the selected provider. The Kimi adapter launches the CLI with anonymous telemetry disabled.
+This fork removes bb product telemetry. Local diagnostic logs and conversation
+history remain. Provider sign-in and model requests still reach the selected
+provider; third-party CLIs have their own data-handling behavior. The service
+template applies the available telemetry opt-outs described in the deployment
+guide.
 
 ## Development
 

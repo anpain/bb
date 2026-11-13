@@ -1,8 +1,80 @@
 # Changelog
 
+Fork history for 0.49.0–0.49.6 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
+
+## 0.49.6
+
+Native provider removal fixes.
+
+### Fixes
+
+- Recognize absolute executable names reported by Claude Code and Cursor, so Remove works after installing a native CLI rather than an npm package.
+- Retain provider credentials when removing supported native CLI binaries and launchers.
+
+## 0.49.5
+
+Choose where bb executes work.
+
+### Execution mode
+
+- Settings → Execution mode switches bb Desktop between its embedded local server and saved remote servers. Add server opens the desktop connection dialog.
+- The local choice remains available in Settings even when hidden in the native server menu.
+- The primary machine's menu offers Change execution mode instead of a disabled Remove machine action. Additional worker machines can still be removed.
+- Each server keeps its own files, history, settings and provider accounts. Switching does not migrate or synchronize them.
+- Built-in agent profile aliases now use English names. Unchanged legacy default lists are upgraded; edited alias lists remain configurable.
+
+## 0.49.4
+
+Install and remove provider CLI tools from bb.
+
+### Provider management
+
+- Settings → Providers offers Install, Update and Remove for supported CLI installations on the active server. Missing CLIs remain visible so they can be installed again.
+- Removal targets the owning npm prefix or supported native Claude Code and Cursor installation, while retaining account credentials.
+- Install, update and removal run as server jobs with progress and error logs. Different actions on one provider are queued separately.
+- The same actions are available through `bb provider install|remove` and the SDK.
+- Kimi Code can be installed through `@moonshot-ai/kimi-code`.
+- Host daemon protocol 266 adds removal actions; enrolled machines need a compatible daemon.
+
+## 0.49.3
+
+Lower background provider resource use.
+
+### Resource use
+
+- A machine runs at most two concurrent provider maintenance probes across health, models, commands, status and usage.
+- Overlapping provider-state requests share their in-flight work instead of multiplying Node processes.
+- Provider discovery no longer prewarms on startup by default. Background prewarming is opt-in with `BB_PROVIDER_PREWARM`.
+
+## 0.49.2
+
+More reliable Kimi account checks on busy machines.
+
+### Fixes
+
+- Allow up to 15 seconds for Kimi ACP initialization during a sign-in status check, reducing false failures under load.
+
+## 0.49.1
+
+Manage server provider accounts in Settings.
+
+### Provider accounts
+
+- Sign in to Codex, Claude Code, Cursor and Kimi Code from Settings on the machine running the agents.
+- Sign-in terminals start when Sign in is pressed, show provider instructions and can be cancelled.
+- Refresh provider and model availability after a successful sign-in.
+
 ## 0.49.0
 
 A reliability release: threads get unstuck on their own, retries and automations ride out provider outages, reconnecting machines catch up on what they missed, and the server no longer stalls on database maintenance or long threads. bb also loads pages and creates threads faster. This release includes everything from 0.48.1, which shipped without notes.
+
+### Fork additions (November 13, 2026)
+
+- Removed bb product telemetry and its onboarding, provider-failure and event-reporting paths. Local logs and conversation history remain available. Provider CLIs retain their own data-handling behavior.
+- Added Kimi Code ACP support and editable agent profiles with provider aliases and default models.
+- Improved the composer, navigation rail, provider usage controls and changed-file summaries through shared plugin slots.
+- Added verified Linux server packages and unsigned Windows x64 installers, with packaged startup checks and fork-specific release feeds.
+- Kept app updates manual. Windows installer workflows were subsequently changed to manual dispatch after 0.49.6.
 
 ### Reliability
 

@@ -13,9 +13,9 @@ export type {
 } from "../../../../../changelog-parser";
 
 const LATEST_CHANGELOG_SOURCE_URL =
-  "https://raw.githubusercontent.com/get-bb/bb/main/CHANGELOG.md";
+  "https://raw.githubusercontent.com/anpain/bb/main/CHANGELOG.md";
 const LATEST_RELEASE_META_SOURCE_URL =
-  "https://raw.githubusercontent.com/get-bb/bb/main/changelog-metadata.ts";
+  "https://raw.githubusercontent.com/anpain/bb/main/changelog-metadata.ts";
 const RELEASE_META_ENTRY_PATTERN =
   /"(\d+(?:\.\d+){1,3})":\s*\{\s*date:\s*"([^"\\]+)",\s*headline:\s*"([^"\\]+)",?\s*\}/g;
 

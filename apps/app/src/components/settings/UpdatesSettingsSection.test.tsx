@@ -627,12 +627,12 @@ describe("UpdatesSettingsSection", () => {
         name: /Full changelog/,
       });
       expect(link.getAttribute("href")).toBe(
-        "https://getbb.app/changelog#0-47-0",
+        "https://github.com/anpain/bb/blob/main/CHANGELOG.md#0470",
       );
       fireEvent.click(link);
 
       expect(openUrlInExternalBrowserMock).toHaveBeenCalledExactlyOnceWith(
-        "https://getbb.app/changelog#0-47-0",
+        "https://github.com/anpain/bb/blob/main/CHANGELOG.md#0470",
       );
     });
 

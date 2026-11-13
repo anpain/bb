@@ -4,6 +4,30 @@ type ReleaseMeta = {
 };
 
 export const RELEASE_META: Record<string, ReleaseMeta> = {
+  "0.49.6": {
+    date: "November 13, 2026",
+    headline: "Native provider removal fixes",
+  },
+  "0.49.5": {
+    date: "November 13, 2026",
+    headline: "Local or server execution",
+  },
+  "0.49.4": {
+    date: "November 13, 2026",
+    headline: "Install and remove provider CLIs in Settings",
+  },
+  "0.49.3": {
+    date: "November 13, 2026",
+    headline: "Lower background provider resource use",
+  },
+  "0.49.2": {
+    date: "November 13, 2026",
+    headline: "Kimi sign-in checks on busy hosts",
+  },
+  "0.49.1": {
+    date: "November 13, 2026",
+    headline: "Server provider accounts in Settings",
+  },
   "0.49.0": {
     date: "November 6, 2026",
     headline: "A more reliable bb",

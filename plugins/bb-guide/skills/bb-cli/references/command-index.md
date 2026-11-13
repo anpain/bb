@@ -74,6 +74,8 @@ This index lists every command path that the core CLI registers, including alias
 - `bb provider list`
 - `bb provider enable`
 - `bb provider disable`
+- `bb provider install`
+- `bb provider remove`
 - `bb provider models`
 
 Use `--selected-model <model-id>` to discover its reasoning choices and include selected-only entries.

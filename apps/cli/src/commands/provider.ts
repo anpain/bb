@@ -8,7 +8,11 @@ import { action } from "../action.js";
 import { createCliBbSdk } from "../client.js";
 import { columnWidths, printBorderlessTable } from "../table.js";
 import { outputJson } from "./helpers.js";
-import { resolveMachineEnvironmentRouting } from "./machine.js";
+import {
+  resolveMachineEnvironmentRouting,
+  resolveMachineId,
+  resolveMachineTargetOption,
+} from "./machine.js";
 
 interface ProviderListCommandOptions {
   environment?: string;
@@ -50,6 +54,59 @@ export function registerProviderCommands(
   const provider = program
     .command("provider")
     .description("Manage providers and inspect their models");
+
+  for (const operation of ["install", "remove"] as const) {
+    provider
+      .command(`${operation} <providerId>`)
+      .description(
+        operation === "install"
+          ? "Install a provider CLI on a machine"
+          : "Remove a provider CLI from a machine",
+      )
+      .option(
+        "--machine <id-or-name>",
+        "Target machine, defaulting to the server machine",
+      )
+      .option("--host <id-or-name>", "Alias for --machine")
+      .option("--json", "Print machine-readable JSON output")
+      .action(
+        action(async (providerId: string, opts: ProviderListCommandOptions) => {
+          const sdk = createCliBbSdk(getUrl());
+          const target = resolveMachineTargetOption(opts);
+          const hostId =
+            target === undefined
+              ? (await sdk.system.config()).primaryHostId
+              : resolveMachineId(await sdk.hosts.list(), target);
+          if (hostId === null)
+            throw new Error("The server machine is not connected.");
+          const events = await sdk.hosts.installProviderCli({
+            hostId,
+            provider: providerId,
+            actionKind: operation,
+          });
+          if (
+            !events.some((event) => event.type === "completed" && event.success)
+          ) {
+            const failure = events.find((event) => event.type === "error");
+            throw new Error(
+              failure?.message ?? `${providerId} ${operation} failed.`,
+            );
+          }
+          if (
+            outputJson(opts, {
+              hostId,
+              provider: providerId,
+              action: operation,
+              events,
+            })
+          )
+            return;
+          console.log(
+            `${providerId} ${operation === "install" ? "installed" : "removed"} on ${hostId}`,
+          );
+        }),
+      );
+  }
 
   addProviderRoutingOptions(provider.command("list"))
     .description("List available providers")

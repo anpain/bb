@@ -43,11 +43,11 @@ import { makeInstalledPlugin } from "@/test/fixtures/plugins";
 
 export default { title: "sidebar/Update button" };
 
-const UPDATE: ProviderCliInstallAction = {
+const UPDATE = {
   kind: "update",
   label: "Update",
   command: "npm install -g",
-};
+} satisfies ProviderCliInstallAction;
 
 interface ProviderVersions {
   current: string;

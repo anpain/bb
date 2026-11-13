@@ -125,6 +125,7 @@ export const KNOWN_ACP_AGENTS: readonly AcpAgentDefinition[] = [
       "https://www.kimi.com/code/docs/en/kimi-code-cli/reference/kimi-acp.html",
     visibility: "installed",
     providerUsage: true,
+    providerInstallation: true,
     fork: "tip",
     launch: {
       displayName: "Kimi Code",

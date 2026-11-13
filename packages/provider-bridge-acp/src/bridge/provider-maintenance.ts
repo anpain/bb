@@ -17,6 +17,7 @@ import {
   downloadedInstallerCommand,
   resolveExecutablePath,
   versionFrom,
+  npmGlobalInstallCommand,
 } from "@bb/provider-bridge-protocol/bridge-kit";
 import { z } from "zod";
 import {
@@ -149,8 +150,10 @@ function healthResult(args: {
   installedVersion?: string | null;
   statusMessage?: string | null;
   loginCommand?: string;
+  installationAvailable?: boolean;
 }): ProviderHealthResult {
-  const maintained = args.maintenance !== undefined;
+  const maintained =
+    args.maintenance !== undefined || args.installationAvailable === true;
   return {
     supported: true,
     health: {
@@ -229,6 +232,7 @@ export async function getAcpProviderHealth(args: {
   env?: NodeJS.ProcessEnv;
 }): Promise<ProviderHealthResult> {
   const maintenance = args.maintenance;
+  const installationAvailable = acpInstaller(args) !== null;
   if (args.command === null) {
     return healthResult({
       maintenance,
@@ -237,7 +241,11 @@ export async function getAcpProviderHealth(args: {
     });
   }
   if ((await resolveExecutablePath(args.command)) === null) {
-    return healthResult({ maintenance, status: "not_installed" });
+    return healthResult({
+      maintenance,
+      status: "not_installed",
+      installationAvailable,
+    });
   }
   const version = await readAcpCliVersion(args.command);
   if (/^kimi(?:\.(?:exe|cmd|bat))?$/iu.test(path.basename(args.command))) {
@@ -252,6 +260,7 @@ export async function getAcpProviderHealth(args: {
       status,
       installedVersion: version,
       loginCommand: "kimi acp --login",
+      installationAvailable,
       statusMessage:
         status === "unknown" ? "Could not check Kimi Code sign-in." : null,
     });
@@ -281,6 +290,15 @@ export async function getAcpProviderHealth(args: {
   }
 }
 
+function acpInstaller(args: {
+  maintenance: AcpMaintenanceDialect | undefined;
+  command: string | null;
+}) {
+  return args.command === "kimi"
+    ? npmGlobalInstallCommand("@moonshot-ai/kimi-code")
+    : (args.maintenance?.installer() ?? null);
+}
+
 export async function getAcpProviderInstallationStatus(args: {
   maintenance: AcpMaintenanceDialect | undefined;
   command: string | null;
@@ -293,12 +311,13 @@ export async function getAcpProviderInstallationStatus(args: {
     installed && args.command !== null
       ? await readAcpCliVersion(args.command)
       : null;
+  const installer = acpInstaller(args);
   const installAction =
-    args.maintenance !== undefined && !installed
+    installer !== null && !installed
       ? {
           kind: "install" as const,
           label: "Install" as const,
-          command: args.maintenance.installer().displayCommand,
+          command: installer.displayCommand,
         }
       : null;
   return {
@@ -309,7 +328,7 @@ export async function getAcpProviderInstallationStatus(args: {
     currentVersion,
     latestVersion: null,
     minimumSupportedVersion: null,
-    npmPackageName: null,
+    npmPackageName: args.command === "kimi" ? "@moonshot-ai/kimi-code" : null,
     npmGlobalPackageVersion: null,
     installAction,
     needsUpdate: false,
@@ -334,10 +353,8 @@ function buildAcpProviderInstallationRun(
     action: "install" | "update";
   },
 ): ProviderInstallationRunResult {
-  if (
-    status.installAction?.kind !== args.action ||
-    args.maintenance === undefined
-  ) {
+  const installer = acpInstaller(args);
+  if (status.installAction?.kind !== args.action || installer === null) {
     return {
       available: false,
       message: `${args.command ?? "This ACP agent"} ${args.action} is not available on this host.`,
@@ -345,7 +362,7 @@ function buildAcpProviderInstallationRun(
   }
   return {
     available: true,
-    command: args.maintenance.installer(),
+    command: installer,
     verification: { kind: "installed" },
   };
 }

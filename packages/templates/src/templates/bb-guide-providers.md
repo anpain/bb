@@ -11,6 +11,9 @@ Providers are agent backends (e.g., codex, claude-code). Each supports different
 
   bb provider list [--machine <id-or-name> | --environment <id>]
                                           List available providers
+  bb provider install <providerId> [--machine <id-or-name>] [--json]
+  bb provider remove <providerId> [--machine <id-or-name>] [--json]
+                                          Install or remove a machine's CLI
   bb provider models [providerId] [--machine <id-or-name> | --environment <id>]
                      [--project <id>]
     [--selected-model <model-id>]
@@ -67,6 +70,15 @@ Enabling and disabling providers
 
 Manage agents in Settings → Providers. Install provider plugins in Settings →
 Plugins.
+
+Settings → Providers → Provider installation manages the CLI executable on the
+server machine. Removed providers remain available to install again. Removing
+a CLI retains saved credentials and chat history. Removal is available for
+writable npm installations and supported user-local Cursor and Claude installs.
+SDK clients use `hosts.providerCliStatus({ hostId })` to inspect `installAction`
+and `removeAction`, then `hosts.installProviderCli({ hostId, provider, actionKind:
+"install" | "remove" })`. Both CLI commands accept `--host` as an alias for
+`--machine` and default to the server machine.
 
 Sign in on the server machine in Settings → Providers → Provider accounts.
 For terminal access, use `bb terminal create --machine <id-or-name> --attach

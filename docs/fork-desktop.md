@@ -13,7 +13,7 @@ Version checks use this fork's release feeds. Automatic installation remains dis
 The **Build fork Linux server** workflow produces the `bb-server-linux-x64` artifact. Extract its `bb-app-*.tgz` and install the package into the service user's home directory with Node.js 22.19 or newer.
 
 ```bash
-npm install --prefix "$HOME/bb-runtime" --no-audit --no-fund /path/to/bb-app-0.49.3.tgz
+npm install --prefix "$HOME/bb-runtime" --no-audit --no-fund /path/to/bb-app-0.49.4.tgz
 KIMI_DISABLE_TELEMETRY=1 DO_NOT_TRACK=1 \
   "$HOME/bb-runtime/node_modules/.bin/bb-app" \
   --data-dir "$HOME/data" --server-bind-host 127.0.0.1 --no-in-app-updates

@@ -16,7 +16,6 @@ import {
   callHostRetryableOnlineRpc,
   isHostUnavailableApiError,
 } from "../hosts/online-rpc.js";
-import { listSystemProviderInfos } from "./execution-options.js";
 import { resolveBridgeLaunchForProviderId } from "./provider-bridge-launch.js";
 import { mapProviderMaintenanceRequests } from "./provider-maintenance-concurrency.js";
 
@@ -100,10 +99,14 @@ export async function getProviderInstallations(
   args: { hostId: string; mode: ProviderInstallationsReadMode },
 ): Promise<ProviderCliStatusResponse> {
   const deadline = Date.now() + PROVIDER_INSTALLATION_STATUS_TIMEOUT_MS;
-  const providers = await listSystemProviderInfos(deps, {
-    hostId: args.hostId,
-    capability: "installation",
-  });
+  await deps.providerRegistry.whenRegistrationsSettled();
+  const disabled = deps.providerRegistry.disabledProviderIds();
+  const providers = deps.providerRegistry
+    .list()
+    .filter(
+      ({ info }) => info.maintenance.installation && !disabled.has(info.id),
+    )
+    .map(({ info }) => info);
   return aggregateProviderInstallations(providers, {
     deadlineMs: deadline,
     now: Date.now,
@@ -226,7 +229,9 @@ export async function settleUnneededProviderInstallation(
   const current =
     args.action === "install"
       ? status.installed
-      : status.installed && !status.needsUpdate && !status.versionUnsupported;
+      : args.action === "remove"
+        ? !status.installed
+        : status.installed && !status.needsUpdate && !status.versionUnsupported;
   return current
     ? [
         {

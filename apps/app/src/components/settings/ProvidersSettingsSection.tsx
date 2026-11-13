@@ -41,6 +41,7 @@ import {
   useSortableSettingsRow,
 } from "./sortable-settings-rows";
 import { ProviderAccountsSettings } from "./ProviderAccountsSettings";
+import { ProviderInstallationSettings } from "./ProviderInstallationSettings";
 
 function idleTimeoutLabel(minutes: number): string {
   return minutes === 0 ? "ASAP" : `${minutes} minutes`;
@@ -316,6 +317,7 @@ export function ProvidersSettingsSection({
 
   return (
     <>
+      <ProviderInstallationSettings disabled={disabled} />
       <ProviderAccountsSettings disabled={disabled} />
       <SettingsSection
         title="Providers"

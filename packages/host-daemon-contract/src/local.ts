@@ -177,7 +177,11 @@ const providerCliInstallSourceValues = [
 ] as const;
 const providerCliInstallSourceSchema = z.enum(providerCliInstallSourceValues);
 
-const providerCliInstallActionKindValues = ["install", "update"] as const;
+const providerCliInstallActionKindValues = [
+  "install",
+  "update",
+  "remove",
+] as const;
 export const providerCliInstallActionKindSchema = z.enum(
   providerCliInstallActionKindValues,
 );
@@ -185,9 +189,9 @@ export type ProviderCliInstallActionKind = z.infer<
   typeof providerCliInstallActionKindSchema
 >;
 
-const providerCliInstallActionSchema = z.object({
+export const providerCliInstallActionSchema = z.object({
   kind: providerCliInstallActionKindSchema,
-  label: z.enum(["Install", "Update"]),
+  label: z.enum(["Install", "Update", "Remove"]),
   command: z.string().min(1),
 });
 export type ProviderCliInstallAction = z.infer<
@@ -205,7 +209,19 @@ const providerCliStatusSchema = z.object({
   minimumSupportedVersion: z.string().min(1).nullable(),
   npmPackageName: z.string().min(1).nullable(),
   npmGlobalPackageVersion: z.string().min(1).nullable(),
-  installAction: providerCliInstallActionSchema.nullable(),
+  installAction: providerCliInstallActionSchema
+    .extend({
+      kind: z.enum(["install", "update"]),
+      label: z.enum(["Install", "Update"]),
+    })
+    .nullable(),
+  removeAction: providerCliInstallActionSchema
+    .extend({
+      kind: z.literal("remove"),
+      label: z.literal("Remove"),
+    })
+    .nullable()
+    .optional(),
   needsUpdate: z.boolean(),
   versionUnsupported: z.boolean(),
 });

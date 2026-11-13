@@ -21,7 +21,7 @@ export interface ProviderCliStatusEntry {
 export interface ProviderCliIssue {
   provider: ProviderCliKey;
   status: ProviderCliStatus;
-  action: ProviderCliStatus["installAction"];
+  action: ProviderCliInstallAction | null;
   title: string;
   description: string;
   fingerprint: string;

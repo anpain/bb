@@ -489,7 +489,7 @@ export function registerHostRoutes(
       );
     }
     return installJobs.start({
-      key: `${hostId} ${payload.provider}`,
+      key: `${hostId} ${payload.provider} ${payload.actionKind}`,
       lane: hostId,
       create: (id) => ({
         id,

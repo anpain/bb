@@ -1315,7 +1315,12 @@ The published lede.
       command: string,
     ): ProviderCliActionableIssue => {
       const issue = makeUpdateIssue({ provider });
-      const action = { ...issue.action, command };
+      const action = {
+        ...issue.action,
+        kind: "update" as const,
+        label: "Update" as const,
+        command,
+      };
       return {
         ...issue,
         action,

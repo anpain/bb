@@ -19,6 +19,7 @@ import type { ProviderInfo } from "@bb/domain";
 import { defaultAppSettings } from "@bb/domain";
 import { makeProviderInfo } from "@bb/test-helpers/domain-fixtures";
 import { makeTerminalSession } from "@/test/fixtures/terminal-sessions";
+import type { ProviderCliStatusResponse } from "@bb/host-daemon-contract";
 import {
   ProvidersSettingsSection,
   reorderProviderIds,
@@ -33,6 +34,8 @@ const mocks = vi.hoisted(() => ({
   closeTerminal: vi.fn(),
   closeAbandoned: vi.fn(),
   refetchStates: vi.fn(),
+  cliStatuses: {} as ProviderCliStatusResponse,
+  startInstall: vi.fn(),
 }));
 
 vi.mock("@/hooks/queries/host-queries", async (original) => ({
@@ -52,6 +55,19 @@ vi.mock("@/hooks/queries/system-queries", () => ({
     dataUpdatedAt: Date.now(),
     errorUpdatedAt: 0,
     refetch: mocks.refetchStates,
+  }),
+  useHostProviderCliStatus: () => ({
+    data: mocks.cliStatuses,
+    isPending: false,
+  }),
+}));
+
+vi.mock("@/components/provider-cli/provider-cli-install", () => ({
+  useProviderCliInstallRunner: () => ({
+    startInstall: mocks.startInstall,
+    runningJobKey: null,
+    queuedJobKeys: new Set(),
+    failuresByJobKey: new Map(),
   }),
 }));
 
@@ -108,10 +124,82 @@ afterEach(() => {
   cleanup();
   mocks.catalog = [];
   mocks.states = [];
+  mocks.cliStatuses = {};
   vi.clearAllMocks();
 });
 
 describe("ProvidersSettingsSection", () => {
+  it("offers server CLI removal and reinstall without starting a login", () => {
+    const base = {
+      displayName: "Claude Code",
+      executableName: "claude",
+      executablePath: "/tools/node_modules/.bin/claude",
+      installed: true,
+      installSource: "external" as const,
+      currentVersion: "2.1.323",
+      latestVersion: null,
+      minimumSupportedVersion: null,
+      npmPackageName: "@anthropic-ai/claude-code",
+      npmGlobalPackageVersion: null,
+      installAction: null,
+      removeAction: {
+        kind: "remove" as const,
+        label: "Remove" as const,
+        command: "npm uninstall --prefix /tools @anthropic-ai/claude-code",
+      },
+      needsUpdate: false,
+      versionUnsupported: false,
+    };
+    mocks.cliStatuses = { "claude-code": base };
+    const settings = () => (
+      <ProvidersSettingsSection
+        disabled={false}
+        generalSettings={defaultAppSettings}
+        onGeneralSettingsChange={vi.fn()}
+      />
+    );
+    const view = render(settings());
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove Claude Code CLI" }),
+    );
+    expect(mocks.startInstall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hostId: "host_server",
+        issue: expect.objectContaining({
+          provider: "claude-code",
+          action: expect.objectContaining({ kind: "remove" }),
+        }),
+      }),
+    );
+    mocks.cliStatuses = {
+      "claude-code": {
+        ...base,
+        installed: false,
+        executablePath: null,
+        currentVersion: null,
+        removeAction: null,
+        installAction: {
+          kind: "install",
+          label: "Install",
+          command: "install claude",
+        },
+      },
+    };
+    view.rerender(settings());
+    fireEvent.click(
+      screen.getByRole("button", { name: "Install Claude Code CLI" }),
+    );
+    expect(mocks.startInstall).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        hostId: "host_server",
+        issue: expect.objectContaining({
+          action: expect.objectContaining({ kind: "install" }),
+        }),
+      }),
+    );
+    expect(mocks.createTerminal).not.toHaveBeenCalled();
+  });
+
   it("starts a device sign-in on the server and closes its terminal when ready", async () => {
     const codex: SystemProviderState = {
       providerId: "codex",

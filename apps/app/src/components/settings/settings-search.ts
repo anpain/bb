@@ -116,6 +116,17 @@ export const SETTINGS_SEARCH_INDEX: Record<
     keywords: ["agents", "models"],
     settings: [
       {
+        title: "Provider installation",
+        keywords: [
+          "install",
+          "uninstall",
+          "remove",
+          "CLI",
+          "установка",
+          "удалить",
+        ],
+      },
+      {
         title: "Provider accounts",
         keywords: [
           "sign in",

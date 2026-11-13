@@ -1,6 +1,10 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { withVcsProcessPriority } from "@bb/process-utils";
+import {
+  resolvePortableCommand,
+  withVcsProcessPriority,
+} from "@bb/process-utils";
+import { providerCliRemovalCommand } from "./provider-cli-removal.js";
 import { operationEnvironment } from "./operation-environment.js";
 import {
   runEnvironmentHook,
@@ -281,10 +285,13 @@ async function runProviderInstallationOnHost(
       providerId: command.providerId,
       bridgeLaunch,
     };
-    const run = await options.providerInstallationRun({
-      ...maintenanceArgs,
-      action: command.action,
-    });
+    const run =
+      command.action === "remove"
+        ? await prepareProviderCliRemoval(options, maintenanceArgs)
+        : await options.providerInstallationRun({
+            ...maintenanceArgs,
+            action: command.action,
+          });
     if (!run.available) {
       return {
         events: [
@@ -307,9 +314,17 @@ async function runProviderInstallationOnHost(
     );
     if (events.some((event) => event.type === "completed" && event.success)) {
       try {
-        const status =
-          await options.providerInstallationStatus(maintenanceArgs);
-        if (!installationVerificationPassed(run.verification, status)) {
+        const verified =
+          run.verification.kind === "removed"
+            ? resolvePortableCommand(run.verification.executableName, {
+                cwd: process.cwd(),
+                env,
+              }) === undefined
+            : installationVerificationPassed(
+                run.verification,
+                await options.providerInstallationStatus(maintenanceArgs),
+              );
+        if (!verified) {
           events = failProviderInstallationVerification({
             providerId: command.providerId,
             events,
@@ -342,6 +357,30 @@ async function runProviderInstallationOnHost(
     }
     throw error;
   }
+}
+
+async function prepareProviderCliRemoval(
+  options: CommandDispatchOptions,
+  args: { providerId: string; bridgeLaunch: AgentRuntimeBridgeLaunch },
+) {
+  const status = await options.providerInstallationStatus({
+    ...args,
+    checkUpdates: false,
+  });
+  const command = await providerCliRemovalCommand(status);
+  return command === null
+    ? {
+        available: false as const,
+        message: `Automatic removal of ${args.providerId} is unavailable for this installation.`,
+      }
+    : {
+        available: true as const,
+        command,
+        verification: {
+          kind: "removed" as const,
+          executableName: status.executableName,
+        },
+      };
 }
 
 async function withRetainedThreadEnvironment<TResult>(
@@ -662,10 +701,22 @@ const onlineRpcHandlers: OnlineRpcHandlerMap = {
       command.bridgeLaunch,
       options,
     );
-    return options.providerInstallationStatus({
+    const status = await options.providerInstallationStatus({
       providerId: command.providerId,
       bridgeLaunch,
     });
+    const removal = await providerCliRemovalCommand(status);
+    return {
+      ...status,
+      removeAction:
+        removal === null
+          ? null
+          : {
+              kind: "remove" as const,
+              label: "Remove" as const,
+              command: removal.displayCommand,
+            },
+    };
   },
   "provider.installation.run": runProviderInstallationOnHost,
   "server_move.inspect": (command, options) =>

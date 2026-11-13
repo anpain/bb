@@ -1170,6 +1170,15 @@ older builds are not migrated. Provider routing is persisted per provider and
 defaults on; `bb pool routing <claude|codex> --off` stops it. See the
 `account-pool` skill for accounts, ordering, and routing.
 
+### Provider CLI installation
+
+Provider CLI binaries are managed in Settings → Providers → Provider installation
+or with `bb provider install|remove <providerId> --machine <id-or-name>`.
+Removal retains account credentials and chat history. User-local native Cursor
+and Claude installations and writable npm installations offer automatic removal.
+For a Linux service that installs npm CLIs, set `NPM_CONFIG_PREFIX` to a writable
+user-local prefix and include its `bin` directory in the service PATH.
+
 ### Concurrency limit
 
 The builtin Concurrency limit plugin caps running threads. The overall limit is

@@ -138,16 +138,16 @@ afterEach(() => {
   useUpdateInventoryMock.mockReset();
 });
 
-const UPDATE_ACTION: ProviderCliInstallAction = {
+const UPDATE_ACTION = {
   kind: "update",
   label: "Update",
   command: "npm install -g example",
-};
+} satisfies ProviderCliInstallAction;
 
 function providerIssue(
   provider: ProviderCliKey,
   displayName: string,
-  action: ProviderCliInstallAction | null = UPDATE_ACTION,
+  action: ProviderCliIssue["status"]["installAction"] = UPDATE_ACTION,
 ): ProviderCliIssue {
   return {
     provider,

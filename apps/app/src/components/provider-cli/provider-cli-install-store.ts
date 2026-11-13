@@ -9,7 +9,11 @@ import type { ProviderCliActionableIssue } from "@/components/provider-cli/provi
 import { BbRequestTimeoutError } from "@bb/sdk/browser";
 import { appToast } from "@/components/ui/app-toast";
 import { invalidateHostProviderCliStatus } from "@/hooks/cache-owners/provider-cli-status-cache-owner";
-import { invalidateSystemExecutionOptions } from "@/hooks/cache-owners/system-cache-effects";
+import {
+  invalidateSystemExecutionOptions,
+  invalidateSystemProviders,
+  restartSystemProviderStatesLoad,
+} from "@/hooks/cache-owners/system-cache-effects";
 import { asHttpError, getHttpErrorMessage } from "@/lib/http-error";
 import { sdk } from "@/lib/sdk";
 
@@ -59,10 +63,12 @@ const PROVIDER_CLI_TITLE_TEMPLATES = {
   failure: {
     install: (displayName) => `${displayName} install failed`,
     update: (displayName) => `${displayName} update failed`,
+    remove: (displayName) => `${displayName} removal failed`,
   },
   log: {
     install: (displayName) => `${displayName} install log`,
     update: (displayName) => `${displayName} update log`,
+    remove: (displayName) => `${displayName} removal log`,
   },
 } satisfies Record<
   ProviderCliTitlePhase,
@@ -299,6 +305,8 @@ function runInstall(job: ProviderCliInstallJob): void {
         if (queryClient !== null) {
           void invalidateHostProviderCliStatus({ queryClient, hostId });
           void invalidateSystemExecutionOptions({ queryClient, hostId });
+          void invalidateSystemProviders({ queryClient });
+          void restartSystemProviderStatesLoad({ queryClient, hostId });
         }
         return;
       }

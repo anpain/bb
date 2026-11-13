@@ -31,7 +31,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Check server types
-        run: pnpm exec turbo run typecheck --filter=@bb/server --filter=@bb/host-daemon --output-logs=new-only
+        run: pnpm exec turbo run typecheck --filter=@bb/server --filter=@bb/host-daemon --filter=@bb/cli --output-logs=new-only
       - name: Test server routes
         run: >-
           pnpm exec turbo run test --filter=@bb/server --output-logs=new-only --
@@ -40,10 +40,11 @@ jobs:
           test/system/setup-guide.test.ts
           test/system/provider-states.test.ts
           test/system/execution-options.test.ts
+          test/public/public-provider-installations.test.ts
       - name: Test the host provider request limit
         run: >-
           pnpm exec turbo run test --filter=@bb/host-daemon --output-logs=new-only --
-          test/command/command-router.test.ts -t 'limits provider checks'
+          test/command/command-router.test.ts src/provider-cli-removal.test.ts -t 'limits provider checks|provider CLI removal'
       - name: Test provider authentication bridge
         run: >-
           pnpm exec turbo run test --filter=@bb/provider-bridge-acp --output-logs=new-only --

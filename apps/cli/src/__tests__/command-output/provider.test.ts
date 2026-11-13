@@ -14,6 +14,56 @@ describe("bb provider command output", () => {
   const register: CommandRegistrar = (program) =>
     registerProviderCommands(program, () => "http://server");
 
+  it.each(["install", "remove"] as const)(
+    "bb provider %s dispatches a server job",
+    async (operation) => {
+      const job = {
+        id: "job_cli_action",
+        hostId: "host-server",
+        provider: "claude-code",
+        actionKind: operation,
+        startedAt: 1,
+      };
+      const start = vi.fn(async () => ({ job: { ...job, state: "running" } }));
+      const events = [
+        {
+          type: "completed",
+          provider: "claude-code",
+          success: true,
+          exitCode: 0,
+          signal: null,
+        },
+      ];
+      stubServerApi({
+        "v1.system.config.$get": vi.fn(async () => ({
+          primaryHostId: "host-server",
+        })),
+        "v1.hosts.:id.provider-clis.install-jobs.$post": start,
+        "v1.hosts.:id.provider-clis.install-jobs.:jobId.$get": vi.fn(
+          async () => ({
+            job: { ...job, state: "completed", finishedAt: 2, events },
+          }),
+        ),
+      });
+      await runCommand(
+        ["provider", operation, "claude-code", "--json"],
+        register,
+      );
+      expect(start).toHaveBeenCalledWith({
+        param: { id: "host-server" },
+        json: { provider: "claude-code", actionKind: operation },
+      });
+      const output = collectLogPayloads(vi.mocked(console.log));
+      expect(output).toHaveLength(1);
+      expect(JSON.parse(String(output[0]))).toEqual({
+        hostId: "host-server",
+        provider: "claude-code",
+        action: operation,
+        events,
+      });
+    },
+  );
+
   it("bb provider list renders the shared borderless table", async () => {
     const get = vi.fn(async () => [{ id: "openai", displayName: "OpenAI" }]);
     stubServerApi({ "v1.system.providers.$get": get });

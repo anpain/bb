@@ -42,6 +42,7 @@ import {
   pickFolderResponseSchema,
   providerCliInstallEventSchema,
   providerCliInstallActionKindSchema,
+  providerCliInstallActionSchema,
 } from "./local.js";
 import { HOST_ARTIFACT_MAX_BYTES } from "./protocol.js";
 import {
@@ -1869,7 +1870,15 @@ export const hostDaemonCommandRegistry = {
   "provider.installation.status": defineHostDaemonCommandDescriptor({
     type: "provider.installation.status",
     schema: providerInstallationStatusCommandSchema,
-    resultSchema: providerInstallationStatusSchema,
+    resultSchema: providerInstallationStatusSchema.extend({
+      removeAction: providerCliInstallActionSchema
+        .extend({
+          kind: z.literal("remove"),
+          label: z.literal("Remove"),
+        })
+        .nullable()
+        .optional(),
+    }),
     transport: "onlineRpc",
     retryable: true,
     flushEventsBeforeResult: false,
@@ -1980,7 +1989,9 @@ type HostDaemonRetryableOnlineRpcCommandSchema =
 type HostDaemonResultSchemaMapForTransport<
   Transport extends HostDaemonCommandTransport,
 > = {
-  [Descriptor in HostDaemonCommandDescriptorForTransport<Transport> as Descriptor["type"]]: Descriptor["resultSchema"];
+  [
+    Descriptor in HostDaemonCommandDescriptorForTransport<Transport> as Descriptor["type"]
+  ]: Descriptor["resultSchema"];
 };
 
 type HostDaemonCommandResultSchemaMap =

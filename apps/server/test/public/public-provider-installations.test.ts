@@ -10,6 +10,7 @@ import {
   systemProviderInfoSchema,
 } from "@bb/server-contract";
 import { DEFAULT_BB_REQUEST_TIMEOUT_MS } from "@bb/sdk";
+import { createDeferredPromise } from "@bb/test-helpers";
 import {
   validatePluginProviderDeclaration,
   validatePluginMachineProviderDeclaration,
@@ -84,7 +85,9 @@ function installationStatus(providerId: string) {
         ? "cursor-agent"
         : providerId === "pi"
           ? "pi"
-          : "codex";
+          : providerId === "acp-kimi"
+            ? "kimi"
+            : "codex";
   return {
     executableName,
     executablePath: `/usr/local/bin/${executableName}`,
@@ -195,7 +198,7 @@ describe("public provider installation routes", () => {
         const response = await harness.app.request(`${url}${query}`);
         expect(response.status).toBe(200);
         const body: ProviderCliStatusResponse = await response.json();
-        expect(Object.keys(body)).toHaveLength(4);
+        expect(Object.keys(body)).toHaveLength(5);
         return [...new Set(Object.values(body).map((s) => s.currentVersion))];
       };
       const count = () =>
@@ -206,26 +209,26 @@ describe("public provider installation routes", () => {
       const dateNow = vi.spyOn(Date, "now").mockImplementation(() => clock);
       try {
         await Promise.all(Array.from({ length: 8 }, () => readVersions()));
-        expect(count()).toBe(4);
+        expect(count()).toBe(5);
         harness.hub.notifyHost(host.id, ["host-connected"]);
         expect(await readVersions()).toEqual(["1.0.0"]);
-        expect(count()).toBe(4);
+        expect(count()).toBe(5);
 
         version = "1.1.0";
         clock += PROVIDER_INSTALLATION_STATUS_FRESH_MS + 1;
         expect(await readVersions()).toEqual(["1.0.0"]);
-        await vi.waitFor(() => expect(pushes).toBe(4));
+        await vi.waitFor(() => expect(pushes).toBe(5));
         expect(await readVersions()).toEqual(["1.1.0"]);
-        expect(count()).toBe(8);
+        expect(count()).toBe(10);
 
         expect(await readVersions("?refresh=true")).toEqual(["1.1.0"]);
-        expect(count()).toBe(12);
-        expect(pushes).toBe(4);
+        expect(count()).toBe(15);
+        expect(pushes).toBe(5);
 
         version = "1.2.0";
         expect(await readVersions("?refresh=true")).toEqual(["1.2.0"]);
-        expect(count()).toBe(16);
-        expect(pushes).toBe(8);
+        expect(count()).toBe(20);
+        expect(pushes).toBe(10);
 
         const installed = await harness.app.request(
           `${API}/hosts/${host.id}/provider-clis/install`,
@@ -238,8 +241,8 @@ describe("public provider installation routes", () => {
         expect(installed.status).toBe(200);
         version = "1.3.0";
         expect(await readVersions()).toEqual(["1.3.0"]);
-        expect(count()).toBe(20);
-        expect(pushes).toBe(8);
+        expect(count()).toBe(25);
+        expect(pushes).toBe(10);
       } finally {
         dateNow.mockRestore();
         responder.unregister();
@@ -269,12 +272,14 @@ describe("public provider installation routes", () => {
         "claude-code",
         "pi",
         "acp-cursor",
+        "acp-kimi",
       ]);
       expect(Object.values(body).map((status) => status.displayName)).toEqual([
         "Codex",
         "Claude Code",
         "Pi",
         "Cursor",
+        "Kimi Code",
       ]);
       expect(
         responder.requests
@@ -296,7 +301,7 @@ describe("public provider installation routes", () => {
               ? request.command.providerId
               : null,
           ),
-      ).toEqual(["codex", "claude-code", "pi", "acp-cursor"]);
+      ).toEqual(["codex", "claude-code", "pi", "acp-cursor", "acp-kimi"]);
     });
   });
 
@@ -331,11 +336,17 @@ describe("public provider installation routes", () => {
 
       expect(response.status).toBe(200);
       const body = (await readJson(response)) as ProviderCliStatusResponse;
-      expect(Object.keys(body)).toEqual(["codex", "pi", "acp-cursor"]);
+      expect(Object.keys(body)).toEqual([
+        "codex",
+        "pi",
+        "acp-cursor",
+        "acp-kimi",
+      ]);
       expect(Object.values(body).map((status) => status.displayName)).toEqual([
         "Codex",
         "Pi",
         "Cursor",
+        "Kimi Code",
       ]);
       expect(warn).toHaveBeenCalledWith(
         {
@@ -498,54 +509,116 @@ describe("public provider installation routes", () => {
     expect(pendingStatusRequests).toEqual([]);
   });
 
-  it("dispatches install/update by registered provider id", async () => {
-    await withTestHarness(async (harness) => {
-      const { host, session } = seedHostSession(harness.deps, {
-        id: "provider-installation-run-host",
+  it.each(["install", "update", "remove"] as const)(
+    "dispatches %s by registered provider id",
+    async (operation) => {
+      await withTestHarness(async (harness) => {
+        const { host, session } = seedHostSession(harness.deps, {
+          id: "provider-installation-run-host",
+        });
+        const responder = registerHostRpcResponder(harness, {
+          hostId: host.id,
+          sessionId: session.id,
+          handle: handleProviderInstallationRpc,
+        });
+
+        const response = await harness.app.request(
+          `${API}/hosts/${host.id}/provider-clis/install`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              provider: "claude-code",
+              actionKind: operation,
+            }),
+          },
+        );
+
+        expect(response.status).toBe(200);
+        expect(await response.text()).toContain(
+          '"type":"completed","provider":"claude-code"',
+        );
+        expect(responder.requests.at(-1)?.command).toMatchObject({
+          type: "provider.installation.run",
+          providerId: "claude-code",
+          action: operation,
+        });
+
+        const unsupported = await harness.app.request(
+          `${API}/hosts/${host.id}/provider-clis/install`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              provider: "no-such-provider",
+              actionKind: "install",
+            }),
+          },
+        );
+        expect(unsupported.status).toBe(404);
+        expect(await readJson(unsupported)).toMatchObject({
+          code: "provider_installation_unavailable",
+        });
       });
+    },
+  );
+
+  it("queues removal separately from an in-progress install of the same provider", async () => {
+    await withTestHarness(async (harness) => {
+      const { host, session } = seedHostSession(harness.deps);
+      const installed = createDeferredPromise<void>();
       const responder = registerHostRpcResponder(harness, {
         hostId: host.id,
         sessionId: session.id,
-        handle: handleProviderInstallationRpc,
-      });
-
-      const response = await harness.app.request(
-        `${API}/hosts/${host.id}/provider-clis/install`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            provider: "claude-code",
-            actionKind: "update",
-          }),
+        handle: async (request) => {
+          if (
+            request.command.type === "provider.installation.run" &&
+            request.command.action === "install"
+          ) {
+            await installed.promise;
+          }
+          return handleProviderInstallationRpc(request);
         },
-      );
-
-      expect(response.status).toBe(200);
-      expect(await response.text()).toContain(
-        '"type":"completed","provider":"claude-code"',
-      );
-      expect(responder.requests.at(-1)?.command).toMatchObject({
-        type: "provider.installation.run",
-        providerId: "claude-code",
-        action: "update",
       });
-
-      const unsupported = await harness.app.request(
-        `${API}/hosts/${host.id}/provider-clis/install`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            provider: "no-such-provider",
-            actionKind: "install",
-          }),
-        },
-      );
-      expect(unsupported.status).toBe(404);
-      expect(await readJson(unsupported)).toMatchObject({
-        code: "provider_installation_unavailable",
-      });
+      const start = async (actionKind: "install" | "remove") => {
+        const response = await harness.app.request(
+          `${API}/hosts/${host.id}/provider-clis/install-jobs`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ provider: "claude-code", actionKind }),
+          },
+        );
+        expect(response.status).toBe(202);
+        return hostProviderCliInstallJobResponseSchema.parse(
+          await response.json(),
+        ).job;
+      };
+      try {
+        const first = await start("install");
+        const removal = await start("remove");
+        expect(removal.id).not.toBe(first.id);
+        expect(removal.actionKind).toBe("remove");
+        installed.resolve();
+        await vi.waitFor(async () => {
+          const response = await harness.app.request(
+            `${API}/hosts/${host.id}/provider-clis/install-jobs/${removal.id}`,
+          );
+          const { job } = hostProviderCliInstallJobResponseSchema.parse(
+            await response.json(),
+          );
+          expect(job.state).toBe("completed");
+        });
+        expect(
+          responder.requests.flatMap(({ command }) =>
+            command.type === "provider.installation.run"
+              ? [command.action]
+              : [],
+          ),
+        ).toEqual(["install", "remove"]);
+      } finally {
+        installed.resolve();
+      }
     });
   });
 
@@ -650,7 +723,8 @@ describe("public provider installation routes", () => {
                   {
                     type: "error" as const,
                     provider: command.providerId,
-                    message: "Codex update is no longer available on this host.",
+                    message:
+                      "Codex update is no longer available on this host.",
                   },
                 ],
               },
@@ -758,6 +832,26 @@ describe("public provider installation routes", () => {
           if (request.command.type === "provider.installation.run") {
             installed = true;
           }
+          if (
+            request.command.type === "provider.installation.status" &&
+            request.command.providerId === "installable-agent"
+          ) {
+            return {
+              ok: true,
+              result: {
+                ...installationStatus("installable-agent"),
+                installed,
+                executablePath: installed ? "/tools/installable-agent" : null,
+                installAction: installed
+                  ? null
+                  : {
+                      kind: "install",
+                      label: "Install",
+                      command: "install installable-agent",
+                    },
+              },
+            };
+          }
           return handleProviderInstallationRpc(request, installed);
         },
       });
@@ -788,6 +882,15 @@ describe("public provider installation routes", () => {
         );
 
       expect(await listProviderIds()).not.toContain("installable-agent");
+      const missingStatus = await harness.app.request(
+        `${API}/hosts/${host.id}/provider-clis/status`,
+      );
+      expect(missingStatus.status).toBe(200);
+      const missing: ProviderCliStatusResponse = await missingStatus.json();
+      expect(missing["installable-agent"]).toMatchObject({
+        installed: false,
+        installAction: { kind: "install" },
+      });
       const installResponse = await installProvider();
       expect(installResponse.status).toBe(200);
       expect(await installResponse.text()).toContain('"success":true');

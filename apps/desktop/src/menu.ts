@@ -53,6 +53,7 @@ export interface InstallApplicationMenuArgs {
   showBuiltinServer: boolean;
   toggleBuiltinServer(): void;
   openAbout(): void;
+  importChats?: () => void;
   openNewTab(): void;
   openNewThread(): void;
   openSettings(): void;
@@ -239,6 +240,14 @@ export function buildApplicationMenuTemplate(
           },
           label: NEW_WINDOW_MENU_LABEL,
         },
+        ...(args.importChats === undefined
+          ? []
+          : [
+              {
+                label: "Import chats…",
+                click: args.importChats,
+              },
+            ]),
         { type: "separator" },
         {
           accelerator: args.accelerators.closeWindowOrSideTab,

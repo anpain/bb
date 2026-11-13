@@ -315,6 +315,7 @@ function upsertThreadTitleSearchSegments(
 }
 
 export interface CreateThreadInput {
+  id?: string;
   projectId: string;
   environmentId?: string | null;
   providerId: string;
@@ -342,13 +343,13 @@ export class InvalidLifecycleOwnerError extends Error {
 }
 
 export function createThread(
-  db: DbConnection,
+  db: ThreadWriteConnection,
   notifier: DbNotifier,
   input: CreateThreadInput,
 ) {
   const visibility = input.visibility ?? "visible";
   const now = Date.now();
-  const id = createThreadId();
+  const id = input.id ?? createThreadId();
   const originKind = input.originKind ?? null;
   const thread = db.transaction(
     (tx) => {

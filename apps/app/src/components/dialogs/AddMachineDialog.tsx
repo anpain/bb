@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import { AddServerButton } from "@/components/settings/AddServerButton";
 import { MachineAccessControls } from "@/components/settings/MachineAccessSettings";
 import { useSystemConfig } from "@/hooks/queries/system-queries";
 import { machineServerAccessReady } from "@/components/machines/machine-server-access";
@@ -90,6 +91,7 @@ export function AddMachineContent({
               : { status: "blocked" }
         }
       >
+        <AddServerButton onBeforeOpen={() => onOpenChange(false)} />
         <MachineAccessControls onNavigate={() => onOpenChange(false)} />
       </MachineAccessGate>
     );

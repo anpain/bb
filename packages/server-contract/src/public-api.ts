@@ -1,4 +1,9 @@
 import {
+  chatImportRequestSchema,
+  type ChatImportRequest,
+  type ChatImportResponse,
+} from "./api/thread-import.js";
+import {
   machineEnvironmentSetSchema,
   machineEnvironmentDeleteSchema,
   type MachineEnvironmentSet,
@@ -1296,6 +1301,14 @@ export const publicApiRoutes = {
   },
 
   threads: {
+    importChat: defineRoute({
+      path: "/threads/import-chat",
+      method: "post",
+      request: jsonRequest<EmptyInput, ChatImportRequest>(
+        chatImportRequestSchema,
+      ),
+      response: jsonResponse<ChatImportResponse>({ status: 201 }),
+    }),
     list: defineRoute({
       path: "/threads",
       method: "get",

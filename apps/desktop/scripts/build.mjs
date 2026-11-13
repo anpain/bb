@@ -129,6 +129,13 @@ await Promise.all([
   }),
   build({
     ...commonOptions,
+    entryPoints: [resolve(packageRoot, "src", "chat-import-preload.ts")],
+    external: ["electron"],
+    format: "cjs",
+    outfile: resolve(distDir, "chat-import-preload.cjs"),
+  }),
+  build({
+    ...commonOptions,
     entryPoints: [resolve(packageRoot, "src", "server-url-dialog-preload.ts")],
     external: ["electron"],
     format: "cjs",

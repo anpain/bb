@@ -44,7 +44,7 @@ vi.mock("@/lib/sdk", () => ({
       experimental_suspend: vi.fn(),
       update: vi.fn(),
     },
-    system: { config: vi.fn() },
+    system: { config: vi.fn(), updateGeneralSettings: vi.fn() },
     threads: {
       count: vi.fn(async () => ({ total: 0 })),
       list: vi.fn(async () => []),
@@ -500,6 +500,34 @@ describe("MachinesSettingsSection", () => {
         "A new machine has to reach this server over the network. Choose the address it should use.",
       ),
     ).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Add server" })).toBeNull();
+  });
+
+  it("opens the Desktop server picker from machine access without saving a machine address", async () => {
+    const addServer = vi.fn();
+    vi.stubGlobal("bbDesktop", { addServer });
+    vi.mocked(sdk.system.config).mockResolvedValue(systemConfig());
+    vi.mocked(sdk.hosts.list).mockResolvedValue([primaryHost]);
+    stubSidebarBootstrapFetch();
+
+    renderSection();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Add a machine" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Set up machine access",
+    });
+    fireEvent.change(
+      within(dialog).getByRole("textbox", { name: "Server address" }),
+      {
+        target: { value: "https://worker.example.com" },
+      },
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add server" }));
+
+    expect(addServer).toHaveBeenCalledOnce();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(sdk.system.updateGeneralSettings).not.toHaveBeenCalled();
   });
 
   it("requests an immediate daemon update retry", async () => {

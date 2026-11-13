@@ -5,6 +5,8 @@ import { openApplicationUrl } from "./application-url.js";
 import { createDesktopLogger } from "./desktop-logger.js";
 import { attachServerUpdateControl } from "./server-update-control.js";
 import { registerServerChoiceIpc } from "./server-choice-ipc.js";
+import { openChatImportDialog } from "./chat-import-dialog.js";
+import { listSavedChats } from "./chat-import-source.js";
 import { randomUUID } from "node:crypto";
 import { accessSync, constants as fsConstants } from "node:fs";
 import { arch, homedir, release, type as osType } from "node:os";
@@ -341,6 +343,7 @@ interface StartOwnedRuntimeArgs {
   bridgePath: string;
   serverUrl: string;
   userDataPath: string;
+  background?: boolean;
 }
 
 interface OwnedRuntime {
@@ -840,6 +843,49 @@ function refreshApplicationMenu(): void {
     openAbout() {
       void showAboutDialog();
     },
+    importChats() {
+      const parentWindow = getFocusedApplicationWindow();
+      if (parentWindow === null) return;
+      const target = serverTargetStore?.getTarget();
+      const active = listServerChoices().find((choice) => choice.active);
+      const remoteUrl =
+        target?.kind === "custom"
+          ? target.url
+          : target?.kind === "connect"
+            ? target.server.url
+            : null;
+      void openChatImportDialog({
+        parentWindow,
+        preloadPath: join(app.getAppPath(), "dist", "chat-import-preload.cjs"),
+        listChats: () => listSavedChats(process.env, homedir()),
+        async localServerUrl() {
+          if (await readCommittedLocalServerMove()) {
+            throw new Error("Local bb data was moved to another machine.");
+          }
+          if (
+            !(await ensureBuiltinRuntimeAttached(true)) ||
+            currentRuntime === null
+          ) {
+            throw new Error("Could not start local bb.");
+          }
+          return currentRuntime.serverUrl;
+        },
+        remote:
+          remoteUrl === null
+            ? null
+            : {
+                url: remoteUrl,
+                label: `${active?.name ?? "Connected server"} (${new URL(remoteUrl).origin})`,
+                fetch: (input, init) =>
+                  parentWindow.webContents.session.fetch(
+                    input instanceof URL ? input.toString() : input,
+                    init,
+                  ),
+              },
+      }).catch((error: unknown) => {
+        desktopLogger.error(`Could not open chat import: ${String(error)}`);
+      });
+    },
     openNewTab() {
       const browserWindow = getFocusedApplicationWindow();
       if (browserWindow !== null) {
@@ -1141,7 +1187,9 @@ function registerApplicationWindow(browserWindow: DesktopBrowserWindow): void {
   });
 }
 
-async function ensureBuiltinRuntimeAttached(): Promise<boolean> {
+async function ensureBuiltinRuntimeAttached(
+  background = false,
+): Promise<boolean> {
   if (localServerMove !== null) {
     return false;
   }
@@ -1175,6 +1223,7 @@ async function ensureBuiltinRuntimeAttached(): Promise<boolean> {
     bridgePath: desktopBridgePath,
     serverUrl: builtinServerUrl,
     userDataPath: desktopUserDataPath,
+    background,
   });
   return runtime !== null;
 }
@@ -2623,6 +2672,10 @@ function reportOwnedRuntimeExit({ bbProcess, runtime }: OwnedRuntime): void {
       );
       return;
     }
+    if (serverTargetStore?.getTarget().kind !== "builtin") {
+      desktopLogger.warn(`Local bb stopped with ${formatExitResult(exit)}`);
+      return;
+    }
     void loadStartupError({
       details: `The Electron-owned bb-app process stopped with ${formatExitResult(
         exit,
@@ -2681,6 +2734,12 @@ async function startOwnedRuntime(
 
   if (raceResult.kind === "process-exited") {
     setCurrentRuntime(null);
+    if (args.background) {
+      desktopLogger.warn(
+        `Local bb stopped before chat import with ${formatExitResult(raceResult.exit)}`,
+      );
+      return null;
+    }
     if (await waitForWindowsInstallerToFinish()) {
       return startOwnedRuntime(args);
     }
@@ -2698,6 +2757,14 @@ async function startOwnedRuntime(
   if (raceResult.result.kind === "compatible") {
     reportOwnedRuntimeExit(ownedRuntime);
     return runtime;
+  }
+
+  if (args.background) {
+    desktopLogger.warn(
+      `Could not start local bb for chat import: ${raceResult.result.reason}`,
+    );
+    await stopOwnedRuntime();
+    return null;
   }
 
   await loadStartupError({

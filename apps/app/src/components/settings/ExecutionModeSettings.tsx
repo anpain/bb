@@ -6,26 +6,15 @@ import {
   SettingsSection,
 } from "@/components/ui/settings-section";
 import { useServerChoices } from "@/hooks/useServerChoices";
-import { getBbDesktopInfo } from "@/lib/bb-desktop";
+import { AddServerButton } from "@/components/settings/AddServerButton";
 
 export function ExecutionModeSettings() {
   const choices = useServerChoices();
-  const desktop = getBbDesktopInfo();
   return (
     <SettingsSection
       title="Execution mode"
       description="Choose where bb runs providers and works with files. Each server has its own projects, history, settings and provider accounts. Cloud models still require an internet connection in local mode."
-      action={
-        desktop?.addServer ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => desktop.addServer?.()}
-          >
-            Add server
-          </Button>
-        ) : undefined
-      }
+      action={<AddServerButton />}
     >
       {choices === null ? (
         <p className="text-sm text-subtle-foreground">

@@ -20,6 +20,17 @@ Thread commands are split across four chapters:
                      and queued messages
   thread-lifecycle   Stop, compact, clear, retry, archive, and delete
 
+Importing chat history:
+
+  bb thread import-chat <file> [--json]
+
+  The JSON file contains providerId ("codex" or "acp-kimi"), sourceId, title,
+  and messages (an ordered array of {"role":"user"|"assistant","text":"..."}).
+  Import creates a text transcript in Personal on the server targeted by the
+  CLI. Importing the same providerId and sourceId again returns the existing
+  bb thread. It does not start an agent or move the original provider session.
+  SDK callers use threads.importChat with the same fields.
+
 Spawning:
 
   bb thread spawn --project <id> --prompt "..." [options]

@@ -106,6 +106,11 @@ Execution mode → Add server** and enter that URL. Older desktop clients offer
 returns to the desktop's embedded bb server. A plain browser tab uses the server
 at its current URL and cannot start a local bb runtime itself.
 
+If you opened **Settings → Machines → Add a machine** and see **Set up machine
+access**, use its **Add server** button to open the same Desktop address dialog.
+The **Server address** field configures the address workers use to reach the
+current server.
+
 An SSH login is only the tunnel's transport. It does not make bb execute as the
 SSH user: this service executes work as `bb`. Adding a saved server URL does
 not install software on the destination or migrate another server's data.
@@ -148,6 +153,22 @@ not an automatic import of all accounts from the desktop. Account Pooler
 currently supports Codex and Claude account pools.
 
 ## Connections and request routing
+
+### Import local chat history
+
+In bb Desktop, choose **File → Import chats** and check the Codex or Kimi Code
+conversations you want. The app reads those saved sessions on your computer
+and saves their text in **Personal** on local bb. When a remote server is
+active, select **Also copy selected chats to …** to send those chats to that
+server as well. Both destinations must run a bb build with chat import support.
+The dialog reports the result for each destination. Repeating an import
+returns the existing copy rather than creating a duplicate.
+
+The first version imports user and assistant text. Attachments, tool output,
+credentials, and provider session state are excluded. The original sessions
+remain available in their provider applications.
+
+### Where requests run
 
 **Server mode:** the desktop or browser sends HTTP/API and streaming WebSocket
 traffic to the local end of your SSH tunnel. SSH forwards it to the bb server's

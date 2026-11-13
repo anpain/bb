@@ -25,6 +25,7 @@ import {
 import type { Environment, Thread, ThreadListEntry } from "@bb/domain";
 import { toEnvironmentResponse } from "../../services/environments/environment-response.js";
 import {
+  chatImportMaxBytes,
   threadIncludeOptionSchema,
   THREAD_COUNT_ROOT_PARENT,
   publicApiRoutes,
@@ -60,6 +61,8 @@ import { listRunningThreadsWithIntendedHosts } from "../../services/threads/disp
 import { syncThreadTitleToProvider } from "../../services/threads/thread-commands.js";
 import { requestThreadStorageDeletion } from "../../services/threads/thread-lifecycle.js";
 import { createThreadFromRequest } from "../../services/threads/thread-create.js";
+import { importChat } from "../../services/threads/chat-import.js";
+import { bodyLimit } from "hono/body-limit";
 import { createThreadForkFromRequest } from "../../services/threads/thread-fork.js";
 import { requireChildThreadsConfirmation } from "../../services/threads/child-thread-confirmation.js";
 import {
@@ -225,6 +228,7 @@ function buildThreadSearchResponse(
 }
 
 export function registerThreadBaseRoutes(app: Hono, deps: AppDeps): void {
+  app.use("/threads/import-chat", bodyLimit({ maxSize: chatImportMaxBytes }));
   const { get, post, patch, del } = typedRoutes<PublicApiSchema>(app, {
     onValidationError: (msg) => new ApiError(400, "invalid_request", msg),
   });
@@ -402,6 +406,10 @@ export function registerThreadBaseRoutes(app: Hono, deps: AppDeps): void {
     });
     return context.json(toThreadResponseFromThread(deps, { thread }), 201);
   });
+
+  post(routes.importChat, (context, payload) =>
+    context.json(importChat(deps, payload), 201),
+  );
 
   post(routes.fork, async (context, payload) => {
     const thread = await createThreadForkFromRequest(deps, payload);

@@ -493,6 +493,7 @@ export function parseProviderUserMessage(
   if (text.length === 0) {
     return null;
   }
+  const imported = decoded.providerThreadId === `imported:${decoded.threadId}`;
   return {
     kind: "user",
     id: messageId(decoded.threadId, "provider-input", decoded.item.id),
@@ -506,11 +507,15 @@ export function parseProviderUserMessage(
     ...(decoded.item.parentToolCallId
       ? { parentToolCallId: decoded.item.parentToolCallId }
       : {}),
-    initiator: "system",
+    initiator: imported ? "user" : "system",
     senderThreadId: null,
     systemMessageKind: "unlabeled",
     systemMessageSubject: null,
-    turnRequest: { isGrouped: false, kind: "steer", status: "accepted" },
+    turnRequest: {
+      isGrouped: false,
+      kind: imported ? "message" : "steer",
+      status: "accepted",
+    },
     text,
     mentions: [],
   };

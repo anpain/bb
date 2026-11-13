@@ -19,6 +19,8 @@ import {
 import type {
   CreateQueuedMessageRequest,
   CreateThreadRequest,
+  ChatImportRequest,
+  ChatImportResponse,
   QueuedMessageListQuery,
   EditMessageRequest,
   EditMessageResponse,
@@ -614,6 +616,9 @@ export interface ThreadQueueArea {
 }
 
 export interface ThreadsArea {
+  importChat(
+    args: ChatImportRequest & { signal?: AbortSignal },
+  ): Promise<ChatImportResponse>;
   archive(args: ThreadActionArgs): Promise<ThreadArchiveResult>;
   archiveAll(args: ThreadActionArgs): Promise<ThreadArchiveAllResult>;
   childSummary(args: ThreadStatusArgs): Promise<ThreadChildSummaryResult>;
@@ -1302,6 +1307,14 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
   return {
     archive: archiveAll,
     archiveAll,
+    async importChat({ signal, ...chat }) {
+      return transport.readJson(
+        transport.api.v1.threads["import-chat"].$post(
+          { json: chat },
+          ...signalRequestArgs(signal),
+        ),
+      );
+    },
     async childSummary(input) {
       return transport.readJson(
         transport.api.v1.threads[":id"]["child-summary"].$get(

@@ -2,7 +2,7 @@
 
 This fork publishes desktop artifacts at <https://github.com/anpain/bb/releases/tag/desktop-latest>.
 
-The **Build fork Windows** GitHub Actions workflow builds the x64 NSIS installer on `windows-2025`, starts the packaged application to verify its renderer and preload, then uploads the installer and Windows update metadata. It can be run manually on the desired branch. Publication does not run if packaging or startup verification fails.
+The **Build fork Windows** GitHub Actions workflow builds the x64 NSIS installer on `windows-2025`, starts the packaged application to verify its renderer and preload, then uploads the installer and Windows update metadata. It runs only when manually dispatched on the desired branch; pushes do not build an installer. Publication does not run if packaging or startup verification fails.
 
 These builds are unsigned. Windows SmartScreen may warn before installation. The packaged startup smoke is not a substitute for interactive Windows testing of providers, terminals, and filesystem permissions.
 

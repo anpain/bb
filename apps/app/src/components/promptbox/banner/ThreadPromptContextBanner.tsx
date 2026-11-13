@@ -1110,9 +1110,12 @@ function WritableContextBanner({
   expandedSegment: string | null;
   onToggleSegment: (key: string) => void;
 }) {
-  const { entries, observers } = useThreadContextSegments(
+  const { entries: allEntries, observers } = useThreadContextSegments(
     input,
     coreThreadContextSegments,
+  );
+  const entries = allEntries.filter(
+    ({ slot }) => slot.experimental_placement !== "timeline-end",
   );
   const segments = entries.map(({ slot }) => ({
     key: threadContextSegmentKey(slot),

@@ -1,3 +1,4 @@
+import { PluginTimelineEndSegments } from "@/components/plugin/PluginTimelineEndSegments";
 import {
   useCallback,
   useEffect,
@@ -543,6 +544,22 @@ export function ThreadScreen({
         unreadDividerAutoScroll={timelineHost.unreadDividerAutoScroll}
         unreadDividerPlacement={timelineHost.unreadDividerPlacement}
       />
+      {!sendMessage.isPending &&
+      !isRunningThreadRuntimeDisplayStatus(thread.runtime.displayStatus) &&
+      timelineRows.some(
+        (row) => row.kind === "conversation" && row.role === "assistant",
+      ) ? (
+        <PluginTimelineEndSegments
+          key={thread.id}
+          threadId={thread.id}
+          projectId={thread.projectId}
+          environment={
+            composer?.contextEnvironmentId
+              ? { id: composer.contextEnvironmentId }
+              : null
+          }
+        />
+      ) : null}
     </SelectionAddToChatContext.Provider>
   );
 

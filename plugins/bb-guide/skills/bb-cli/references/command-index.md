@@ -339,3 +339,8 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 - `bb browser watch`
 - `bb browser import-sources`
 - `bb browser import-cookies`
+## Agent profiles
+
+- `bb settings agent-profiles show --json`
+- `bb settings agent-profiles replace <file>`
+- `bb thread tell <thread-id> '@profile task'` dispatches linked profile tasks.

@@ -948,7 +948,7 @@ describe("plugin service", () => {
     expect(builtin.entry_id).toBeNull();
   });
 
-  it("names public plugins in the install event so PostHog can rank them", () => {
+  it("names public plugins in the install event", () => {
     expect(
       pluginInstalledTelemetryEvent(
         "tasks",

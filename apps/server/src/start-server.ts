@@ -65,10 +65,7 @@ import {
   appInstallFromServerConfig,
   createTelemetryService,
 } from "./services/system/telemetry.js";
-import {
-  createSetupGuideExperiment,
-  SETUP_GUIDE_FLAG_TIMEOUT_MS,
-} from "./services/system/setup-guide-experiment.js";
+import { createSetupGuideExperiment } from "./services/system/setup-guide-experiment.js";
 import { TerminalSessionLifecycle } from "./services/terminals/terminal-session-lifecycle.js";
 import { createLifecycleDedupers } from "./lifecycle-dedupers.js";
 import type { ServerLogger, ServerRuntimeConfig } from "./types.js";
@@ -258,11 +255,8 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
   });
   const setupGuideExperiment = await createSetupGuideExperiment({
     dataDir: serverConfig.BB_DATA_DIR,
-    fetch: globalThis.fetch,
-    flagTimeoutMs: SETUP_GUIDE_FLAG_TIMEOUT_MS,
     logger,
     override: serverConfig.BB_SETUP_GUIDE_VARIANT ?? null,
-    telemetry,
   });
 
   const machineAuth = await createMachineAuthService({

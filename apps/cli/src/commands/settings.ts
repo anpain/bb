@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { readFile } from "node:fs/promises";
 import {
   AI_TASKS,
   AI_TEXT_TASKS,
@@ -8,6 +9,7 @@ import {
   keyboardPlatformSchema,
   appShortcutSchema,
   appSettingsSchema,
+  agentProfilesSchema,
   completedTurnDisplaySchema,
   describeUiPreference,
   experimentKeySchema,
@@ -387,6 +389,39 @@ export function registerSettingsCommands(
   const settings = program
     .command("settings")
     .description("Inspect and update BB settings");
+
+  const profiles = settings
+    .command("agent-profiles")
+    .description("Configure explicit @profile model dispatch");
+  profiles
+    .command("show")
+    .option("--json", "Print JSON")
+    .action(
+      action(async () => {
+        const config = await createCliBbSdk(getUrl()).system.config();
+        console.log(
+          JSON.stringify(config.generalSettings.agentProfiles, null, 2),
+        );
+      }),
+    );
+  profiles
+    .command("replace <file>")
+    .description(
+      "Replace profiles from a JSON array; model IDs must come from the installed provider catalog",
+    )
+    .action(
+      action(async (file: string) => {
+        const value: unknown = JSON.parse(await readFile(file, "utf8"));
+        const agentProfiles = agentProfilesSchema.parse(value);
+        const sdk = createCliBbSdk(getUrl());
+        const config = await sdk.system.config();
+        await sdk.system.updateGeneralSettings({
+          ...config.generalSettings,
+          agentProfiles,
+        });
+        console.log("Agent profiles saved.");
+      }),
+    );
 
   settings
     .command("show")

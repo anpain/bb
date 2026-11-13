@@ -79,13 +79,22 @@ export function useSidebarFooterPreferences() {
       label: "Mobile apps",
       icon: "Smartphone",
     },
-    ...sidebarFooterItems.map((slot): FooterItem => ({
-      kind: "plugin",
-      key: footerPreferenceKey(slot),
-      label: slot.label,
-      icon: slot.icon,
-      slot,
-    })),
+    ...sidebarFooterItems
+      .filter(
+        (slot) =>
+          !(
+            hasRail &&
+            slot.kind === "disclosure" &&
+            slot.experimental_placement === "rail-bottom"
+          ),
+      )
+      .map((slot): FooterItem => ({
+        kind: "plugin",
+        key: footerPreferenceKey(slot),
+        label: slot.label,
+        icon: slot.icon,
+        slot,
+      })),
     {
       kind: "builtin",
       id: "report-bug",

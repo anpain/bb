@@ -88,19 +88,11 @@ docs, start with
 
 ### Telemetry
 
-Production runs (the desktop app, `npx bb-app`, and `pnpm start` checkouts) send
-anonymous usage telemetry (app starts, thread creation counts, user message
-counts, and plugin installs) to help us understand adoption. Each event carries
-the app version, how bb was installed (desktop, npm, or source checkout), and
-the OS release, CPU architecture, and Node version. Source checkouts report whether
-`origin` points to `github.com/get-bb/bb`, another repository, or is unavailable.
-Telemetry never includes Git commit hashes or remote URLs. Identification is a random per-install
-id stored in your data dir — no user, host, project, workspace, or message
-content is ever attached. Plugin install events name only public plugins
-(bundled plugins and `bb-community` marketplace entries); installs from a local
-path, a private git or npm source, or a third-party marketplace report no name. Development runs (`pnpm dev`, `pnpm start:worktree`) never send. Opt out any run with
-`BB_TELEMETRY=false`. See
-[`apps/server/src/services/system/telemetry.ts`](./apps/server/src/services/system/telemetry.ts).
+This fork permanently disables bb app and server telemetry, including anonymous
+usage events, telemetry-disabled events, and telemetry feature-flag requests.
+Saved settings and environment variables cannot re-enable telemetry. The legacy
+`BB_TELEMETRY`, `BB_POSTHOG_API_KEY`, and `telemetryEnabled` inputs are accepted
+for compatibility but have no enabling effect.
 
 ## Development
 

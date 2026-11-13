@@ -208,11 +208,7 @@ export default function providerUsagePlugin(bb: BbPluginApi): void {
         .then((hosts) => hosts.filter((host) => host.type !== "ephemeral")),
       bb.sdk.plugins.experimental_discoverRpc({ method: usageListMethod }),
       bb.sdk.providers
-        .list(
-          hostId === undefined
-            ? { capability: "usage" }
-            : { capability: "usage", hostId },
-        )
+        .list(hostId === undefined ? {} : { hostId })
         .catch(() => []),
       bb.sdk.system.config().catch(() => null),
     ]);
@@ -271,7 +267,8 @@ export default function providerUsagePlugin(bb: BbPluginApi): void {
               ? `source:${source.pluginId}`
               : resource.scope.hostId;
           return (
-            request.providerIds.includes(resource.providerId) &&
+            (request.providerIds.length === 0 ||
+              request.providerIds.includes(resource.providerId)) &&
             (request.machineIds === null ||
               request.machineIds.includes(machineId)) &&
             (resource.scope.kind === "shared" ||
@@ -359,6 +356,15 @@ export default function providerUsagePlugin(bb: BbPluginApi): void {
         );
         if (source.error !== null || failures.has(key))
           machine.error = "Some usage could not be refreshed.";
+      }
+      if (!machine.id.startsWith("source:")) {
+        for (const provider of providers) {
+          if (
+            !machine.providers.some((entry) => entry.providerId === provider.id)
+          ) {
+            machine.providers.push(normalizedProvider(provider, undefined));
+          }
+        }
       }
     }
     const providerOrder = new Map(

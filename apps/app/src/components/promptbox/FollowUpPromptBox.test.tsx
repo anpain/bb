@@ -1524,20 +1524,24 @@ describe("FollowUpPromptBox", () => {
     }
   });
 
-  it("keeps the status footer out of text selection", () => {
+  it("keeps the environment header out of text selection without a bottom footer", () => {
     const props = createFollowUpPromptBoxProps({ kind: "ready" });
     props.environmentSummary = <span>Local environment</span>;
     render(<FollowUpPromptBox {...props} />);
 
-    const footer = document.querySelector("[data-follow-up-composer-footer]");
-    expect(footer?.classList.contains("select-none")).toBe(true);
+    const header = document.querySelector("[data-follow-up-environment]");
+    expect(header?.classList.contains("select-none")).toBe(true);
+    expect(header?.classList.contains("mx-6")).toBe(true);
+    expect(
+      document.querySelector("[data-follow-up-composer-footer]"),
+    ).toBeNull();
     expect(screen.getByText("Local environment").closest(".select-none")).toBe(
-      footer,
+      document.querySelector("[data-follow-up-environment]"),
     );
   });
 
   it.each(["recording", "transcribing"] as const)(
-    "keeps the status footer while the prompt box handles voice controls during %s",
+    "keeps the environment header while the prompt box handles voice controls during %s",
     (state) => {
       mocks.voiceState = state;
       const props = createFollowUpPromptBoxProps({ kind: "ready" });
@@ -1547,7 +1551,7 @@ describe("FollowUpPromptBox", () => {
 
       expect(screen.getByTestId("prompt-box").dataset.voiceState).toBe(state);
       expect(
-        document.querySelector("[data-follow-up-composer-footer]"),
+        document.querySelector("[data-follow-up-environment]"),
       ).toBeTruthy();
       expect(screen.getByText("Local environment")).toBeTruthy();
     },

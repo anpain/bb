@@ -251,6 +251,7 @@ export function registerSystemRoutes(
     const settings = getAppSettings(deps.db);
     return {
       ...settings,
+      telemetryEnabled: false,
       showUnhandledProviderEvents: settings.showDiagnosticEvents,
     };
   }
@@ -310,13 +311,14 @@ export function registerSystemRoutes(
         : undefined;
     const updatedSettings = appSettingsSchema.parse({
       ...settings,
+      agentProfiles: settings.agentProfiles ?? current.agentProfiles,
       idleProviderSessionTimeoutMinutes:
         settings.idleProviderSessionTimeoutMinutes === undefined
           ? current.idleProviderSessionTimeoutMinutes
           : settings.idleProviderSessionTimeoutMinutes,
       allowFastServiceTier:
         settings.allowFastServiceTier ?? current.allowFastServiceTier,
-      telemetryEnabled: settings.telemetryEnabled ?? current.telemetryEnabled,
+      telemetryEnabled: false,
       terminalCopyOnSelect:
         settings.terminalCopyOnSelect ?? current.terminalCopyOnSelect,
       keepHistoryAfterContextClear:
@@ -339,10 +341,7 @@ export function registerSystemRoutes(
           : diagnosticValue,
     });
     setAppSettings(deps.db, updatedSettings);
-    if (current.telemetryEnabled && !updatedSettings.telemetryEnabled) {
-      deps.telemetry.capture({ name: "telemetry_disabled" });
-    }
-    deps.telemetry.setEnabled(updatedSettings.telemetryEnabled);
+    deps.telemetry.setEnabled(false);
     deps.hub.notifySystem(["config-changed"]);
     return context.json(compatibleGeneralSettings());
   });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   experimental_useThreadContextKind,
   type ExperimentalThreadContextSegmentInput,
@@ -6,9 +6,7 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { BranchPicker } from "@bb/shared-ui/branch-picker";
 import { Icon } from "@bb/shared-ui/icon";
-import {
-  getMergeBaseBranchCandidateGroups,
-} from "../merge-base-branch-candidates";
+import { getMergeBaseBranchCandidateGroups } from "../merge-base-branch-candidates";
 import { BannerActionSlot } from "@bb/shared-ui/prompt-banner-actions";
 import {
   AnimatedDisclosureBody,
@@ -24,9 +22,12 @@ import {
 } from "../workspace-change-summary.js";
 import { WorkspaceChangesList } from "../workspace-changes-list.js";
 import { useChangedFileActions } from "../changed-files.js";
-import { useMergeBase, type MergeBaseState } from "../merge-base.js";
+import { type MergeBaseState } from "../merge-base.js";
 import { useGitStatus, useShowGitChanges } from "../queries.js";
-import type { WorkspaceFileStatus, WorkspaceStatus } from "../../contract.js";
+import type { WorkspaceFileStatus } from "../../contract.js";
+import { experimental_useAppPanel as useAppPanel } from "@get-bb/plugin-sdk/app";
+import { GIT_DIFF_TAB_ID } from "../../contract.js";
+import { Button } from "@bb/shared-ui/button";
 
 const TOGGLE_ID = "thread-prompt-banner-git-toggle";
 const BODY_ID = "thread-prompt-banner-git-body";
@@ -106,18 +107,6 @@ export function MergeBaseActionView({
         popoverAlign="end"
       />
     </BannerActionSlot>
-  );
-}
-
-function MergeBaseAction({
-  environmentId,
-  workspace,
-}: {
-  environmentId: string;
-  workspace: WorkspaceStatus;
-}) {
-  return (
-    <MergeBaseActionView mergeBase={useMergeBase(environmentId, workspace)} />
   );
 }
 
@@ -207,18 +196,61 @@ function SegmentContent({
   const { workspace } = useGitStatus(environmentId);
   const actions = useChangedFileActions(environmentId);
   const section = selectWorkspaceChangedFilesSection(workspace);
+  const panel = useAppPanel();
+  const [showAll, setShowAll] = useState(false);
   if (workspace === undefined || section === null) return null;
+  if (props.part === "summary")
+    return (
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <Icon name="FileDiff" className="size-6 shrink-0" />
+        <div className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+          <span>Changed {section.stats.fileCount} files</span>
+          <span>{renderChangeSummary(toChangeTally(section.stats))}</span>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            panel.openTab({
+              tab: {
+                id: GIT_DIFF_TAB_ID,
+                context: { kind: "thread" },
+                availability: "fixed",
+              },
+            })
+          }
+        >
+          View changes
+        </Button>
+      </div>
+    );
+  if (props.part === "action") return null;
+  const files = showAll ? section.files : section.files.slice(0, 3);
   return (
-    <ChangedFilesSegmentView
-      {...props}
-      section={section}
-      action={
-        props.part === "action" ? (
-          <MergeBaseAction environmentId={environmentId} workspace={workspace} />
-        ) : null
-      }
-      onFileClick={(file) => actions.onChangedFileClick({ file, section })}
-    />
+    <div className="border-t border-border">
+      <WorkspaceChangesList
+        files={files}
+        fileCount={files.length}
+        className="space-y-3 p-3"
+        onFileClick={(file) => actions.onChangedFileClick({ file, section })}
+      />
+      {section.files.length > 3 ? (
+        <button
+          type="button"
+          aria-expanded={showAll}
+          className="flex w-full items-center gap-2 border-t border-border bg-state-hover px-3 py-2 text-sm"
+          onClick={() => setShowAll((value) => !value)}
+        >
+          {showAll
+            ? "Show fewer files"
+            : `Show ${section.files.length - 3} more files`}
+          <Icon
+            name={showAll ? "ChevronUp" : "ChevronDown"}
+            className="size-4"
+          />
+        </button>
+      ) : null}
+    </div>
   );
 }
 

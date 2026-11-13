@@ -2701,6 +2701,20 @@ receives `dismiss()`. A disclosure registration returns an
 `open`/`close`/`toggle` controller, and only one disclosure is active across
 all plugins.
 
+`ExperimentalSidebarFooterDisclosureRegistration.experimental_placement` accepts
+`"rail-bottom"` to render the same disclosure above Settings in rail navigation,
+with a responsive popover and footer fallback for list navigation.
+`experimental_triggerIcon` supplies a reactive visual inside the host-owned button.
+`experimental_railContent` mounts plugin-owned controls below that button only in
+rail navigation, through the same slot boundary. Provider Usage uses this path
+and receives explicit `providerIds` from configured chat aliases, so icons can
+render from the provider directory before quota requests complete.
+for provider allowance buttons. Before stabilization, audit height overflow,
+missing limits, plugin removal and compact responsive popover behavior.
+Provider Usage is the core caller for both. Before stabilization, verify collapsed
+rails, compact drawers, focus restoration, plugin removal, controller commands,
+and list fallback against the same disclosure contract.
+
 Docs: `frontend-core-slots.md`.
 
 **Audit before stabilizing.**
@@ -4375,50 +4389,22 @@ range widenings automatically is made.
 
 ## `PluginBbSdk.system.experimental_recordTelemetryEvent`
 
-Posts one anonymous product event to `POST /api/v1/system/telemetry/events`,
-which forwards it to usage telemetry under the install's anonymous id and
-drops it when usage data sharing is off. The schema is a strict allow-list of
-setup-guide, new-thread-submit, plugin-creation-started, and release notes
-events; anything else is a 400. App callers, all through `recordTelemetryEvent`
-in `apps/app/src/components/onboarding/onboarding-telemetry.ts`: the setup guide
-(`OnboardingFlow`, `useOnboardingProjectImport`, and agent installs it starts
-through `provider-cli-install-store`), `NewThreadComposer`'s `new_thread_submit` outcomes,
-`PluginCreateButton`'s `plugin_creation_started`, and Settings → Updates'
-changelog (`release_notes_opened`, inline or on the web). `bb plugin new` sends
-`plugin_creation_started` through the same SDK method. The setup guide's
-Plugins step reports `recommendation` `shown`, `selected` and `deselected`
-(a featured plugin switched back off) with a per-visit `recommendation_id`; `selected` also stores that id in server-owned settings
-until the plugin's next use, disable or uninstall. `NewThreadComposer` also
-reports `new_thread_blocker` once per blocker reason while a draft exists.
-`onboarding_agent_state` adds `agent_statuses`, each agent's provider status
-by id; the server keeps only shipped agent ids.
-`onboarding_operation` reports a guide action's started, succeeded or failed
-outcome with only a public agent or plugin id or counts and, for the Projects
-step, whether the scan ran out of time and how many folders it could not open.
-A failed operation or `onboarding_sign_in` adds a `failure_reason` from a fixed
-set (`no_host`, `host_unavailable`, `timed_out`, `not_found`, `permission`,
-`command_failed`, `unsupported`, or `other`); a failed `remote_access` adds a
-`failure_stage` (`sign_in`, `pairing`, or `turn_on`) instead. Agent install
-and sign-in failures with `command_failed`, and `sign_in` or `pairing`
-remote access failures, may add `failure_detail` from a fixed set of error
-classes and an integer `exit_code`; never output or messages.
-`onboarding_left` reports the step a guide was on when the page unloaded
-before the guide finished; it passes the optional second argument
-`{ keepalive: true }`, which sends the request with `fetch`'s `keepalive` so it
-outlives the page. A failed `new_thread_submit` may add `failure_reason` from
-the same fixed set.
-`onboarding_error` reports `kind` (`render`, `uncaught` or
-`unhandled_rejection`) with the guide's step, from `OnboardingErrorTelemetry`
-around the guide in `OnboardingGate`, which reports and rethrows render errors
-and listens for window errors only while the guide is open.
-`onboarding_exposed` (`entry`) marks the guide being shown; the server saves
-the assignment, adds `setup_guide_variant` and `setup_guide_source`, sets
-`setup_guide_variant` as a person property (`$set`), and sends
-`$feature_flag_called` when the variant came from the PostHog flag. Every
-setup-guide event gets `setup_guide_variant` from the server.
+Posts one product event to `POST /api/v1/system/telemetry/events`. In this fork
+the telemetry service is permanently disabled, so the route performs only local
+compatibility behavior and recommendation bookkeeping; no event, feature-flag
+request, exposure, or telemetry-disabled notification leaves the server. The
+schema remains a strict allow-list of setup-guide, new-thread-submit,
+plugin-creation-started, and release-notes events; anything else is a 400.
 
-Stabilize after deciding whether third-party plugins may emit product events
-at all and, if so, how they are namespaced and rate limited.
+App callers use `recordTelemetryEvent` in
+`apps/app/src/components/onboarding/onboarding-telemetry.ts`; `bb plugin new`
+uses the same SDK method. A selected setup-guide plugin recommendation still
+stores its `recommendation_id` in server-owned settings until the plugin's next
+use, disable, or uninstall. The optional `{ keepalive: true }` argument retains
+its request behavior for page-unload callers.
+
+Stabilize after deciding whether third-party plugins may use this compatibility
+route at all and, if so, how they are namespaced and rate limited.
 
 ## `PluginBbSdk.system.experimental_cliCommand`, `experimental_installCliCommand`, and `experimental_removeCliCommand`
 
@@ -4842,3 +4828,19 @@ precedence, bounded discovery failure, and module-ABI preservation after Node
 replacement. Settle the shared process-local instance lifecycle across SDK
 bundle versions and whether `bundledNpmCli` belongs on the public surface before
 removing the prefix.
+
+# Sidebar footer reactive usage tooltip
+
+`ExperimentalSidebarFooterDisclosureRegistration.experimental_tooltip` is an
+experimental component rendered by the host's shared tooltip inside the plugin
+slot boundary. Core footer rendering and Provider Usage use the same registration
+path. Stabilization requires reviewing accessibility, compact-layout behavior and
+reactive subscription lifecycle across footer visibility changes.
+# Timeline context segment placement
+
+`ExperimentalThreadContextSegmentRegistration.experimental_placement` selects
+`composer` (default) or `timeline-end`. Timeline-end segments render once below
+the conversation and update through the same visibility and component contract.
+Core uses the shared segment host for both placements; Git's changed-files card
+uses timeline-end. Stabilization requires placement, visibility, thread switching,
+and plugin failure isolation contract tests across both hosts.

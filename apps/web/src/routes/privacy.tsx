@@ -70,17 +70,10 @@ function PrivacyRoute() {
           </p>
 
           <p>
-            Unless you turn it off, the bb app sends us anonymous usage events
-            through PostHog about how you use bb, including starting the app,
-            setting it up, and using threads and plugins. We use these events
-            to see how bb is used and to decide what to improve. Each
-            event carries a random install ID, the app version, and basic system
-            details such as your operating system, processor type, and Node.js
-            version. PostHog also records the IP address each event comes from
-            and the approximate location it maps to. Events never include your
-            prompts, code, file names, project names, or account details. To
-            turn this off, go to Settings → General → Share anonymous usage
-            data, or set <code>BB_TELEMETRY=false</code>.
+            This fork permanently disables bb app telemetry. The app and server
+            send no anonymous usage events, telemetry-disabled notifications, or
+            telemetry feature-flag requests. Saved settings and environment
+            variables cannot enable them.
           </p>
 
           <p>The iOS and Android apps store the following on your device:</p>

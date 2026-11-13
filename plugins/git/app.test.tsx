@@ -32,7 +32,12 @@ it("registers the Diff tab, Info rows and sections, the composer segment, and th
     "uncommitted-changes",
   ]);
   expect(app.threadContextSegments).toMatchObject([
-    { id: "changed-files", group: "3_git", order: 10 },
+    {
+      id: "changed-files",
+      group: "3_git",
+      order: 10,
+      experimental_placement: "timeline-end",
+    },
   ]);
   expect(app.threadActions).toMatchObject([
     { id: "commit", placement: "header", title: "Commit" },

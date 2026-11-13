@@ -46,6 +46,28 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
       "The main bb window, containing the sidebar, the conversation, and the side panel. A plugin can add rows, controls, panel tabs, and message content to the numbered regions.",
     surfaces: [
       {
+        id: "sidebar-footer-usage-tooltip",
+        title: "Sidebar footer usage tooltip",
+        summary:
+          "Render reactive quota details in the shared sidebar footer tooltip.",
+        bullets: [
+          "Register a disclosure and its experimental_tooltip component through the same footer API",
+          "Use existing theme, tooltip and slot boundaries; Provider Usage uses this core path",
+          "Place a disclosure above Settings with experimental_placement: rail-bottom; list navigation falls back to the footer",
+          "Render a reactive gauge with experimental_triggerIcon inside the host-owned button",
+          "Mount provider controls below the rail disclosure with experimental_railContent; receives providerIds from configured aliases and is omitted in list navigation",
+        ],
+        apiSymbols: [
+          "ExperimentalSidebarFooterDisclosureRegistration.experimental_tooltip",
+          "ExperimentalSidebarFooterDisclosureRegistration.experimental_placement",
+          "ExperimentalSidebarFooterDisclosureRegistration.experimental_triggerIcon",
+          "ExperimentalSidebarFooterDisclosureRegistration.experimental_railContent",
+          "ExperimentalSidebarFooter.register",
+        ],
+        firstParty: ["Provider Usage"],
+        experimental: true,
+      },
+      {
         id: "sidebar-navigation",
         title: "Sidebar navigation",
         summary:
@@ -714,6 +736,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
           "Warn or inform before someone sends, such as a rate limit or a retry",
           "Show only on new threads, open threads, or queued messages",
           "Add a segment to an open thread's context row, with details below it",
+          "Use experimental_placement: timeline-end to render the same segment below the conversation instead of beside the composer; Git uses this for live changed-file totals and file previews",
           "Draw a collapsible card like bb's Plan card, with a dismiss button",
         ],
         apiSymbols: [

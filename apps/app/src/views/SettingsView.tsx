@@ -54,6 +54,7 @@ import {
 import { useHostDaemon, useLocalHostDaemonAccess } from "@/hooks/useHostDaemon";
 import { useAppThemePreview } from "@/hooks/useAppThemePreview";
 import { ProvidersSettingsSection } from "@/components/settings/ProvidersSettingsSection";
+import { AgentProfilesSettings } from "@/components/settings/AgentProfilesSettings";
 import { CodeRendererSettings } from "@/components/settings/CodeRendererSettings";
 import { SidebarThreadListSetting } from "@/components/settings/SidebarThreadListSetting";
 import { SidebarNavigationProviderSetting } from "@/components/settings/SidebarNavigationProviderSetting";
@@ -197,8 +198,6 @@ interface GeneralSettingsSectionProps {
 interface PrivacySettingsSectionProps {
   onStreamerModeChange: (enabled: boolean) => void;
   streamerMode: boolean;
-  telemetryEnabled: boolean;
-  onTelemetryEnabledChange: (enabled: boolean) => void;
   disabled: boolean;
   enabled: boolean;
   onEnabledChange: (enabled: boolean) => void;
@@ -1075,8 +1074,6 @@ export function PrivacySettingsSection({
   onEnabledChange,
   streamerMode,
   onStreamerModeChange,
-  telemetryEnabled,
-  onTelemetryEnabledChange,
 }: PrivacySettingsSectionProps) {
   return (
     <SettingsSection title="Privacy & diagnostics">
@@ -1094,15 +1091,11 @@ export function PrivacySettingsSection({
         </SettingsWithControl>
 
         <SettingsWithControl
-          label="Share anonymous usage data"
-          description="Send anonymous usage data, such as app starts, setup progress and feature use, to help improve bb. Turning this off takes effect immediately for this server."
+          label="Anonymous usage telemetry"
+          labelBadge="Disabled"
+          description="This fork sends no usage events, telemetry-disabled notifications, or telemetry feature-flag requests. Settings and environment variables cannot enable them."
         >
-          <Switch
-            checked={telemetryEnabled}
-            disabled={disabled}
-            onCheckedChange={onTelemetryEnabledChange}
-            aria-label="Share anonymous usage data"
-          />
+          {null}
         </SettingsWithControl>
 
         <SettingsWithControl
@@ -1333,13 +1326,26 @@ export function SettingsView() {
     content = <PluginSettingsPage pluginId={activePluginId} />;
   } else if (activeSection === "providers") {
     content = (
-      <ProvidersSettingsSection
-        disabled={systemConfigQuery.data === undefined}
-        generalSettings={generalSettings}
-        onGeneralSettingsChange={(next) =>
-          updateGeneralSettingsMutation.mutateAsync(next).catch(() => undefined)
-        }
-      />
+      <>
+        {systemConfigQuery.data !== undefined ? (
+          <AgentProfilesSettings
+            settings={generalSettings}
+            disabled={false}
+            onChange={(patch) =>
+              updateGeneralSettingsMutation.mutateAsync(patch)
+            }
+          />
+        ) : null}
+        <ProvidersSettingsSection
+          disabled={systemConfigQuery.data === undefined}
+          generalSettings={generalSettings}
+          onGeneralSettingsChange={(next) =>
+            updateGeneralSettingsMutation
+              .mutateAsync(next)
+              .catch(() => undefined)
+          }
+        />
+      </>
     );
   } else if (activeSection === "ai-services") {
     content = <AiServicesSettingsSection />;
@@ -1504,12 +1510,6 @@ export function SettingsView() {
         <CliSkillsSettingsSection />
         <VoiceInputSettingsSection />
         <PrivacySettingsSection
-          telemetryEnabled={generalSettings.telemetryEnabled}
-          onTelemetryEnabledChange={(enabled) =>
-            updateGeneralSettingsMutation.mutate({
-              telemetryEnabled: enabled,
-            })
-          }
           streamerMode={generalSettings.streamerMode}
           onStreamerModeChange={(enabled) =>
             updateGeneralSettingsMutation.mutate({

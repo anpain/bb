@@ -186,6 +186,15 @@ async function prepareBetterSqlite3PackageDirectory(packageDirectory, options) {
   );
   const supportsLegacyPrebuild =
     typeof packageJson.dependencies?.["prebuild-install"] === "string";
+  if (process.env.BB_DESKTOP_SKIP_RUNTIME_VERIFICATION === "1") {
+    if (supportsLegacyPrebuild) {
+      await runPrebuildInstall(
+        packageDirectory,
+        resolveBetterSqlite3PrebuildArguments(options),
+      );
+    }
+    return;
+  }
   const canVerify =
     options.platform === process.platform &&
     options.arch === process.arch &&
@@ -260,6 +269,7 @@ async function prepareParcelWatcherPackageDirectory(packageDirectory, options) {
     );
   }
   if (
+    process.env.BB_DESKTOP_SKIP_RUNTIME_VERIFICATION === "1" ||
     options.platform !== process.platform ||
     options.arch !== process.arch ||
     options.electronVersion !== resolveElectronVersion()
@@ -374,6 +384,7 @@ async function afterPack(context) {
     electronVersion: resolveElectronVersion(),
     platform,
   });
+  if (process.env.BB_DESKTOP_SKIP_RUNTIME_VERIFICATION === "1") return;
   const { smokePackagedNpm } = await import("./smoke-packaged-npm.mjs");
   const productName = context.packager.appInfo.productFilename;
   const appBinary =

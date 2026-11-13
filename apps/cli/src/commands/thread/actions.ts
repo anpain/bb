@@ -770,6 +770,9 @@ function describeThreadTellOutcome(
   threadId: string,
   response: PostThreadMessageResult,
 ): string {
+  if (response.delivery === "dispatched") {
+    return `Thread ${threadId} dispatched linked tasks: ${response.childThreadIds.join(", ")}`;
+  }
   if (response.delivery === "queued") {
     // The server says WHY it is waiting, so the CLI does not have to guess
     // from the flags it happened to send. `bb thread queue list` shows the

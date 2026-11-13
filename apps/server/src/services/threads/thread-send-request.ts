@@ -14,6 +14,7 @@ import { requireThreadCommandEnvironment } from "./thread-command-environment.js
 import { assertThreadHostAcceptsWork } from "./thread-host-admission.js";
 import { runWithTurnTrace } from "../system/turn-trace.js";
 import { assertProviderAcceptsPromptActions } from "../providers/provider-plan-command.js";
+import { dispatchAgentProfiles } from "./agent-profile-dispatch.js";
 
 interface AcceptThreadSendRequestArgs {
   payload: SendMessageRequest;
@@ -25,6 +26,14 @@ export async function acceptThreadSendRequest(
   args: AcceptThreadSendRequestArgs,
 ): Promise<SendMessageResponse> {
   assertThreadHostAcceptsWork(deps.db, args.thread);
+  const childThreadIds = await dispatchAgentProfiles(
+    deps,
+    args.thread,
+    args.payload,
+  );
+  if (childThreadIds !== null) {
+    return { ok: true, delivery: "dispatched", childThreadIds };
+  }
   assertProviderAcceptsPromptActions(deps.providerRegistry, {
     input: args.payload.input,
     providerId: args.thread.providerId,

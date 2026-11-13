@@ -1,4 +1,5 @@
 import { HOST_TAILWIND_VERSION } from "@bb/plugin-build/host-tailwind-version";
+import { getAppSettings } from "@bb/db";
 import type { PluginUpdateJobs } from "../services/plugins/plugin-update-jobs.js";
 import { timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
@@ -472,7 +473,15 @@ export function registerPluginRoutes(
   app.get("/plugins/contributions", (context) =>
     context.json({
       cliCommands: plugins.listCliContributions(),
-      mentionProviders: plugins.listMentionProviderContributions(),
+      mentionProviders: [
+        ...plugins.listMentionProviderContributions(),
+        {
+          pluginId: "bb-agent-profiles",
+          id: "profile",
+          label: "Agent profiles",
+          triggers: ["@"],
+        },
+      ],
     }),
   );
 
@@ -503,6 +512,25 @@ export function registerPluginRoutes(
       projectId: projectId !== null && projectId.length > 0 ? projectId : null,
       threadId: threadId !== null && threadId.length > 0 ? threadId : null,
     });
+    if (trigger === "@") {
+      const profiles = getAppSettings(deps.db).agentProfiles.filter((profile) =>
+        [profile.name, ...profile.aliases].some((value) =>
+          value.toLowerCase().includes(query.toLowerCase()),
+        ),
+      );
+      if (profiles.length > 0)
+        groups.unshift({
+          pluginId: "bb-agent-profiles",
+          providerId: "profile",
+          label: "Agent profiles",
+          items: profiles.map((profile) => ({
+            itemId: `profile:${profile.id}`,
+            title: profile.aliases[0],
+            icon: null,
+            subtitle: `${profile.name} · ${profile.model ?? "Choose a model in Settings"}`,
+          })),
+        });
+    }
     return context.json({ ok: true, groups });
   });
 

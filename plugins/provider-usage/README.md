@@ -1,10 +1,46 @@
 # Provider usage
 
+The footer tooltip summarizes each provider's reported windows as remaining
+percentages. Opening the shared footer disclosure shows all providers, refresh,
+reset times, authentication errors and retained/stale measurements. Installed
+providers without a usage source remain visible as unknown rather than zero.
+Background refresh uses the same source cache every minute while visible, and
+rechecks on return after 30 seconds away. Startup loads provider inventory before
+collecting quotas, so branding does not wait for the slowest quota endpoint.
+An empty RPC provider filter means all providers.
+
+With rail navigation, a bare lightning indicator sits at the bottom of the far-left
+rail, above individual provider buttons and the relocated footer, and opens its details to the right.
+Its color reflects the smallest reported remaining allowance on the selected source.
+The overview and provider buttons share the persisted source selection and thread fallback;
+an empty shared source does not override machine quotas. List navigation keeps the same disclosure in the footer.
+
+Each provider button uses its native logo and two remaining-allowance arcs: a
+five-hour/daily window above and weekly below, falling back to a reported monthly
+window when no weekly window exists. The actual period is named in the tooltip
+and account details. Unknown limits use solid subdued tracks without a filled allowance and are not zero usage.
+Multiple accounts share one provider button, showing the lowest reported remaining
+allowance per position; opening it shows every account separately.
+
+OpenCode V2 exposes consumed tokens separately through
+`opencode api get /api/experimental/session/stats`, including input, output,
+reasoning, cache and model breakdowns. These are observed session statistics,
+not subscription quota or remaining balance. A zero reported cost does not prove
+that the upstream account was not charged. These statistics are not currently
+collected by BB's quota source.
+
+Kimi Code uses its installed CLI's authenticated loopback usage endpoint without
+a model call or copied OAuth credentials. OpenCode reuses `acp-opencode` and
+reports Go subscription usage only; quotas for other OpenCode providers are not
+inferred. Credits are shown only if Kimi actually reports its booster wallet.
+
 Shows usage from enabled usage-source plugins in the sidebar. When a location has
 more than one provider, the card opens on an **All** tab that stacks every provider
-tab's accounts, each marked with its provider icon. Provider tabs use provider icons,
+tab's accounts, each marked with its provider icon. Provider tabs use icons and names,
 with pooled accounts stacked under each provider. Each account shows its plan and,
-per usage window, a bar, the percent used, and the time until reset.
+per usage window, the full limit name, remaining percentage, remaining allowance bar,
+and time until reset. Warning colors indicate high consumption; missing reset times
+are explicitly marked unavailable. Click a limit for additional reset details.
 The card lists account metadata cheaply, then fetches the accounts on the selected
 tab. Unopened tabs have no quota badge until measured, and a badge shows only while
 that provider's accounts are off screen. Shared sources such as Account Pooler are selected by default; an explicit

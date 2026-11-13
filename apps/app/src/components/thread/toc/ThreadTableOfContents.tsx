@@ -1,4 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { LayoutGroup } from "motion/react";
+import { Sidebar001, Sidebar001Item } from "@/components/ui/sidebar-001";
+import { ProximitySidebar } from "@/components/ui/proximity-sidebar";
 import type {
   ThreadConversationOutlineItem,
   ThreadConversationOutlineResponse,
@@ -514,6 +524,8 @@ export function ThreadTableOfContents({
   onNavigateToRow,
 }: ThreadTableOfContentsProps) {
   const bottomAnchor = useBottomAnchoredScroll();
+  const instanceId = useId();
+  const panelId = `thread-toc-panel-${instanceId}`;
   const [rootElement, setRootElement] = useState<HTMLElement | null>(null);
   const tocVisible = useThreadTocVisible(rootElement);
   const [open, setOpen] = useState(false);
@@ -704,7 +716,7 @@ export function ThreadTableOfContents({
     <div
       ref={setRootElement}
       data-thread-toc=""
-      className="group/toc relative w-8"
+      className="group/toc relative w-[110px]"
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={(event) => {
         if (event.currentTarget.contains(document.activeElement)) return;
@@ -725,119 +737,104 @@ export function ThreadTableOfContents({
           type="button"
           aria-label="Thread table of contents"
           aria-expanded={open}
-          aria-controls={`thread-toc-panel-${threadId}`}
+          aria-controls={panelId}
           onClick={() => setOpen(true)}
-          className="no-scrollbar flex max-h-[calc(100vh-7rem)] w-8 cursor-pointer flex-col items-center gap-2 overflow-y-auto py-2"
+          className="absolute -top-3 right-0 h-3 w-8 cursor-pointer rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
-          <span aria-hidden className="flex w-full flex-col items-center gap-2">
-            {railItems.map((item) => (
-              <span
-                key={item.id}
-                className={cn(
-                  "h-[3px] shrink-0 rounded-full transition-all duration-150",
-                  item.id === activeUserId
-                    ? "w-5 bg-foreground/30 group-hover/toc:bg-foreground/70"
-                    : "w-3 bg-foreground/5 group-hover/toc:bg-foreground/20",
-                )}
-              />
-            ))}
-          </span>
+          <span className="sr-only">Open message list</span>
         </button>
+        <ProximitySidebar
+          items={railItems}
+          activeId={activeUserId}
+          onSelect={(id) => {
+            void handleSelect(id);
+          }}
+        />
 
         {open ? (
           <div
-            id={`thread-toc-panel-${threadId}`}
+            id={panelId}
             className="pointer-events-auto absolute right-full top-0 w-[18.25rem] max-w-[calc(100vw-3rem)] pr-1"
           >
-            <div className="rounded-lg border border-border bg-popover p-1 shadow-lg">
-              <div className="flex items-center gap-1 pb-1">
-                {hasAgentMessages ? (
+            <LayoutGroup id={panelId}>
+              <div className="rounded-2xl border border-border bg-popover p-2 shadow-lg">
+                <div className="flex items-center gap-1 pb-1">
+                  {hasAgentMessages ? (
+                    <TocPanelTab
+                      label="Agent messages"
+                      active={activeTab === "agent"}
+                      onSelect={() => setTab("agent")}
+                    />
+                  ) : null}
                   <TocPanelTab
-                    label="Agent messages"
-                    active={activeTab === "agent"}
-                    onSelect={() => setTab("agent")}
-                  />
-                ) : null}
-                <TocPanelTab
-                  label="Your messages"
-                  active={activeTab === "user"}
-                  onSelect={() => setTab("user")}
-                />
-              </div>
-              <div className="relative isolate">
-                <div
-                  ref={scrollRef}
-                  className="max-h-64 overflow-y-auto overflow-x-hidden"
-                >
-                  <div
-                    ref={topSentinelRef}
-                    aria-hidden
-                    className="h-px w-full"
-                  />
-                  <ul className="flex flex-col">
-                    {items.map((item) => {
-                      const active = item.id === activeId;
-                      const pending = item.id === pendingJumpId;
-                      return (
-                        <li key={item.id}>
-                          <button
-                            ref={(node) => {
-                              if (node) itemEls.current.set(item.id, node);
-                              else itemEls.current.delete(item.id);
-                            }}
-                            type="button"
-                            aria-busy={pending}
-                            onClick={() => {
-                              void handleSelect(item.id);
-                            }}
-                            className={cn(
-                              "flex w-full cursor-pointer rounded-md px-2 py-1.5 text-left transition-colors",
-                              active
-                                ? "bg-state-hover"
-                                : "hover:bg-state-hover",
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                "text-xs leading-snug",
-                                active
-                                  ? "text-foreground"
-                                  : "text-muted-foreground",
-                                pending && "animate-pulse",
-                              )}
-                            >
-                              <TocItemPreview
-                                item={item}
-                                senderThreadMetadataById={
-                                  senderThreadMetadataById
-                                }
-                              />
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  <div
-                    ref={bottomSentinelRef}
-                    aria-hidden
-                    className="h-px w-full"
+                    label="Your messages"
+                    active={activeTab === "user"}
+                    onSelect={() => setTab("user")}
                   />
                 </div>
-                {aboveOverflow ? (
+                <div className="relative isolate">
                   <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-x-0 top-0 z-10 h-8 bg-gradient-to-b from-popover/90 via-popover/60 to-transparent"
-                  />
-                ) : null}
-                {belowOverflow ? (
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-8 bg-gradient-to-t from-popover/90 via-popover/60 to-transparent"
-                  />
-                ) : null}
+                    ref={scrollRef}
+                    className="max-h-64 overflow-y-auto overflow-x-hidden"
+                  >
+                    <div
+                      ref={topSentinelRef}
+                      aria-hidden
+                      className="h-px w-full"
+                    />
+                    <Sidebar001>
+                      <ul className="relative flex flex-col">
+                        {items.map((item) => {
+                          const active = item.id === activeId;
+                          const pending = item.id === pendingJumpId;
+                          return (
+                            <li key={item.id}>
+                              <Sidebar001Item
+                                id={item.id}
+                                active={active}
+                                pending={pending}
+                                register={(node) => {
+                                  if (node) itemEls.current.set(item.id, node);
+                                  else itemEls.current.delete(item.id);
+                                }}
+                                onSelect={() => {
+                                  void handleSelect(item.id);
+                                }}
+                                label={
+                                  <TocItemPreview
+                                    item={item}
+                                    senderThreadMetadataById={
+                                      senderThreadMetadataById
+                                    }
+                                  />
+                                }
+                              />
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </Sidebar001>
+                    <div
+                      ref={bottomSentinelRef}
+                      aria-hidden
+                      className="h-px w-full"
+                    />
+                  </div>
+                  {aboveOverflow ? (
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-x-0 top-0 z-10 h-8 bg-gradient-to-b from-popover/90 via-popover/60 to-transparent"
+                    />
+                  ) : null}
+                  {belowOverflow ? (
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-8 bg-gradient-to-t from-popover/90 via-popover/60 to-transparent"
+                    />
+                  ) : null}
+                </div>
               </div>
-            </div>
+            </LayoutGroup>
           </div>
         ) : null}
       </div>

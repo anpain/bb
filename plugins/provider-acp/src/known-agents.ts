@@ -1,4 +1,5 @@
 import type { AcpAgentDefinition } from "./agents.js";
+import type { AcpNativeRootsResolver } from "./native-roots/resolver.js";
 import { resolveCursorNativeRoots } from "./native-roots/cursor.js";
 import { resolveGrokNativeRoots } from "./native-roots/grok.js";
 import { resolveHermesNativeRoots } from "./native-roots/hermes.js";
@@ -6,6 +7,7 @@ import { resolveOmpNativeRoots } from "./native-roots/omp.js";
 import { resolveOpenCodeNativeRoots } from "./native-roots/opencode.js";
 
 const PLUGIN_ID = "provider-acp";
+const resolveNoNativeRoots: AcpNativeRootsResolver = async () => ({});
 
 function declaredIcon(name: string): string {
   return `${PLUGIN_ID}/${name}`;
@@ -112,6 +114,24 @@ export const KNOWN_ACP_AGENTS: readonly AcpAgentDefinition[] = [
       },
     },
     nativeRootsResolver: resolveOpenCodeNativeRoots,
+  },
+  {
+    id: "acp-kimi",
+    displayName: "Kimi Code",
+    icon: declaredIcon("registry-kimi"),
+    signInCommand: "kimi acp --login",
+    installUrl:
+      "https://www.kimi.com/code/docs/en/kimi-code-cli/reference/kimi-acp.html",
+    visibility: "installed",
+    providerUsage: true,
+    fork: "tip",
+    launch: {
+      displayName: "Kimi Code",
+      command: "kimi",
+      args: ["acp"],
+      env: {},
+    },
+    nativeRootsResolver: resolveNoNativeRoots,
   },
   {
     id: "acp-omp",

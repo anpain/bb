@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { UsageProvider } from "./usage-schema.js";
+import { railUsageWindows } from "./app.js";
+import { createElement } from "react";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import {
   loadPluginApp,
@@ -9,9 +12,18 @@ import {
   renderSlot,
 } from "@get-bb/plugin-sdk/testing/app";
 
+beforeEach(() => {
+  const values = new Map<string, string>();
+  vi.stubGlobal("localStorage", {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+    clear: () => values.clear(),
+  });
+});
+
 afterEach(() => {
   cleanup();
-  localStorage.clear();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -64,6 +76,56 @@ function threadOnMachine(
 }
 
 describe("provider usage footer disclosure", () => {
+  it("keeps missing periods unknown and preserves the monthly fallback label", () => {
+    const provider: UsageProvider = {
+      id: "account",
+      providerId: "codex",
+      accountLabel: null,
+      displayName: "Codex",
+      logoUrl: null,
+      icon: null,
+      strings: { iconTint: null },
+      signInHint: "Sign in",
+      expiredHint: "Sign in again",
+      usage: {
+        status: "ok",
+        accountEmail: null,
+        planLabel: null,
+        windows: [
+          {
+            label: "Monthly limit",
+            usedPercent: 40,
+            resetsAt: null,
+            cost: null,
+          },
+          {
+            label: "Weekly limit",
+            usedPercent: 70,
+            resetsAt: null,
+            cost: null,
+          },
+          {
+            label: "Five-hour limit",
+            usedPercent: 120,
+            resetsAt: null,
+            cost: null,
+          },
+        ],
+      },
+    };
+    expect(
+      railUsageWindows(provider).map((window) => window?.usedPercent),
+    ).toEqual([120, 70]);
+    if (provider.usage?.status !== "ok") throw new Error("Expected usage");
+    provider.usage.windows = provider.usage.windows.filter(
+      (window) => window.label === "Monthly limit",
+    );
+    expect(
+      railUsageWindows(provider).map((window) => window?.label ?? null),
+    ).toEqual([null, "Monthly limit"]);
+    provider.usage = { status: "error", message: "Offline" };
+    expect(railUsageWindows(provider)).toEqual([null, null]);
+  });
   it("aggregates every machine and keeps machine and provider selection local to the card", async () => {
     const pooledAccounts: UsageProvider[] = (
       [
@@ -226,7 +288,7 @@ describe("provider usage footer disclosure", () => {
       kind: "disclosure",
       id: "usage",
       label: "Provider usage",
-      icon: "ChartColumn",
+      icon: "Gauge",
     });
     if (item?.kind !== "disclosure") throw new Error("missing disclosure");
 
@@ -238,7 +300,7 @@ describe("provider usage footer disclosure", () => {
           body: JSON.stringify({
             force: false,
             machineIds: null,
-            maxAgeMs: 30 * 60_000,
+            maxAgeMs: 60_000,
             providerIds: [],
           }),
         }),
@@ -278,7 +340,7 @@ describe("provider usage footer disclosure", () => {
           body: JSON.stringify({
             force: false,
             machineIds: ["source:account-pool"],
-            maxAgeMs: 2 * 60_000,
+            maxAgeMs: 60_000,
             providerIds: ["codex", "claude-code"],
           }),
         }),
@@ -295,7 +357,7 @@ describe("provider usage footer disclosure", () => {
     expect(
       slot.getByRole("heading", { name: "codex@example.com" }),
     ).toBeTruthy();
-    expect(slot.getByText("97%")).toBeTruthy();
+    expect(slot.getByText("3% left")).toBeTruthy();
     expect(
       localStorage.getItem("bb.bb--provider-usage.selected-machine.v1"),
     ).toBe("host-m5");
@@ -321,13 +383,13 @@ describe("provider usage footer disclosure", () => {
     expect(
       slot.getByRole("heading", { name: "claude@example.com" }),
     ).toBeTruthy();
-    expect(slot.getByText("82%")).toBeTruthy();
+    expect(slot.getByText("18% left")).toBeTruthy();
 
     fireEvent.click(codexTab);
     expect(
       slot.getByRole("heading", { name: "codex@example.com" }),
     ).toBeTruthy();
-    expect(slot.getByText("37%")).toBeTruthy();
+    expect(slot.getByText("63% left")).toBeTruthy();
     fireEvent.keyDown(codexTab, { key: "ArrowLeft" });
     expect(claudeTab.getAttribute("aria-selected")).toBe("true");
 
@@ -378,7 +440,7 @@ describe("provider usage footer disclosure", () => {
         body: JSON.stringify({
           force: false,
           machineIds: null,
-          maxAgeMs: 5 * 60_000,
+          maxAgeMs: 30_000,
           providerIds: [],
         }),
       }),
@@ -409,17 +471,17 @@ describe("provider usage footer disclosure", () => {
     ).not.toBeNull();
     expect(slot.getAllByText("team@example.com")).toHaveLength(1);
     expect(slot.getAllByText("personal@example.com")).toHaveLength(1);
-    expect(slot.getByText("46%")).toBeTruthy();
-    expect(slot.getByText("2d 3h")).toBeTruthy();
+    expect(slot.getByText("54% left")).toBeTruthy();
+    expect(slot.getByText("Resets in 2d 3h")).toBeTruthy();
     expect(
       slot.getAllByRole("heading").map((heading) => heading.textContent),
     ).toEqual(["team@example.com", "personal@example.com"]);
     const windowButton = slot.getByRole("button", {
-      name: "Weekly limit: 46% used. Reset time not reported",
+      name: "Weekly limit: 54% remaining. Reset time not reported",
     });
     fireEvent.click(windowButton);
     expect(slot.getByText("Reset time not reported.")).toBeTruthy();
-    expect(slot.getByText("82%")).toBeTruthy();
+    expect(slot.getByText("18% left")).toBeTruthy();
     fireEvent.click(slot.getByRole("tab", { name: "Claude Code" }));
     expect(slot.getByText("claude-team@example.com")).toBeTruthy();
     expect(slot.queryByText("personal@example.com")).toBeNull();
@@ -540,12 +602,137 @@ it.each([
     expect(slot.getByText(expected, { exact: false })).toBeTruthy(),
   );
   if (state === "source-error") {
-    expect(slot.getByText("42%")).toBeTruthy();
+    expect(slot.getByText("58% left")).toBeTruthy();
     expect(slot.queryByText("private backend error")).toBeNull();
     expect(
       slot.queryByRole("button", { name: "Retry usage refresh" }),
     ).toBeNull();
   }
+  await mounted.lifecycle.dispose();
+});
+
+it("shows the same measured quotas in the overview and rail despite an empty pool", async () => {
+  const account: UsageProvider = {
+    id: "codex-account",
+    providerId: "codex",
+    accountLabel: null,
+    displayName: "Codex",
+    logoUrl: null,
+    icon: null,
+    strings: { iconTint: null },
+    signInHint: "Sign in.",
+    expiredHint: "Sign in again.",
+    usage: {
+      status: "ok",
+      accountEmail: null,
+      planLabel: "Plus",
+      windows: [
+        {
+          label: "Five-hour limit",
+          usedPercent: 3,
+          resetsAt: null,
+          cost: null,
+        },
+        { label: "Weekly limit", usedPercent: 100, resetsAt: null, cost: null },
+      ],
+    },
+  };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({
+        ok: true,
+        result: {
+          machines: [
+            {
+              id: "host-real",
+              displayName: "MacBook",
+              status: "connected",
+              error: null,
+              providers: [account],
+            },
+            {
+              id: "source:empty",
+              displayName: "Empty pool",
+              status: "connected",
+              error: null,
+              providers: [],
+            },
+          ],
+        },
+      }),
+    ),
+  );
+  const app = await loadPluginApp(() => import("./app"));
+  const mounted = await mountPluginContentScripts(app, {
+    pluginId: "bb--provider-usage",
+  });
+  const item = app.experimentalSidebarFooterItems[0];
+  if (item?.kind !== "disclosure" || !item.experimental_railContent)
+    throw new Error("missing rail");
+  const overview = renderSlot(
+    item,
+    { dismiss: vi.fn() },
+    { pluginId: "bb--provider-usage" },
+  );
+  const Rail = item.experimental_railContent;
+  const rail = renderSlot(
+    {
+      component: (props: { providerIds: readonly string[] }) =>
+        createElement(TooltipProvider, null, createElement(Rail, props)),
+    },
+    { providerIds: ["codex"] },
+    {
+      pluginId: "bb--provider-usage",
+      providers: {
+        providers: [
+          {
+            id: "codex",
+            displayName: "Codex",
+            logoUrl: "/api/v1/system/providers/codex/logo",
+            pluginId: "provider-codex",
+            available: true,
+            completedTurnDisplay: "collapse",
+            composerActions: [],
+            maintenance: { health: true, usage: true, installation: true },
+            capabilities: {
+              modelCatalogScope: "host",
+              permissionModes: ["auto"],
+              supportsFork: true,
+              supportsNativeUserQuestion: false,
+              supportsServiceTier: false,
+              supportsSessionRewind: true,
+              supportsThreadArchive: true,
+              supportsThreadRename: true,
+            },
+          },
+        ],
+      },
+    },
+  );
+  await waitFor(() => expect(overview.getByText("97% left")).toBeTruthy());
+  const button = await waitFor(() =>
+    rail.getByRole("button", {
+      name: "Codex usage: Five-hour limit, 97% remaining; Weekly limit, 0% remaining",
+    }),
+  );
+  expect(button.querySelector("path")?.hasAttribute("stroke-dasharray")).toBe(
+    false,
+  );
+  expect(
+    button
+      .querySelector("[data-provider-logo]")
+      ?.getAttribute("data-provider-logo"),
+  ).toBe("/api/v1/system/providers/codex/logo");
+  fireEvent.click(button);
+  expect(
+    document
+      .querySelector('[data-state="open"][role="dialog"] section')
+      ?.classList.contains("border"),
+  ).not.toBe(true);
+  await waitFor(() =>
+    expect(rail.getAllByText("97% left").length).toBeGreaterThan(0),
+  );
   await mounted.lifecycle.dispose();
 });
 
@@ -626,7 +813,7 @@ it("keeps a measured refresh when an older snapshot response arrives late", asyn
   );
   await new Promise((resolve) => setTimeout(resolve, 0));
   releaseInventory!();
-  await waitFor(() => expect(slot.getByText("37%")).toBeTruthy());
+  await waitFor(() => expect(slot.getByText("63% left")).toBeTruthy());
   await waitFor(() =>
     expect(
       slot
@@ -635,6 +822,6 @@ it("keeps a measured refresh when an older snapshot response arrives late", asyn
     ).toBe(false),
   );
   expect(slot.queryByText("Usage not reported.")).toBeNull();
-  expect(slot.getByText("37%")).toBeTruthy();
+  expect(slot.getByText("63% left")).toBeTruthy();
   await mounted.lifecycle.dispose();
 });

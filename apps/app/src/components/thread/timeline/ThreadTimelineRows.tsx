@@ -1867,11 +1867,19 @@ function TimelineExpandableRowView({
       leadingIconUrl={leadingIconUrl}
       leadingIconStyle={leadingIconStyle}
       autoExpanded={
-        liveAutoExpandedRowIds.has(row.id) ||
-        initialAutoExpandedRowIds.has(row.id)
+        row.kind !== "step-summary" &&
+        row.kind !== "bundle-summary" &&
+        row.kind !== "turn" &&
+        (liveAutoExpandedRowIds.has(row.id) ||
+          initialAutoExpandedRowIds.has(row.id))
       }
       forceExpanded={searchExpandedRowIds.has(row.id)}
-      terminalAutoExpanded={terminalAutoExpandedRowIds.has(row.id)}
+      terminalAutoExpanded={
+        row.kind !== "step-summary" &&
+        row.kind !== "bundle-summary" &&
+        row.kind !== "turn" &&
+        terminalAutoExpandedRowIds.has(row.id)
+      }
       onTitleAction={onTitleAction}
       onIntent={preloadBody}
       renderBody={renderBody}
@@ -2190,77 +2198,77 @@ function TimelineRowsList({
   const isTopLevelList = spacing === "top-level";
   return (
     <TimelineSearchExpansionContext.Provider value={stableSearchExpandedRowIds}>
-        <div
-          className={cn(
-            "flex min-w-0 flex-col [&_button:not(:disabled)]:cursor-pointer",
-            timelineRowsListGapClassName(spacing),
-            className,
-          )}
-          data-timeline-row-list={spacing}
-          style={isInitialRevealPending ? { visibility: "hidden" } : undefined}
-          aria-busy={isInitialRevealPending || undefined}
-        >
-          <TimelineWindowedItems
-            alwaysMountedKeys={alwaysMountedKeys}
-            estimateItemHeight={(index) => {
-              const item = items[index];
-              return item?.kind === "row"
-                ? estimateTimelineWindowedRowHeight(item.row, spacing)
-                : 28;
-            }}
-            gap={spacing === "bundle" ? 0 : 8}
-            initialWindowAnchor={
-              isTopLevelList && detailScrollRoot === null ? scrollRestore : null
+      <div
+        className={cn(
+          "flex min-w-0 flex-col [&_button:not(:disabled)]:cursor-pointer",
+          timelineRowsListGapClassName(spacing),
+          className,
+        )}
+        data-timeline-row-list={spacing}
+        style={isInitialRevealPending ? { visibility: "hidden" } : undefined}
+        aria-busy={isInitialRevealPending || undefined}
+      >
+        <TimelineWindowedItems
+          alwaysMountedKeys={alwaysMountedKeys}
+          estimateItemHeight={(index) => {
+            const item = items[index];
+            return item?.kind === "row"
+              ? estimateTimelineWindowedRowHeight(item.row, spacing)
+              : 28;
+          }}
+          gap={spacing === "bundle" ? 0 : 8}
+          initialWindowAnchor={
+            isTopLevelList && detailScrollRoot === null ? scrollRestore : null
+          }
+          itemKeys={itemKeys}
+          measurements={measurements}
+          positionKeeper={
+            detailScrollRoot?.positionKeeper ??
+            bottomAnchor?.positionKeeper ??
+            null
+          }
+          pinnedToEnd={
+            isTopLevelList &&
+            detailScrollRoot === null &&
+            bottomAnchor?.isAtBottom === true
+          }
+          renderItem={(index, windowedState) => {
+            const item = items[index];
+            if (item === undefined) {
+              return null;
             }
-            itemKeys={itemKeys}
-            measurements={measurements}
-            positionKeeper={
-              detailScrollRoot?.positionKeeper ??
-              bottomAnchor?.positionKeeper ??
-              null
-            }
-            pinnedToEnd={
-              isTopLevelList &&
-              detailScrollRoot === null &&
-              bottomAnchor?.isAtBottom === true
-            }
-            renderItem={(index, windowedState) => {
-              const item = items[index];
-              if (item === undefined) {
-                return null;
-              }
-              if (item.kind === "unread-divider") {
-                return (
-                  <div
-                    key={item.id}
-                    ref={windowedState.itemRef}
-                    data-scroll-landmark-id={item.id}
-                    data-timeline-window-key={`divider:${item.id}`}
-                  >
-                    <TimelineUnreadDivider />
-                  </div>
-                );
-              }
+            if (item.kind === "unread-divider") {
               return (
-                <TimelineRowItemWrapper
-                  key={item.row.id}
-                  row={item.row}
-                  spacing={spacing}
-                  windowedState={windowedState}
+                <div
+                  key={item.id}
+                  ref={windowedState.itemRef}
+                  data-scroll-landmark-id={item.id}
+                  data-timeline-window-key={`divider:${item.id}`}
                 >
-                  <MemoizedTimelineRowView
-                    activeLatestBundleId={activeLatestBundleId}
-                    row={item.row}
-                    scopeActive={scopeActive}
-                    showAssistantMessageActions={showAssistantMessageActions}
-                    spacing={spacing}
-                    compactActivityIntents={compactActivityIntents}
-                  />
-                </TimelineRowItemWrapper>
+                  <TimelineUnreadDivider />
+                </div>
               );
-            }}
-          />
-        </div>
+            }
+            return (
+              <TimelineRowItemWrapper
+                key={item.row.id}
+                row={item.row}
+                spacing={spacing}
+                windowedState={windowedState}
+              >
+                <MemoizedTimelineRowView
+                  activeLatestBundleId={activeLatestBundleId}
+                  row={item.row}
+                  scopeActive={scopeActive}
+                  showAssistantMessageActions={showAssistantMessageActions}
+                  spacing={spacing}
+                  compactActivityIntents={compactActivityIntents}
+                />
+              </TimelineRowItemWrapper>
+            );
+          }}
+        />
+      </div>
     </TimelineSearchExpansionContext.Provider>
   );
 }

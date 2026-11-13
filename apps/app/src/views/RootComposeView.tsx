@@ -162,7 +162,7 @@ import {
   type RootComposeTerminalTarget,
 } from "./RootComposePanelTabContent";
 
-const ROOT_COMPOSE_SIDEBAR_ACTION_ALIGNED_TOP_PADDING_CLASS = "pt-14";
+const ROOT_COMPOSE_SIDEBAR_ACTION_ALIGNED_TOP_PADDING_CLASS = "";
 
 const EMPTY_TERMINAL_SESSIONS: readonly TerminalSession[] = [];
 

@@ -103,8 +103,8 @@ export const SETTINGS_SEARCH_INDEX: Record<
         keywords: ["privacy", "screen share", "hide models"],
       },
       {
-        title: "Share anonymous usage data",
-        keywords: ["privacy", "telemetry", "analytics"],
+        title: "Anonymous usage telemetry",
+        keywords: ["privacy", "telemetry", "analytics", "disabled"],
       },
       {
         title: "Show diagnostic events",
@@ -115,6 +115,7 @@ export const SETTINGS_SEARCH_INDEX: Record<
   providers: {
     keywords: ["agents", "models"],
     settings: [
+      { title: "Agent profiles", keywords: ["aliases", "dispatch", "codex", "kimi", "claude", "opencode", "кодекс", "кими", "клод", "опенкод", "default model"] },
       {
         title: "Allow faster service tiers",
         keywords: ["fast mode", "priority", "speed"],

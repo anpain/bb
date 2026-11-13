@@ -260,7 +260,7 @@ it("persists terminal copy-on-select and preserves opt-out for older clients", a
   });
 });
 
-it("preserves telemetry opt-out when older clients update other settings", async () => {
+it("keeps telemetry disabled when older clients update other settings", async () => {
   await withTestHarness(async (harness) => {
     const put = (settings: object) =>
       harness.app.request("/api/v1/settings/general", {
@@ -273,7 +273,7 @@ it("preserves telemetry opt-out when older clients update other settings", async
     ).toBe(200);
     expect(getAppSettings(harness.db).telemetryEnabled).toBe(false);
     const { telemetryEnabled, ...legacy } = defaultAppSettings;
-    expect(telemetryEnabled).toBe(true);
+    expect(telemetryEnabled).toBe(false);
     expect((await put({ ...legacy, showKeyboardHints: false })).status).toBe(
       200,
     );
@@ -285,10 +285,7 @@ it("preserves telemetry opt-out when older clients update other settings", async
   });
 });
 
-it.each([
-  "confirmThreadArchive",
-  "summarizeShellCommands",
-] as const)(
+it.each(["confirmThreadArchive", "summarizeShellCommands"] as const)(
   "persists %s opt-out and preserves it for older clients",
   async (key) => {
     await withTestHarness(async (harness) => {

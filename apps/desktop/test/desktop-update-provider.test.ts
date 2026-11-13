@@ -7,13 +7,13 @@ import {
 describe("desktop update feed url", () => {
   it("gives each platform its own feed file inside one release tag", () => {
     expect(createDesktopUpdateFeedUrl("macos")).toBe(
-      "https://github.com/get-bb/bb/releases/download/desktop-latest/desktop-version.json",
+      "https://github.com/yarxhe/bb/releases/download/desktop-latest/desktop-version.json",
     );
     expect(createDesktopUpdateFeedUrl("linux")).toBe(
-      "https://github.com/get-bb/bb/releases/download/desktop-latest/desktop-version-linux.json",
+      "https://github.com/yarxhe/bb/releases/download/desktop-latest/desktop-version-linux.json",
     );
     expect(createDesktopUpdateFeedUrl("windows")).toBe(
-      "https://github.com/get-bb/bb/releases/download/desktop-latest/desktop-version-windows.json",
+      "https://github.com/yarxhe/bb/releases/download/desktop-latest/desktop-version-windows.json",
     );
   });
 });
@@ -23,34 +23,34 @@ const alwaysReplaceable = () => true;
 const neverReplaceable = () => false;
 
 describe("desktop update support", () => {
-  it("enables both update paths on macOS", () => {
+  it("keeps fork updates manual on macOS", () => {
     expect(
       resolveDesktopUpdateSupport({
         canReplaceAppImage: neverReplaceable,
         env: {},
         platform: "macos",
       }),
-    ).toEqual({ autoUpdate: true, versionCheck: true });
+    ).toEqual({ autoUpdate: false, versionCheck: true });
   });
 
-  it("checks for and installs updates on Windows", () => {
+  it("checks for updates without replacing the Windows fork automatically", () => {
     expect(
       resolveDesktopUpdateSupport({
         canReplaceAppImage: alwaysReplaceable,
         env: { APPIMAGE: APP_IMAGE_PATH },
         platform: "windows",
       }),
-    ).toEqual({ autoUpdate: true, versionCheck: true });
+    ).toEqual({ autoUpdate: false, versionCheck: true });
   });
 
-  it("installs updates on Linux only inside an AppImage", () => {
+  it("keeps Linux updates manual inside and outside an AppImage", () => {
     expect(
       resolveDesktopUpdateSupport({
         canReplaceAppImage: alwaysReplaceable,
         env: { APPIMAGE: APP_IMAGE_PATH },
         platform: "linux",
       }),
-    ).toEqual({ autoUpdate: true, versionCheck: true });
+    ).toEqual({ autoUpdate: false, versionCheck: true });
     expect(
       resolveDesktopUpdateSupport({
         canReplaceAppImage: alwaysReplaceable,
@@ -80,7 +80,7 @@ describe("desktop update support", () => {
         platform: "linux",
       }),
     ).toEqual({ autoUpdate: false, versionCheck: true });
-    expect(checked).toEqual([APP_IMAGE_PATH]);
+    expect(checked).toEqual([]);
   });
 
   it("does not consult the filesystem on macOS", () => {

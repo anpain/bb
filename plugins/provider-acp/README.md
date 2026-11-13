@@ -1,7 +1,7 @@
 # ACP providers
 
 First-party plugin for ACP (Agent Client Protocol) agent providers: Cursor,
-opencode, omp, Grok Build and Hermes Agent.
+opencode, Kimi Code, omp, Grok Build and Hermes Agent.
 
 OpenCode Go usage appears under OpenCode in the Provider usage panel for the
 selected machine. It reads the official Go endpoint using the machine's OpenCode
@@ -50,3 +50,18 @@ What lives here:
 
 The kit itself, including the ACP wire schema, the delta translation, the
 per-agent dialects and the bridge process, is `packages/provider-bridge-acp`.
+## Kimi usage and model profiles
+
+Kimi Code advertises usage maintenance through the existing bb host-local usage
+API and this plugin's usage-source RPC. Collection launches a short-lived
+`kimi web --host 127.0.0.1 --port 0 --no-open --log-level error`, consumes only its
+local authorization handoff in memory, requests `/api/v1/oauth/usage`, then stops
+that child process. Existing CLI authentication and refresh remain CLI-owned;
+no login or model prompt is performed. Kimi telemetry is disabled for collection.
+Five-hour, weekly and monthly windows appear only when returned, as do booster
+credits. Unsupported CLI versions return unavailable usage.
+
+OpenCode remains the existing installed-only `acp-opencode` provider. Its
+workspace model catalog supplies configured models, including custom providers
+such as `rurout/gpt-6.1-sol`; bb does not hard-code or silently substitute them.
+Settings → Providers → Agent profiles can bind aliases to any catalog model.

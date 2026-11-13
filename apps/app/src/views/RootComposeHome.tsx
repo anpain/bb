@@ -146,7 +146,7 @@ export function RootComposeHome({
           isCompact
             ? "relative min-h-0 flex-1"
             : cn(
-                "mx-auto flex w-full flex-col px-4 pb-4 pt-2",
+                "mx-auto flex min-h-full w-full flex-col justify-center px-4 py-14",
                 ROOT_COMPOSE_MAX_WIDTH_CLASS,
                 wideContentClassName,
               )

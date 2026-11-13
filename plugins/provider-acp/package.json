@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Run bb threads with ACP agents (supports Cursor, opencode, omp and more).",
+  "description": "Run bb threads with ACP agents (supports Cursor, opencode, Kimi Code, omp and more).",
   "engines": {
     "bb": ">=0.0",
     "bbPluginSdk": ">=0.4.90"
   },
   "bb": {
     "name": "ACP providers",
-    "description": "Run bb threads with ACP agents (supports Cursor, opencode, omp and more).",
+    "description": "Run bb threads with ACP agents (supports Cursor, opencode, Kimi Code, omp and more).",
     "branding": {
       "icon": "./icons/acp.svg",
       "experimental_icons": {
@@ -90,6 +90,11 @@
         "kind": "agent",
         "id": "acp-hermes-agent",
         "displayName": "Hermes"
+      },
+      {
+        "kind": "agent",
+        "id": "acp-kimi",
+        "displayName": "Kimi Code"
       }
     ]
   },

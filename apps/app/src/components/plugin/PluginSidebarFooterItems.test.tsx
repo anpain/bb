@@ -37,6 +37,7 @@ import {
 import {
   PluginSidebarFooterDisclosure,
   PluginSidebarFooterItems,
+  PluginRailDisclosures,
   usePluginSidebarFooterDisclosure,
 } from "./PluginSidebarFooterItems";
 import {
@@ -77,8 +78,10 @@ function renderWithProviders(ui: ReactNode, store = createStore()) {
 
 function FooterHarness({
   onCustomize = () => {},
+  rail = false,
 }: {
   onCustomize?: () => void;
+  rail?: boolean;
 }) {
   const disclosure = usePluginSidebarFooterDisclosure();
   return (
@@ -89,6 +92,7 @@ function FooterHarness({
       />
       <SidebarMenu>
         <PluginSidebarFooterItems
+          rail={rail}
           onCustomize={onCustomize}
           activeDisclosureKey={disclosure.activeKey}
           onDisclosureCommand={disclosure.handleCommand}
@@ -109,6 +113,17 @@ function UsageDisclosure({ dismiss }: { dismiss(): void }) {
   );
 }
 
+function RailDisclosureHarness() {
+  const disclosure = usePluginSidebarFooterDisclosure();
+  return (
+    <PluginRailDisclosures
+      activeKey={disclosure.activeKey}
+      onCommand={disclosure.handleCommand}
+      onDismiss={disclosure.dismiss}
+    />
+  );
+}
+
 afterEach(() => {
   cleanup();
   resetPluginSlotStoreForTest();
@@ -117,6 +132,92 @@ afterEach(() => {
 });
 
 describe("PluginSidebarFooterItems", () => {
+  it("keeps rail actions accessible when horizontal footer preferences hide them", () => {
+    setPluginSlotRegistrations(
+      "example",
+      collectPluginAppRegistrations(
+        definePluginApp((app) => {
+          app.experimental_sidebarFooter.register({
+            kind: "action",
+            id: "action",
+            label: "Run action",
+            icon: "Zap",
+            onActivate: vi.fn(),
+          });
+        }),
+      ),
+    );
+    const store = createStore();
+    store.set(sidebarFooterHiddenAtom, ["plugin:example/action"]);
+    store.set(sidebarFooterCapacityAtom, 0);
+    renderWithProviders(<FooterHarness rail />, store);
+    expect(screen.getByRole("button", { name: "Run action" })).toBeTruthy();
+    expect(store.get(sidebarFooterHiddenAtom)).toEqual([
+      "plugin:example/action",
+    ]);
+  });
+  it("omits the footer overflow control in the vertical rail", () => {
+    renderWithProviders(<FooterHarness rail />);
+    expect(
+      screen.queryByRole("button", { name: "More footer actions" }),
+    ).toBeNull();
+    expect(screen.queryByText("Customize footer")).toBeNull();
+  });
+  it("omits mobile apps and bug reporting from the rail even when available", () => {
+    renderWithProviders(
+      <SidebarMenu>
+        <PluginSidebarFooterItems
+          rail
+          onCustomize={() => {}}
+          activeDisclosureKey={null}
+          onDisclosureCommand={() => {}}
+          builtInActions={[
+            { id: "mobile", onActivate: vi.fn() },
+            { id: "report-bug", onActivate: vi.fn() },
+          ]}
+        />
+      </SidebarMenu>,
+    );
+    expect(screen.queryByRole("button", { name: "Mobile apps" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Report a bug" })).toBeNull();
+  });
+  it("opens rail disclosures beside their trigger and returns focus on dismissal", async () => {
+    setPluginSlotRegistrations(
+      "usage",
+      collectPluginAppRegistrations(
+        definePluginApp((app) => {
+          app.experimental_sidebarFooter.register({
+            kind: "disclosure",
+            id: "usage",
+            label: "Provider usage",
+            icon: "Gauge",
+            component: UsageDisclosure,
+            experimental_placement: "rail-bottom",
+            experimental_triggerIcon: () => <span>Live allowance</span>,
+            experimental_railContent: () => (
+              <button type="button">Provider allowance</button>
+            ),
+          });
+        }),
+      ),
+    );
+    renderWithProviders(<RailDisclosureHarness />);
+    expect(
+      screen.getAllByRole("button", { name: "Provider allowance" }),
+    ).toHaveLength(1);
+    const trigger = screen.getByRole("button", { name: "Provider usage" });
+    expect(trigger.textContent).toContain("Live allowance");
+    fireEvent.click(trigger);
+    expect(await screen.findByText("Provider usage content")).toBeTruthy();
+    expect(
+      document.querySelector('[role="dialog"]')?.getAttribute("data-side"),
+    ).toBe("right");
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss usage" }));
+    await waitFor(() =>
+      expect(trigger.getAttribute("aria-expanded")).toBe("false"),
+    );
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
   it("fills the footer to its measured capacity and keeps overflow in More when an icon is removed", () => {
     setPluginSlotRegistrations(
       "example",

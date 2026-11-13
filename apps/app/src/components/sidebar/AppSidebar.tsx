@@ -26,6 +26,7 @@ import { useThreadListReplacement } from "./threadListProvider";
 import {
   PluginSidebarFooterDisclosure,
   PluginSidebarFooterItems,
+  PluginRailDisclosures,
   usePluginSidebarFooterDisclosure,
 } from "@/components/plugin/PluginSidebarFooterItems";
 import { SidebarPluginAttentionGlyph } from "./SidebarPluginAttentionGlyph";
@@ -72,6 +73,10 @@ import {
 } from "./sidebarNavigationProvider";
 
 import { NAV_RAIL_WIDTH_CLASS } from "./navRailWidth";
+import {
+  useSystemConfig,
+  useSystemProviders,
+} from "@/hooks/queries/system-queries";
 
 const BUG_REPORT_NEW_ISSUE_URL = "https://github.com/get-bb/bb/issues/new";
 
@@ -95,6 +100,26 @@ export function AppSidebar({
   alternateBody,
 }: AppSidebarProps) {
   const placement = sidebarNavigationPlacement(navigation);
+  const providers = useSystemProviders().data;
+  const config = useSystemConfig().data;
+  useEffect(() => {
+    const used = new Set(
+      config?.generalSettings.agentProfiles
+        .filter((profile) => profile.aliases.length > 0)
+        .map((profile) => profile.providerId),
+    );
+    const links = (providers ?? [])
+      .filter((provider) => used.has(provider.id) && provider.logoUrl !== null)
+      .map((provider) => {
+        const link = document.createElement("link");
+        link.rel = "preload";
+        link.as = "image";
+        link.href = provider.logoUrl!;
+        document.head.appendChild(link);
+        return link;
+      });
+    return () => links.forEach((link) => link.remove());
+  }, [providers, config?.generalSettings.agentProfiles]);
   const [desktopInfo] = useState(getBbDesktopInfo);
   const isFramed = useIsSidebarFramed();
   const threadListReplacement = useThreadListReplacement();
@@ -255,22 +280,25 @@ export function AppSidebar({
   const footer = (
     <SidebarFooter
       className={cn(
-        "w-full justify-center pl-(--bb-frame-footer-inset) pointer-fine:pl-[calc(var(--bb-frame-footer-inset)_+_(2rem_-_var(--bb-title-bar-control-size))/2)] pointer-fine:[&_[data-sidebar=menu-button]]:size-(--bb-title-bar-control-size) [&_[data-sidebar=menu-button]]:ring-inset pointer-fine:[&_[data-sidebar=menu]]:gap-0.5",
-        isFramed
-          ? cn(
-              "h-(--bb-app-chrome-row-height) py-0",
-              placement === "rail" && "-mb-px",
-            )
-          : "pb-(--bb-frame-footer-inset)",
+        "w-full items-center justify-center [&_[data-sidebar=menu-button]]:ring-inset",
+        placement === "rail" ? "p-0" : "pl-(--bb-frame-footer-inset)",
+        isFramed && placement !== "rail"
+          ? "h-(--bb-app-chrome-row-height) py-0"
+          : placement === "rail"
+            ? "pb-0"
+            : "pb-(--bb-frame-footer-inset)",
       )}
     >
       <SidebarMenu
         className={cn(
-          "flex-row items-center gap-1",
+          placement === "rail"
+            ? "flex-col items-center gap-2 [&_[data-sidebar=menu-item]]:mx-0 [&_[data-sidebar=menu-button]]:size-(--bb-sidebar-control-size) [&_[data-sidebar=menu-button]]:justify-center [&_[data-sidebar=menu-button]]:p-0 [&_[data-sidebar=menu-button]_[data-icon-root]]:size-(--bb-sidebar-control-icon-size)"
+            : "flex-row items-center gap-1",
           isFooterCustomizing && "hidden",
         )}
       >
         <PluginSidebarFooterItems
+          rail={placement === "rail"}
           onCustomize={() => {
             pluginSidebarFooter.dismiss();
             setNavigationCustomizing(false);
@@ -314,7 +342,11 @@ export function AppSidebar({
           ]}
         />
         <SidebarPluginAttentionGlyph
-          className={SIDEBAR_FOOTER_ACTION_CLASS}
+          className={cn(
+            SIDEBAR_FOOTER_ACTION_CLASS,
+            placement === "rail" &&
+              "size-(--bb-sidebar-control-size) justify-center p-0 [&_[data-icon-root]]:size-(--bb-sidebar-control-icon-size)",
+          )}
           onNavigate={closeOnMobile}
         />
         <SidebarUpdatesBadge onNavigate={closeOnMobile} />
@@ -361,7 +393,14 @@ export function AppSidebar({
           </div>
         ) : (
           <PluginSidebarFooterDisclosure
-            item={pluginSidebarFooter.activeItem}
+            item={
+              placement === "rail" &&
+              pluginSidebarFooter.activeItem?.kind === "disclosure" &&
+              pluginSidebarFooter.activeItem.experimental_placement ===
+                "rail-bottom"
+                ? null
+                : pluginSidebarFooter.activeItem
+            }
             onDismiss={pluginSidebarFooter.dismiss}
           />
         )}
@@ -399,12 +438,11 @@ export function AppSidebar({
             <SidebarCollapsibleBody
               data-testid="nav-rail-sidebar-body"
               className={cn(
-                "col-start-2 row-start-1",
-                (isBodyHidden || placement === "list") && "row-span-2",
+                "col-start-2 row-start-1 row-span-2",
                 isFramed &&
                   !isBodyHidden &&
                   placement === "rail" &&
-                  "rounded-bl-none border-b-0 [clip-path:inset(0_-6px_0_0_round_var(--bb-frame-card-radius)_0_0_0)]",
+                  "[clip-path:inset(0_-6px_0_0_round_var(--bb-frame-card-radius)_0_0_var(--bb-frame-card-radius))]",
               )}
             >
               <div
@@ -419,32 +457,29 @@ export function AppSidebar({
             {placement === "rail" ? (
               <div
                 className={cn(
-                  "col-start-1 row-start-2 flex shrink-0 items-center justify-center",
+                  "col-start-1 row-start-2 flex max-h-[65svh] min-h-0 shrink-0 flex-col items-center gap-2 overflow-y-auto",
                   NAV_RAIL_WIDTH_CLASS,
                   isFramed
-                    ? "h-(--bb-app-chrome-row-height)"
+                    ? "pb-1"
                     : "bg-surface-recessed -mb-[env(safe-area-inset-bottom)] pt-2 pb-[calc(var(--bb-frame-footer-inset)_+_env(safe-area-inset-bottom))]",
                 )}
               >
+                <PluginRailDisclosures
+                  providerIds={
+                    config?.generalSettings.agentProfiles
+                      .filter((profile) => profile.aliases.length > 0)
+                      .map((profile) => profile.providerId) ?? []
+                  }
+                  activeKey={pluginSidebarFooter.activeKey}
+                  onCommand={pluginSidebarFooter.handleCommand}
+                  onDismiss={pluginSidebarFooter.dismiss}
+                />
+                {footer}
                 <NavRailSettingsButton
                   isSettingsActive={isSettingsActive}
                   settingsRoutePath={settingsRoutePath}
                 />
               </div>
-            ) : null}
-            {placement === "rail" ? (
-              <SidebarCollapsibleBody
-                data-testid="sidebar-footer-body"
-                contentInFlow
-                hidden={isBodyHidden}
-                className={cn(
-                  "col-start-2 row-start-2",
-                  isFramed &&
-                    "rounded-tl-none border-t-0 [clip-path:inset(0_-6px_0_0_round_0_0_0_var(--bb-frame-card-radius))]",
-                )}
-              >
-                {footer}
-              </SidebarCollapsibleBody>
             ) : null}
           </div>
         </Sidebar>

@@ -243,7 +243,7 @@ export const BB_CLI_LAUNCHER_ENV = defineEnvVar<string>({
 
 export const BB_APP_INSTALL_KIND_ENV = defineEnvVar<AppInstallKind>({
   description:
-    "Internal marker the bb-app launcher hands its server child for telemetry attribution: desktop for the desktop app, npm for package installs, source for pnpm start checkouts. Absent when the server runs without the launcher.",
+    "Internal marker the bb-app launcher hands its server child: desktop for the desktop app, npm for package installs, source for pnpm start checkouts. Absent when the server runs without the launcher.",
   name: APP_INSTALL_KIND_ENV_NAME,
   parse: parseAppInstallKindEnvValue,
 });
@@ -264,7 +264,7 @@ export const BB_APP_SOURCE_COMMIT_ENV = defineEnvVar<string>({
 
 export const BB_APP_SURFACE_ENV = defineEnvVar<AppSurface>({
   description:
-    "Internal launcher marker for telemetry attribution. Set by bb-app and desktop launchers.",
+    "Internal launcher marker identifying the app surface. Set by bb-app and desktop launchers.",
   name: APP_SURFACE_ENV_NAME,
   parse: parseAppSurfaceEnvValue,
 });
@@ -299,7 +299,7 @@ export const BB_CONNECT_GATE_KEYS_URL_ENV = defineEnvVar<string>({
 
 export const BB_POSTHOG_API_KEY_ENV = defineEnvVar<string>({
   description:
-    "PostHog project API key for anonymous usage telemetry. Telemetry is disabled when empty.",
+    "Legacy PostHog project API key. Accepted for compatibility but ignored; bb telemetry is permanently disabled.",
   name: "BB_POSTHOG_API_KEY",
   parse: parseStringEnvValue,
 });
@@ -327,14 +327,14 @@ export const BB_SKIP_ONBOARDING_ENV = defineEnvVar<boolean>({
 
 export const BB_SETUP_GUIDE_VARIANT_ENV = defineEnvVar<SetupGuideVariant>({
   description:
-    "Forces the first-run setup guide variant (control or new) for QA, ignoring telemetry and the setup-guide-redesign experiment.",
+    "Forces the first-run setup guide variant (control or new) for QA, ignoring a legacy saved assignment.",
   name: "BB_SETUP_GUIDE_VARIANT",
   parse: parseSetupGuideVariantEnvValue,
 });
 
 export const BB_TELEMETRY_ENV = defineEnvVar<boolean>({
   description:
-    "Anonymous usage telemetry (app starts, thread creation counts, user message counts, and plugin installs, tagged with app version, install kind, and OS and Node versions). Set to false to opt out.",
+    "Legacy anonymous usage telemetry switch. Accepted for compatibility but ignored; telemetry is permanently disabled.",
   name: "BB_TELEMETRY",
   parse: parseBooleanEnvValue,
 });
@@ -348,7 +348,7 @@ export const BB_FF_PLACEHOLDER_ENV = defineEnvVar<boolean>({
 
 export const BB_FF_INITIATOR_TELEMETRY_ENV = defineEnvVar<boolean>({
   description:
-    "Adds a fixed initiator value (user, agent, automation, plugin or system) to anonymous thread_created and user_message_sent telemetry. On by default; set false to omit it.",
+    "Legacy anonymous telemetry feature flag. Accepted for compatibility but ignored; telemetry is permanently disabled.",
   name: "BB_FF_INITIATOR_TELEMETRY",
   parse: parseBooleanEnvValue,
 });
@@ -450,9 +450,8 @@ export const DEFAULT_BB_APP_SURFACE = APP_SURFACE_WEB;
 export const DEFAULT_BB_APP_URL = "";
 export const DEFAULT_BB_SERVER_BIND_HOST: ServerBindHost = BB_LOOPBACK_HOST;
 export const DEFAULT_BB_EXTERNAL_URL = "";
-export const DEFAULT_BB_POSTHOG_API_KEY =
-  "phc_tejoYoNLV6vG8QAd5eYXXvcsENFYnP4brpZDGqG7zvpy";
-export const DEFAULT_BB_TELEMETRY = true;
+export const DEFAULT_BB_POSTHOG_API_KEY = "";
+export const DEFAULT_BB_TELEMETRY = false;
 export const DEFAULT_BB_DEV_APP_HOST = "";
 export const DEFAULT_BB_MARKETPLACE_URL =
   "https://getbb.app/marketplace/v2/marketplace.json";

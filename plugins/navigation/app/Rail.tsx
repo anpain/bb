@@ -131,7 +131,7 @@ export function Rail() {
         data-testid="app-nav-rail"
         className="flex min-h-0 flex-1 flex-col items-center pb-2"
       >
-        <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-1.5 overflow-y-auto py-0.5 [scrollbar-width:none]">
+        <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto py-0.5 [scrollbar-width:none]">
           <RailButton
             label="Home"
             active={isHomeActive}

@@ -12,12 +12,23 @@ import {
   experimental_ProviderIcon as ProviderIcon,
   experimental_useSidebarThreads,
   experimental_usePluginId,
+  experimental_useProviders,
   type ExperimentalSidebarFooterDisclosureProps,
   useBbContext,
 } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,9 +71,9 @@ export interface UsageStoreSnapshot {
 }
 
 const ALL_PROVIDERS_TAB_ID = "all";
-const CARD_MAX_AGE_MS = 2 * 60_000;
-const FOCUS_MAX_AGE_MS = 5 * 60_000;
-const SAFETY_REFRESH_INTERVAL_MS = 30 * 60_000;
+const CARD_MAX_AGE_MS = 60_000;
+const FOCUS_MAX_AGE_MS = 30_000;
+const SAFETY_REFRESH_INTERVAL_MS = 60_000;
 const storeListeners = new Set<() => void>();
 let storeSnapshot: UsageStoreSnapshot = {
   data: null,
@@ -97,6 +108,18 @@ function subscribeStore(listener: () => void): () => void {
 
 function getStoreSnapshot(): UsageStoreSnapshot {
   return storeSnapshot;
+}
+
+function useUsageMachine(snapshot: UsageStoreSnapshot) {
+  const pluginId = experimental_usePluginId();
+  const { threadId } = useBbContext();
+  const sidebarThreads = experimental_useSidebarThreads();
+  return selectUsageMachine(
+    snapshot.data?.machines ?? [],
+    readSelectedMachine(`bb.${pluginId}.selected-machine.v1`),
+    sidebarThreads.threads.find((thread) => thread.id === threadId)?.host?.id ??
+      null,
+  );
 }
 
 function rpcErrorMessage(body: unknown): string | null {
@@ -185,13 +208,6 @@ function formatResetCountdown(resetsAt: string | null): string | null {
   const days = Math.floor(hours / 24);
   return hours % 24 === 0 ? `${days}d` : `${days}d ${hours % 24}h`;
 }
-function shortWindowLabel(label: string): string {
-  return label
-    .replace(/^Five-hour limit$|^5 hours$/u, "5h")
-    .replace(/^Weekly limit$|^Weekly/u, "7d")
-    .replace(/^Daily limit$/u, "1d");
-}
-
 function usageToneTextClass(usedPercent: number): string {
   if (usedPercent >= 95) return "text-destructive";
   if (usedPercent >= 80) return "text-warning";
@@ -264,8 +280,7 @@ function UsageNotice({
   );
 }
 
-const USAGE_GRID_CLASS_NAME =
-  "grid grid-cols-[max-content_minmax(0,1fr)_max-content_max-content] gap-x-3";
+const USAGE_GRID_CLASS_NAME = "grid grid-cols-1 gap-3";
 
 function UsageWindow({ window }: { window: UsageWindowValue }) {
   const [showReset, setShowReset] = useState(false);
@@ -273,48 +288,52 @@ function UsageWindow({ window }: { window: UsageWindowValue }) {
   const countdown = formatResetCountdown(window.resetsAt);
   const value =
     window.cost === null
-      ? Math.round(window.usedPercent) + "% used"
+      ? Math.max(0, Math.round(100 - window.usedPercent)) + "% remaining"
       : formatUsdCents(window.cost.usedUsdCents, true) +
         " / " +
         formatUsdCents(window.cost.limitUsdCents, false);
   return (
     <button
       type="button"
-      className="col-span-full grid grid-cols-subgrid rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+      className="col-span-full flex flex-col gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
       title={`${window.label} · ${reset ?? "Reset time not reported"}`}
       aria-label={`${window.label}: ${value}. ${reset ?? "Reset time not reported"}`}
       aria-expanded={showReset}
       onClick={() => setShowReset((shown) => !shown)}
     >
-      <span className="col-span-full grid h-5 grid-cols-subgrid items-center text-2xs">
-        <span className="max-w-20 truncate text-subtle-foreground">
-          {shortWindowLabel(window.label)}
-        </span>
-        <span className="h-1 min-w-0 overflow-hidden rounded-full bg-sidebar-border">
-          <span
-            className={
-              "block h-full rounded-full " +
-              usageBarColorClass(window.usedPercent)
-            }
-            style={{
-              width: Math.max(2, Math.min(100, window.usedPercent)) + "%",
-            }}
-          />
+      <span className="flex items-center justify-between gap-3 text-xs">
+        <span className="min-w-0 truncate text-sidebar-foreground">
+          {window.label}
         </span>
         <span
           className={cn(
-            "text-right tabular-nums",
+            "shrink-0 font-medium tabular-nums",
             usageToneTextClass(window.usedPercent),
           )}
         >
-          {Math.round(window.usedPercent)}%
+          {Math.max(0, Math.round(100 - window.usedPercent))}% left
         </span>
+      </span>
+      <span className="h-1.5 w-full overflow-hidden rounded-full bg-sidebar-border">
         <span
-          aria-hidden="true"
-          className="min-w-9 text-right tabular-nums text-subtle-foreground"
-        >
-          {countdown ?? "—"}
+          className={
+            "block h-full rounded-full " +
+            usageBarColorClass(window.usedPercent)
+          }
+          style={{
+            width: Math.max(0, Math.min(100, 100 - window.usedPercent)) + "%",
+          }}
+        />
+      </span>
+      <span className="flex w-full justify-between gap-2 text-2xs text-subtle-foreground">
+        <span>
+          {countdown === null
+            ? "Reset time unavailable"
+            : `Resets in ${countdown}`}
         </span>
+        {window.cost === null ? null : (
+          <span className="tabular-nums">{value}</span>
+        )}
       </span>
       {showReset ? (
         <span className="col-span-full pb-1 text-2xs text-subtle-foreground">
@@ -351,11 +370,13 @@ function AccountUsage({
   loading,
   unavailable,
   showProvider,
+  framed,
 }: {
   account: UsageProvider;
   loading: boolean;
   unavailable: boolean;
   showProvider: boolean;
+  framed: boolean;
 }) {
   const usage = account.usage;
   const email = usage?.status === "ok" ? usage.accountEmail : null;
@@ -370,20 +391,23 @@ function AccountUsage({
   return (
     <section
       aria-label={showProvider ? `${account.displayName} ${title}` : title}
-      className="col-span-full grid grid-cols-subgrid"
+      className={cn(
+        "col-span-full grid grid-cols-1 gap-2",
+        framed && "rounded-xl border border-sidebar-border bg-sidebar/60 p-3",
+      )}
     >
-      <div className="col-span-full flex h-5 min-w-0 items-center gap-1.5">
+      <div className="col-span-full flex min-w-0 items-center gap-2">
         {showProvider ? (
           <ProviderIcon
             providerKind="agent"
             provider={account}
             fallback="Bot"
-            className="size-3 shrink-0"
+            className="size-5 shrink-0"
           />
         ) : null}
         <h3
           title={title}
-          className="min-w-0 flex-1 truncate text-2xs font-medium text-sidebar-foreground"
+          className="min-w-0 flex-1 truncate text-xs font-medium text-sidebar-foreground"
         >
           {title}
         </h3>
@@ -419,11 +443,13 @@ function ProviderAccounts({
   loading,
   unavailable,
   showProvider,
+  framed = true,
 }: {
   accounts: UsageProvider[];
   loading: boolean;
   unavailable: boolean;
   showProvider: boolean;
+  framed?: boolean;
 }) {
   return accounts.map((account) => (
     <AccountUsage
@@ -432,6 +458,7 @@ function ProviderAccounts({
       loading={loading}
       unavailable={unavailable}
       showProvider={showProvider}
+      framed={framed}
     />
   ));
 }
@@ -532,9 +559,7 @@ export function ProviderUsageStatusContent({
     return () => window.clearInterval(timer);
   }, []);
   const machines = snapshot.data?.machines ?? [];
-  const [requestedMachineId, setRequestedMachineId] = useState<string | null>(
-    () => readSelectedMachine(machineSelectionStorageKey),
-  );
+  const requestedMachineId = readSelectedMachine(machineSelectionStorageKey);
   const [requestedProviderIds, setRequestedProviderIds] = useState(
     lastProviderIdByMachine,
   );
@@ -666,7 +691,7 @@ export function ProviderUsageStatusContent({
   const selectMachine = useCallback(
     (machineId: string) => {
       lastMachineId = machineId;
-      setRequestedMachineId(machineId);
+      updateStore({ ...storeSnapshot });
       if (machineSelectionStorageKey !== null) {
         try {
           window.localStorage.setItem(machineSelectionStorageKey, machineId);
@@ -788,7 +813,7 @@ export function ProviderUsageStatusContent({
                   aria-controls={panelId}
                   tabIndex={isActive ? 0 : -1}
                   className={cn(
-                    "relative flex h-6 shrink-0 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring w-7",
+                    "relative flex h-7 shrink-0 items-center justify-center gap-1.5 rounded-md px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
                     isActive
                       ? "bg-sidebar-accent text-sidebar-foreground"
                       : "group/tab text-muted-foreground hover:text-sidebar-foreground",
@@ -809,6 +834,7 @@ export function ProviderUsageStatusContent({
                       !isActive && "opacity-60 group-hover/tab:opacity-100",
                     )}
                   />
+                  <span>{provider.displayName}</span>
                   {tone === null || isActive || isAllTab ? null : (
                     <span
                       aria-hidden="true"
@@ -888,7 +914,7 @@ export function ProviderUsageStatusContent({
             {providers.map((provider) => (
               <div
                 key={provider.id}
-                className="col-span-full grid grid-cols-subgrid gap-y-2 border-t border-sidebar-border pt-2.5 first:border-t-0 first:pt-0"
+                className="col-span-full grid grid-cols-1 gap-3"
               >
                 <ProviderAccounts
                   accounts={provider.accounts}
@@ -905,7 +931,7 @@ export function ProviderUsageStatusContent({
               accounts={activeProvider.accounts}
               loading={snapshot.isRefreshing}
               unavailable={unavailable}
-              showProvider={false}
+              showProvider
             />
           </div>
         )}
@@ -940,14 +966,285 @@ function ProviderUsageStatus(props: ExperimentalSidebarFooterDisclosureProps) {
   );
 }
 
+function ProviderUsageGauge() {
+  const snapshot = useSyncExternalStore(
+    subscribeStore,
+    getStoreSnapshot,
+    getStoreSnapshot,
+  );
+  const machine = useUsageMachine(snapshot);
+  const windows = (machine?.providers ?? []).flatMap((provider) =>
+    provider.usage?.status === "ok" ? provider.usage.windows : [],
+  );
+  const used =
+    windows.length === 0
+      ? null
+      : Math.max(...windows.map((window) => window.usedPercent));
+  const remaining =
+    used === null ? null : Math.max(0, Math.min(100, 100 - used));
+  return (
+    <span
+      className="relative flex size-5 items-center justify-center"
+      aria-hidden="true"
+    >
+      <Icon
+        name="Zap"
+        className={cn(
+          "size-5",
+          snapshot.isRefreshing && "animate-pulse",
+          remaining !== null && used !== null && usageToneTextClass(used),
+        )}
+      />
+    </span>
+  );
+}
+
+export function railUsageWindows(
+  provider: UsageProvider,
+): (UsageWindowValue | null)[] {
+  const windows = provider.usage?.status === "ok" ? provider.usage.windows : [];
+  const worst = (values: UsageWindowValue[]) =>
+    values.reduce<UsageWindowValue | null>(
+      (result, value) =>
+        result === null || value.usedPercent > result.usedPercent
+          ? value
+          : result,
+      null,
+    );
+  return [
+    worst(
+      windows.filter((window) => /five.hour|5.hour|daily/iu.test(window.label)),
+    ),
+    worst(windows.filter((window) => /weekly/iu.test(window.label))) ??
+      worst(windows.filter((window) => /monthly/iu.test(window.label))),
+  ];
+}
+
+function ProviderUsageRail({
+  providerIds,
+}: {
+  providerIds: readonly string[];
+}) {
+  const directory = experimental_useProviders();
+  const pluginId = experimental_usePluginId();
+  const snapshot = useSyncExternalStore(
+    subscribeStore,
+    getStoreSnapshot,
+    getStoreSnapshot,
+  );
+  const machine = useUsageMachine(snapshot);
+  const groups = new Map<string, UsageProvider[]>();
+  for (const provider of machine?.providers ?? []) {
+    if (provider.usage?.status === "not_installed") continue;
+    const group = groups.get(provider.providerId) ?? [];
+    group.push(provider);
+    groups.set(provider.providerId, group);
+  }
+  const railProviderIds = new Set([
+    ...directory.providers
+      .filter((provider) => provider.maintenance?.usage)
+      .map((provider) => provider.id),
+    ...providerIds,
+  ]);
+  for (const id of railProviderIds) {
+    if (groups.has(id)) continue;
+    const provider = directory.providers.find((provider) => provider.id === id);
+    if (!provider) continue;
+    groups.set(id, [
+      {
+        id,
+        providerId: id,
+        accountLabel: null,
+        displayName: provider.displayName,
+        logoUrl: provider.logoUrl,
+        icon: provider.icon ?? null,
+        strings: { iconTint: provider.strings?.iconTint ?? null },
+        signInHint: provider.strings?.signInHint ?? "Sign in to this provider.",
+        expiredHint: provider.strings?.expiredHint ?? "Sign in again.",
+        usage: null,
+      },
+    ]);
+  }
+  return (
+    <div className="flex flex-col items-center gap-4">
+      {[...groups].map(([id, accounts]) => {
+        const provider = accounts[0]!;
+        const windows = [0, 1].map((index) =>
+          accounts
+            .map(railUsageWindows)
+            .map((values) => values[index])
+            .reduce<UsageWindowValue | null>(
+              (worst, value) =>
+                value && (!worst || value.usedPercent > worst.usedPercent)
+                  ? value
+                  : worst,
+              null,
+            ),
+        );
+        return (
+          <Popover
+            key={id}
+            onOpenChange={(open) => {
+              if (!open || !machine) return;
+              void refreshUsage({
+                pluginId,
+                force: false,
+                machineIds: [machine.id],
+                maxAgeMs: CARD_MAX_AGE_MS,
+                providerIds: [id],
+              });
+            }}
+          >
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`${provider.displayName} usage: ${windows.map((window, index) => (window ? `${window.label}, ${Math.max(0, Math.min(100, 100 - window.usedPercent)).toFixed(0)}% remaining` : `${index === 0 ? "Short-period" : "Weekly"} limit not reported`)).join("; ")}`}
+                    className="relative flex size-(--bb-sidebar-control-size) items-center justify-center rounded-md p-0 data-[state=open]:bg-state-active"
+                  >
+                    <ProviderIcon
+                      providerKind="agent"
+                      provider={
+                        directory.providers.find(
+                          (entry) => entry.id === id,
+                        ) ?? {
+                          ...provider,
+                          id,
+                        }
+                      }
+                      className="size-4"
+                    />
+                    <svg
+                      viewBox="0 0 40 40"
+                      aria-hidden="true"
+                      className="pointer-events-none absolute size-8 overflow-visible"
+                      fill="none"
+                      strokeWidth="2.3"
+                      strokeLinecap="round"
+                    >
+                      {windows.map((window, index) => (
+                        <g key={index}>
+                          <path
+                            d={
+                              index === 0
+                                ? "M7 10 A17 17 0 0 1 33 10"
+                                : "M4 19 A16 16 0 1 0 36 19"
+                            }
+                            className="stroke-muted-foreground/30"
+                          />
+                          {window ? (
+                            <path
+                              d={
+                                index === 0
+                                  ? "M7 10 A17 17 0 0 1 33 10"
+                                  : "M4 19 A16 16 0 1 0 36 19"
+                              }
+                              className={cn(
+                                "stroke-current",
+                                usageToneTextClass(window.usedPercent),
+                              )}
+                              pathLength="100"
+                              strokeDasharray={`${Math.max(0, Math.min(100, 100 - window.usedPercent))} 100`}
+                            />
+                          ) : null}
+                        </g>
+                      ))}
+                    </svg>
+                  </Button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                {windows[0]
+                  ? `${windows[0].label} · ${Math.max(0, Math.min(100, 100 - windows[0].usedPercent)).toFixed(0)}% remaining`
+                  : `${provider.displayName} · Limit not reported`}
+              </TooltipContent>
+            </Tooltip>
+            <PopoverContent
+              side="right"
+              align="end"
+              mobileTitle={`${provider.displayName} usage`}
+              className="max-h-[min(32rem,80svh)] w-80 overflow-y-auto p-3"
+            >
+              <div className="grid gap-2">
+                <ProviderAccounts
+                  accounts={accounts}
+                  loading={snapshot.isRefreshing}
+                  unavailable={snapshot.error !== null}
+                  showProvider={true}
+                  framed={false}
+                />
+              </div>
+            </PopoverContent>
+          </Popover>
+        );
+      })}
+    </div>
+  );
+}
+
+function ProviderUsageTooltip() {
+  const snapshot = useSyncExternalStore(
+    subscribeStore,
+    getStoreSnapshot,
+    getStoreSnapshot,
+  );
+  const machine = useUsageMachine(snapshot);
+  return (
+    <div className="flex max-w-80 flex-col gap-1 text-xs">
+      <span className="font-medium">
+        Provider usage{snapshot.isRefreshing ? " · Refreshing…" : ""}
+      </span>
+      <span>
+        Overview shows the lowest reported remaining allowance, not a combined
+        quota.
+      </span>
+      {snapshot.error ? (
+        <span>{snapshot.error} Last available data may be stale.</span>
+      ) : null}
+      {(machine?.providers ?? []).map((provider) => (
+        <div key={provider.id}>
+          {provider.usage?.status === "ok" &&
+          provider.usage.windows.length > 0 ? (
+            provider.usage.windows.map((window) => (
+              <div key={window.label}>
+                {provider.displayName} · {window.label} ·{" "}
+                {Math.max(0, 100 - window.usedPercent).toFixed(0)}% remaining
+              </div>
+            ))
+          ) : (
+            <span>
+              {provider.displayName} ·{" "}
+              {provider.usage?.status === "ok"
+                ? "No reported limits"
+                : (provider.usage?.status ?? "Unknown")}
+            </span>
+          )}
+        </div>
+      ))}
+      {!machine ? (
+        <span>
+          {snapshot.isRefreshing ? "Loading usage…" : "Usage unavailable"}
+        </span>
+      ) : null}
+      <span>Click for details and refresh</span>
+    </div>
+  );
+}
+
 export default definePluginApp((app) => {
   app.slots.settingsSection({ id: "usage", component: UsageSettings });
   app.experimental_sidebarFooter.register({
     kind: "disclosure",
     id: "usage",
     label: "Provider usage",
-    icon: "ChartColumn",
+    icon: "Gauge",
     component: ProviderUsageStatus,
+    experimental_tooltip: ProviderUsageTooltip,
+    experimental_placement: "rail-bottom",
+    experimental_triggerIcon: ProviderUsageGauge,
+    experimental_railContent: ProviderUsageRail,
   });
   app.contentScripts.register({
     id: "refresh-usage",
@@ -1009,6 +1306,8 @@ export default definePluginApp((app) => {
       document.addEventListener("visibilitychange", onVisibilityChange);
       window.addEventListener("blur", onBlur);
       window.addEventListener("focus", onActive);
+      if (storeSnapshot.data === null)
+        reconcile(SAFETY_REFRESH_INTERVAL_MS, []);
       reconcile(SAFETY_REFRESH_INTERVAL_MS, null);
       scheduleSafetyRefresh();
       return () => {

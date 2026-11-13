@@ -6,8 +6,10 @@ description: "Configure or troubleshoot ACP agent discovery, custom models, skil
 # ACP providers
 
 Known agents can be discovered automatically when their CLI is installed on the
-host: `opencode`, `omp`, `grok`, and `hermes` appear as `acp-opencode`, `acp-omp`,
-`acp-grok`, and `acp-hermes-agent`. Inspect the target host's catalog with
+host: `opencode`, `kimi`, `omp`, `grok`, and `hermes` appear as `acp-opencode`,
+`acp-kimi`, `acp-omp`, `acp-grok`, and `acp-hermes-agent`. Kimi Code runs as
+`kimi acp` over stdio and uses the CLI's existing authentication. Inspect the
+target host's catalog with
 `bb provider list` and `bb provider models <provider-id>` using its environment
 or machine selector.
 
@@ -149,8 +151,8 @@ restart is needed.
 
 - Required: `id` (lowercase letters, digits, and dashes; permanent),
   `displayName`, and `command`. The provider id is `acp-<id>`. `cursor` is
-  reserved; an entry with id `opencode`, `omp`, `grok`, or `hermes-agent`
-  replaces the shipped agent.
+  reserved; an entry with id `opencode`, `kimi`, `omp`, `grok`, or
+  `hermes-agent` replaces the shipped agent.
 - Launch: `args`, `env`, and `cwd`.
 - `modelCli` for CLI model listing and selection, `reasoningCli` for
   launch-time reasoning flags, `nativeReasoning` for ACP

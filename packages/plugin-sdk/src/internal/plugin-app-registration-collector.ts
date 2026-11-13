@@ -85,6 +85,10 @@ const SIDEBAR_FOOTER_DISCLOSURE_KEYS: ReadonlySet<string> = new Set([
   "icon",
   "kind",
   "component",
+  "experimental_tooltip",
+  "experimental_placement",
+  "experimental_triggerIcon",
+  "experimental_railContent",
 ]);
 
 class SidebarFooterCollector implements ExperimentalSidebarFooter {
@@ -128,6 +132,12 @@ class SidebarFooterCollector implements ExperimentalSidebarFooter {
     }
 
     if (registration.kind === "disclosure") {
+      if (
+        registration.experimental_placement !== undefined &&
+        registration.experimental_placement !== "rail-bottom"
+      ) {
+        throw new Error(`${kind}: invalid experimental_placement`);
+      }
       this.rejectUnknownKeys(
         kind,
         registration,
@@ -139,6 +149,33 @@ class SidebarFooterCollector implements ExperimentalSidebarFooter {
         icon,
         kind: "disclosure",
         component: requireComponent(kind, registration.component),
+        ...(registration.experimental_railContent === undefined
+          ? {}
+          : {
+              experimental_railContent: requireComponent(
+                kind,
+                registration.experimental_railContent,
+              ),
+            }),
+        ...(registration.experimental_placement === undefined
+          ? {}
+          : { experimental_placement: registration.experimental_placement }),
+        ...(registration.experimental_triggerIcon === undefined
+          ? {}
+          : {
+              experimental_triggerIcon: requireComponent(
+                kind,
+                registration.experimental_triggerIcon,
+              ),
+            }),
+        ...(registration.experimental_tooltip === undefined
+          ? {}
+          : {
+              experimental_tooltip: requireComponent(
+                kind,
+                registration.experimental_tooltip,
+              ),
+            }),
         source: "experimental_sidebarFooter",
         runtime,
       };
@@ -974,6 +1011,10 @@ export function collectPluginAppRegistrations(
       },
       experimental_threadContextSegment(registration) {
         const kind = "slots.experimental_threadContextSegment";
+        const placement = registration.experimental_placement ?? "composer";
+        if (placement !== "composer" && placement !== "timeline-end") {
+          throw new Error(`${kind}: invalid experimental_placement`);
+        }
         const id = requireSlotId(kind, registration?.id);
         requireUniqueId(kind, seenIds.threadContextSegment, id);
         const optionalComponent = (field: "action" | "details") => {
@@ -998,6 +1039,7 @@ export function collectPluginAppRegistrations(
           throw new Error(`${kind}: "useVisible" must be a function`);
         }
         collected.threadContextSegments.push({
+          experimental_placement: placement,
           id,
           title: requireNonEmptyString(kind, "title", registration.title),
           group: requireNonEmptyString(kind, "group", registration.group),

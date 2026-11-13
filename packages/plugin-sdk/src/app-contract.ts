@@ -1337,6 +1337,14 @@ export interface ExperimentalSidebarFooterActionRegistration extends Experimenta
 export interface ExperimentalSidebarFooterDisclosureRegistration extends ExperimentalSidebarFooterItemBase {
   kind: "disclosure";
   component: ComponentType<ExperimentalSidebarFooterDisclosureProps>;
+  /** Reactive tooltip content rendered through the host's shared tooltip. */
+  experimental_tooltip?: ComponentType;
+  /** Render above Settings in rail navigation, falling back to the footer in list navigation. */
+  experimental_placement?: "rail-bottom";
+  /** Reactive visual inside the host-owned disclosure button. */
+  experimental_triggerIcon?: ComponentType;
+  /** Additional rail controls below this disclosure's trigger. */
+  experimental_railContent?: ComponentType<{ providerIds: readonly string[] }>;
 }
 
 /** One host-rendered item in the app sidebar footer. */
@@ -2034,6 +2042,7 @@ export interface ExperimentalThreadContextSegmentProps extends ExperimentalThrea
  * mounts each component in its own crash boundary.
  */
 export interface ExperimentalThreadContextSegmentRegistration {
+  experimental_placement?: "composer" | "timeline-end";
   /** Unique within the plugin; letters, digits, `-`, `_`. */
   id: string;
   /** Accessible name of the group the host wraps around `summary`. */

@@ -1,17 +1,17 @@
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getAppSettings, setAppSettings } from "@bb/db";
-import { createMigratedConnection } from "@bb/db/testing";
 import { defaultAppSettings } from "@bb/domain";
-import { withTestHarness } from "../helpers/test-app.js";
-import { DEFAULTS } from "@bb/config/defaults";
+import { systemConfigResponseSchema } from "@bb/server-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  appInstallFromServerConfig,
   createTelemetryService,
   runWithTelemetryRequest,
 } from "../../src/services/system/telemetry.js";
+import { createSetupGuideExperiment } from "../../src/services/system/setup-guide-experiment.js";
+import { withTestHarness } from "../helpers/test-app.js";
+import { readJson } from "../helpers/json.js";
 
 function createTestLogger() {
   return {
@@ -37,19 +37,25 @@ describe("telemetry service", () => {
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  it("sends events with a stable anonymous install id", async () => {
-    const telemetry = await createTelemetryService({
+  function createService(enabled = true, telemetryEnabled = true) {
+    return createTelemetryService({
       apiKey: "phc_test",
       appInstall: null,
       appSurface: "web",
       appVersion: "1.2.3",
       dataDir,
-      telemetryEnabled: true,
-      enabled: true,
+      telemetryEnabled,
+      enabled,
       logger: createTestLogger(),
     });
+  }
 
+  it("stays fully inert when settings and environment request telemetry", async () => {
+    const telemetry = await createService();
+    telemetry.setEnabled(true);
+    telemetry.setSharedProperty("$feature/setup-guide-redesign", "new");
     telemetry.capture({ name: "app_started" });
+    telemetry.capture({ name: "telemetry_disabled" });
     runWithTelemetryRequest(
       { appSurface: "desktop", accessRoute: "connect" },
       () => {
@@ -62,346 +68,63 @@ describe("telemetry service", () => {
         });
       },
     );
-    telemetry.capture({
-      name: "user_message_sent",
-      properties: {
-        is_child_thread: false,
-        message_source: "thread_send",
-        provider: "codex",
-      },
-    });
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    const persistedId = (
-      await readFile(join(dataDir, "telemetry-id"), "utf8")
-    ).trim();
-    expect(persistedId).toMatch(/^[0-9a-f]{32}$/);
-
-    const calls = fetchMock.mock.calls.map((call) => {
-      const [url, init] = call as [string, { body: string }];
-      return { url, payload: JSON.parse(init.body) as Record<string, never> };
-    });
-    for (const { url, payload } of calls) {
-      expect(url).toBe("https://us.i.posthog.com/capture/");
-      expect(payload).toMatchObject({
-        api_key: "phc_test",
-        distinct_id: persistedId,
-      });
-    }
-    expect(calls[0]?.payload).toMatchObject({
-      event: "app_started",
-      properties: {
-        app_version: "1.2.3",
-        app_surface: "web",
-        arch: process.arch,
-        platform: process.platform,
-      },
-    });
-    expect(calls[1]?.payload).toMatchObject({
-      event: "thread_created",
-      properties: {
-        app_version: "1.2.3",
-        app_surface: "desktop",
-        access_route: "connect",
-        is_child_thread: true,
-        provider: "claude-code",
-      },
-    });
-    expect(calls[2]?.payload.properties).not.toHaveProperty("access_route");
-    expect(calls[2]?.payload).toMatchObject({
-      event: "user_message_sent",
-      properties: {
-        app_version: "1.2.3",
-        app_surface: "web",
-        is_child_thread: false,
-        message_source: "thread_send",
-        provider: "codex",
-      },
-    });
+    expect(telemetry.isEnabled()).toBe(false);
+    expect(telemetry.featureFlagIdentity()).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+    await expect(readdir(dataDir)).resolves.toEqual([]);
   });
 
-  it("adds shared properties such as a flag variant to later events", async () => {
-    const telemetry = await createTelemetryService({
-      apiKey: "phc_test",
-      appInstall: null,
-      appSurface: "web",
-      appVersion: "1.2.3",
+  it("does not evaluate feature flags or record exposures", async () => {
+    const telemetry = await createService();
+    const experiment = await createSetupGuideExperiment({
       dataDir,
-      telemetryEnabled: true,
-      enabled: true,
       logger: createTestLogger(),
-    });
-    telemetry.capture({ name: "app_started" });
-    telemetry.setSharedProperty("$feature/setup-guide-redesign", "new");
-    telemetry.capture({
-      name: "turn_finished",
-      properties: {
-        outcome: "succeeded",
-        error_category: "none",
-        provider: "codex",
-        install_turn_number: 1,
-        execution_location: "server_machine",
-      },
+      override: null,
     });
 
-    const payloads = fetchMock.mock.calls.map((call) => {
-      const [, init] = call as [string, { body: string }];
-      return JSON.parse(init.body) as { properties: Record<string, unknown> };
+    await expect(experiment.resolve()).resolves.toEqual({
+      guide: { variant: "control", source: "default" },
     });
-    expect(payloads[0]?.properties).not.toHaveProperty(
-      "$feature/setup-guide-redesign",
-    );
-    expect(payloads[1]?.properties).toMatchObject({
-      "$feature/setup-guide-redesign": "new",
-      install_turn_number: 1,
-      outcome: "succeeded",
-    });
-    expect(telemetry.featureFlagIdentity()).toEqual({
-      apiKey: "phc_test",
-      distinctId: (
-        await readFile(join(dataDir, "telemetry-id"), "utf8")
-      ).trim(),
-    });
-  });
-
-  it("tags events with how bb was installed without sending any commits", async () => {
-    const commit = "a".repeat(40);
-    const installs = [
-      appInstallFromServerConfig({}),
-      appInstallFromServerConfig({ BB_APP_INSTALL_KIND: "npm" }),
-      appInstallFromServerConfig({
-        BB_APP_INSTALL_KIND: "source",
-        BB_APP_SOURCE_COMMIT: commit,
-        BB_APP_SOURCE_ORIGIN: "official",
+    await experiment.recordExposure("first_run");
+    await expect(
+      experiment.annotate({
+        name: "onboarding_step_reached",
+        properties: { step: "plugins", entry: "first_run" },
       }),
-      appInstallFromServerConfig({
-        BB_APP_INSTALL_KIND: "source",
-        BB_APP_SOURCE_COMMIT: commit,
-        BB_APP_SOURCE_ORIGIN: "fork",
-      }),
-    ];
-    for (const appInstall of installs) {
-      const telemetry = await createTelemetryService({
-        apiKey: "phc_test",
-        appInstall,
-        appSurface: "web",
-        appVersion: "1.2.3",
-        dataDir,
-        telemetryEnabled: true,
-        enabled: true,
-        logger: createTestLogger(),
-      });
-      telemetry.capture({ name: "app_started" });
-    }
-
-    const properties = fetchMock.mock.calls.map((call) => {
-      const [, init] = call as [string, { body: string }];
-      return (JSON.parse(init.body) as { properties: Record<string, unknown> })
-        .properties;
+    ).resolves.toEqual({
+      name: "onboarding_step_reached",
+      properties: { step: "plugins", entry: "first_run" },
     });
-    expect(properties[0]).toMatchObject({
-      install_kind: "unmanaged",
-      node_version: process.version,
-    });
-    expect(properties[0]).not.toHaveProperty("source_origin");
-    expect(properties[1]).toMatchObject({ install_kind: "npm" });
-    expect(properties[2]).toMatchObject({
-      install_kind: "source",
-      source_origin: "official",
-    });
-    expect(properties[3]).toMatchObject({
-      install_kind: "source",
-      source_origin: "fork",
-    });
-    for (const payload of properties) {
-      expect(payload).not.toHaveProperty("source_commit");
-      expect(JSON.stringify(payload)).not.toContain(commit);
-    }
-  });
-
-  it("reuses the persisted install id across restarts", async () => {
-    const args = {
-      apiKey: "phc_test",
-      appInstall: null,
-      appSurface: "web" as const,
-      appVersion: "1.2.3",
-      dataDir,
-      telemetryEnabled: true,
-      enabled: true,
-      logger: createTestLogger(),
-    };
-    const first = await createTelemetryService(args);
-    first.capture({ name: "app_started" });
-    const second = await createTelemetryService(args);
-    second.capture({ name: "app_started" });
-
-    const ids = fetchMock.mock.calls.map((call) => {
-      const [, init] = call as [string, { body: string }];
-      return (JSON.parse(init.body) as { distinct_id: string }).distinct_id;
-    });
-    expect(ids[0]).toBe(ids[1]);
-  });
-
-  it.each([
-    {
-      apiKey: "",
-      appVersion: "1.2.3",
-      enabled: true,
-      label: "there is no API key",
-    },
-    {
-      apiKey: "phc_test",
-      appVersion: "1.2.3",
-      enabled: false,
-      label: "the user opted out",
-    },
-    {
-      apiKey: "phc_test",
-      appVersion: DEFAULTS.appVersion,
-      enabled: true,
-      label: "the release version is unresolved",
-    },
-  ])("is fully inert when $label", async ({ apiKey, appVersion, enabled }) => {
-    const telemetry = await createTelemetryService({
-      apiKey,
-      appInstall: null,
-      appSurface: "web",
-      appVersion,
-      dataDir,
-      telemetryEnabled: true,
-      enabled,
-      logger: createTestLogger(),
-    });
-    telemetry.setEnabled(true);
     telemetry.capture({ name: "app_started" });
 
     expect(fetchMock).not.toHaveBeenCalled();
     await expect(readdir(dataDir)).resolves.toEqual([]);
   });
 
-  it("honors persisted opt-out at startup and changes without restarting", async () => {
-    const db = createMigratedConnection();
-    try {
-      setAppSettings(db, { ...getAppSettings(db), telemetryEnabled: false });
-      const args = {
-        apiKey: "phc_test",
-        appInstall: null,
-        appSurface: "web" as const,
-        appVersion: "1.2.3",
-        dataDir,
-        enabled: true,
-        telemetryEnabled: getAppSettings(db).telemetryEnabled,
-        logger: createTestLogger(),
-      };
-      const telemetry = await createTelemetryService(args);
-      telemetry.capture({ name: "app_started" });
-      expect(fetchMock).not.toHaveBeenCalled();
-      setAppSettings(db, { ...getAppSettings(db), telemetryEnabled: true });
-      telemetry.setEnabled(true);
-      telemetry.capture({ name: "app_started" });
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-      setAppSettings(db, { ...getAppSettings(db), telemetryEnabled: false });
-      telemetry.setEnabled(false);
-      telemetry.capture({ name: "app_started" });
-      const restarted = await createTelemetryService({
-        ...args,
-        telemetryEnabled: getAppSettings(db).telemetryEnabled,
-      });
-      restarted.capture({ name: "app_started" });
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-    } finally {
-      db.$client.close();
-    }
-  });
-
-  it("updates the cached preference only after valid settings writes", async () => {
+  it("forces saved and requested settings off without a disabled-event ping", async () => {
     await withTestHarness(async (harness) => {
-      const telemetry = await createTelemetryService({
-        apiKey: "phc_test",
-        appInstall: null,
-        appSurface: "web",
-        appVersion: "1.2.3",
-        dataDir,
-        enabled: true,
-        telemetryEnabled: getAppSettings(harness.db).telemetryEnabled,
-        logger: createTestLogger(),
+      setAppSettings(harness.db, {
+        ...getAppSettings(harness.db),
+        telemetryEnabled: true,
       });
-      harness.deps.telemetry = telemetry;
-      const put = (settings: object) =>
-        harness.app.request("/api/v1/settings/general", {
-          method: "PUT",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(settings),
-        });
-      telemetry.capture({ name: "app_started" });
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(
-        (await put({ ...defaultAppSettings, telemetryEnabled: false })).status,
-      ).toBe(200);
-      expect(fetchMock).toHaveBeenCalledTimes(2);
-      const [, optOutRequest] = fetchMock.mock.calls[1] as [
-        string,
-        { body: string },
-      ];
-      const [, appStartedRequest] = fetchMock.mock.calls[0] as [
-        string,
-        { body: string },
-      ];
-      const optOutEvent = JSON.parse(optOutRequest.body) as {
-        distinct_id: string;
-        event: string;
-      };
-      const appStartedEvent = JSON.parse(appStartedRequest.body) as {
-        distinct_id: string;
-      };
-      expect(optOutEvent).toMatchObject({
-        distinct_id: appStartedEvent.distinct_id,
-        event: "telemetry_disabled",
+      harness.deps.telemetry = await createService();
+      const response = await harness.app.request("/api/v1/settings/general", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...defaultAppSettings, telemetryEnabled: true }),
       });
-      telemetry.capture({ name: "app_started" });
-      expect(fetchMock).toHaveBeenCalledTimes(2);
-      expect(
-        (await put({ ...defaultAppSettings, telemetryEnabled: false })).status,
-      ).toBe(200);
-      expect(fetchMock).toHaveBeenCalledTimes(2);
-      expect((await put({ telemetryEnabled: true })).status).toBe(400);
-      telemetry.capture({ name: "app_started" });
-      expect(fetchMock).toHaveBeenCalledTimes(2);
-      const { telemetryEnabled, ...legacy } = defaultAppSettings;
-      expect(telemetryEnabled).toBe(true);
-      expect((await put(legacy)).status).toBe(200);
-      telemetry.capture({ name: "app_started" });
-      expect(fetchMock).toHaveBeenCalledTimes(2);
-      expect((await put(defaultAppSettings)).status).toBe(200);
-      telemetry.capture({ name: "app_started" });
-      expect(fetchMock).toHaveBeenCalledTimes(3);
-    });
-  });
 
-  it("logs and swallows send failures", async () => {
-    const logger = createTestLogger();
-    fetchMock.mockRejectedValue(new Error("offline"));
-    const telemetry = await createTelemetryService({
-      apiKey: "phc_test",
-      appInstall: null,
-      appSurface: "desktop",
-      appVersion: "1.2.3",
-      dataDir,
-      telemetryEnabled: true,
-      enabled: true,
-      logger,
-    });
-
-    telemetry.capture({ name: "app_started" });
-    await vi.waitFor(() => {
-      expect(logger.debug).toHaveBeenCalledWith(
-        {
-          app_surface: "desktop",
-          err: expect.any(Error),
-          event: "app_started",
-        },
-        "Telemetry event send failed",
+      expect(response.status).toBe(200);
+      expect(getAppSettings(harness.db).telemetryEnabled).toBe(false);
+      await expect(readJson(response)).resolves.toMatchObject({
+        telemetryEnabled: false,
+      });
+      const config = systemConfigResponseSchema.parse(
+        await readJson(await harness.app.request("/api/v1/system/config")),
       );
+      expect(config.generalSettings.telemetryEnabled).toBe(false);
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 });

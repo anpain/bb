@@ -1,6 +1,78 @@
 import { z } from "zod";
 import { completedTurnDisplaySchema } from "./completed-turn-display.js";
 import { isValidGitBranchName } from "./git-checkout.js";
+import { reasoningLevelSchema, serviceTierSchema } from "./shared-types.js";
+
+export const agentProfileSchema = z.object({
+  id: z.string().regex(/^[a-z0-9-]+$/),
+  name: z.string().trim().min(1),
+  providerId: z.string().min(1),
+  model: z.string().min(1).nullable(),
+  aliases: z.array(z.string().regex(/^[\p{L}\p{N}_-]+$/u)).min(1),
+  reasoningLevel: reasoningLevelSchema.nullable().default(null),
+  serviceTier: serviceTierSchema.nullable().default(null),
+});
+export const agentProfilesSchema = z
+  .array(agentProfileSchema)
+  .superRefine((profiles, context) => {
+    const ids = new Set<string>();
+    const aliases = new Set<string>();
+    for (const profile of profiles) {
+      if (ids.has(profile.id))
+        context.addIssue({
+          code: "custom",
+          message: "Profile IDs must be unique",
+        });
+      ids.add(profile.id);
+      for (const alias of profile.aliases) {
+        const key = alias.toLowerCase();
+        if (aliases.has(key))
+          context.addIssue({
+            code: "custom",
+            message: `Duplicate profile alias: ${alias}`,
+          });
+        aliases.add(key);
+      }
+    }
+  });
+export const defaultAgentProfiles: z.infer<typeof agentProfilesSchema> = [
+  {
+    id: "codex",
+    name: "Codex",
+    providerId: "codex",
+    model: null,
+    aliases: ["codex", "кодекс"],
+    reasoningLevel: null,
+    serviceTier: null,
+  },
+  {
+    id: "kimi",
+    name: "Kimi",
+    providerId: "acp-kimi",
+    model: null,
+    aliases: ["kimi", "кими"],
+    reasoningLevel: null,
+    serviceTier: null,
+  },
+  {
+    id: "claude",
+    name: "Claude",
+    providerId: "claude-code",
+    model: null,
+    aliases: ["claude", "клод"],
+    reasoningLevel: null,
+    serviceTier: null,
+  },
+  {
+    id: "opencode",
+    name: "OpenCode",
+    providerId: "acp-opencode",
+    model: null,
+    aliases: ["opencode", "опенкод", "опен"],
+    reasoningLevel: null,
+    serviceTier: null,
+  },
+];
 
 export const MANAGED_BRANCH_PREFIX_MAX_LENGTH = 64;
 
@@ -31,6 +103,7 @@ export const appSettingsSchema = z
     keepHistoryAfterContextClear: z.boolean(),
     summarizeShellCommands: z.boolean(),
     providerOrder: z.array(z.string().min(1)),
+    agentProfiles: agentProfilesSchema.default(defaultAgentProfiles),
     defaultProviderId: z.string().min(1).nullable(),
     providerCompletedTurnDisplay: z.record(
       z.string().min(1),
@@ -70,11 +143,12 @@ export const defaultAppSettings: AppSettings = {
   keepHistoryAfterContextClear: false,
   summarizeShellCommands: true,
   providerOrder: [],
+  agentProfiles: defaultAgentProfiles,
   defaultProviderId: null,
   providerCompletedTurnDisplay: {},
   streamerMode: false,
   allowFastServiceTier: true,
-  telemetryEnabled: true,
+  telemetryEnabled: false,
   managedBranchPrefix: DEFAULT_MANAGED_BRANCH_PREFIX,
   idleProviderSessionTimeoutMinutes: 30,
   machineServerUrl: null,

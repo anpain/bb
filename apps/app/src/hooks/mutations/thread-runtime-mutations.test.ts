@@ -355,6 +355,40 @@ describe("thread runtime mutations", () => {
     );
   });
 
+  it("does not leave the parent running after profile dispatch", async () => {
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(
+      threadQueryKey("thread-1"),
+      makeThreadResponse({ status: "idle" }),
+    );
+    queryClient.setQueryData(
+      threadTimelineQueryKey("thread-1"),
+      makeThreadTimelineResponse(),
+    );
+    vi.mocked(sdk.threads.send).mockResolvedValueOnce({
+      ok: true,
+      delivery: "dispatched",
+      childThreadIds: ["child-1", "child-2"],
+    });
+    const mutation = new MutationObserver(
+      queryClient,
+      sendThreadMessageMutationOptions(queryClient),
+    );
+    const result = await mutation.mutate({
+      id: "thread-1",
+      mode: "auto",
+      input: [{ type: "text", text: "@kimi @opencode review", mentions: [] }],
+    });
+    expect(result).toMatchObject({
+      delivery: "dispatched",
+      childThreadIds: ["child-1", "child-2"],
+    });
+    expect(
+      queryClient.getQueryData<ThreadResponse>(threadQueryKey("thread-1"))
+        ?.status,
+    ).toBe("idle");
+  });
+
   it("restores a queued-row steer when provisioning keeps it queued", async () => {
     const queuedMessage = makeQueuedMessage({
       waitingOn: { kind: "thread-busy" },
@@ -437,9 +471,9 @@ describe("thread runtime mutations", () => {
 
     expect(
       queryClient
-        .getQueryData<
-          ThreadQueuedMessage[]
-        >(threadQueuedMessagesQueryKey("thread-1"))
+        .getQueryData<ThreadQueuedMessage[]>(
+          threadQueuedMessagesQueryKey("thread-1"),
+        )
         ?.map((queuedMessage) => queuedMessage.id),
     ).toEqual(["qmsg-2"]);
   });

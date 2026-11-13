@@ -131,7 +131,7 @@ describe("loadUsage", () => {
     });
   });
 
-  it("keeps an enabled empty pool selected without fetching machine quotas", async () => {
+  it("fetches machine quotas when the enabled pool is empty", async () => {
     const machines = [
       machine("host", [account("local")]),
       machine("source:pool", []),
@@ -139,7 +139,11 @@ describe("loadUsage", () => {
     const { calls, getUsage } = recordingUsage(() => ({ machines }));
     const { state, target } = usageState();
     await loadUsage(getUsage, null, false, target);
-    expect(calls).toHaveLength(1);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).toMatchObject({
+      machineIds: ["host"],
+      providerIds: ["codex"],
+    });
     expect(state.machines).toBe(machines);
   });
 

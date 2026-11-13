@@ -3345,7 +3345,7 @@ export function PromptBoxInternal({
         attachFilesWithHistory(Array.from(event.dataTransfer.files));
       }}
       className={cn(
-        "group/promptbox relative w-full rounded-xl border border-border bg-background shadow-lift",
+        "group/promptbox relative z-10 w-full rounded-3xl border border-border bg-surface-raised-solid shadow-lift",
         showCompactLayout && "overflow-hidden",
       )}
     >
@@ -3455,7 +3455,11 @@ export function PromptBoxInternal({
               scrollContainerRef={editorScrollContainerRef}
               inputLocked={composerInputLocked}
               isCompactLayout={showCompactLayout}
-              minHeight={minHeight}
+              minHeight={
+                attachments.length > 0 || (pendingUploads?.length ?? 0) > 0
+                  ? Math.min(minHeight, 40)
+                  : minHeight
+              }
               layout={surface === "new-thread" ? "root-compose" : "thread"}
               resolveMentionLink={mentionResolveLink}
             />

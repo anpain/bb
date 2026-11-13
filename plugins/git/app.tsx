@@ -83,6 +83,7 @@ export default definePluginApp((app) => {
   });
   app.slots.experimental_threadContextSegment({
     id: "changed-files",
+    experimental_placement: "timeline-end",
     title: "Changed files",
     group: experimental_THREAD_CONTEXT_SEGMENT_GROUPS.git,
     order: 10,

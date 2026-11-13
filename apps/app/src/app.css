@@ -38,14 +38,14 @@
     --secondary-panel-width-mobile: min(76vw, 320px);
     --bb-sidebar-rail-padding: var(--bb-frame-rail-padding);
     --bb-sidebar-control-size: var(--bb-frame-rail-control-size);
-    --bb-sidebar-control-icon-size: 16px;
+    --bb-sidebar-control-icon-size: 20px;
   }
 
   @media (width < 48rem) and (pointer: coarse) {
     :root {
       --bb-sidebar-rail-padding: 12px;
       --bb-sidebar-control-size: 36px;
-      --bb-sidebar-control-icon-size: 20px;
+      --bb-sidebar-control-icon-size: 22px;
     }
   }
 

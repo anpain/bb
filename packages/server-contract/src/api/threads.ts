@@ -319,7 +319,11 @@ export type SendMessageRequest = z.infer<typeof sendMessageRequestSchema>;
  * message, and there is only one now — so the useful half of that answer, WHY
  * it is waiting, moved onto the queued arm where it can be typed.
  */
-export const sendMessageDeliverySchema = z.enum(["sent", "queued"]);
+export const sendMessageDeliverySchema = z.enum([
+  "sent",
+  "queued",
+  "dispatched",
+]);
 export type SendMessageDelivery = z.infer<typeof sendMessageDeliverySchema>;
 
 /**
@@ -328,6 +332,11 @@ export type SendMessageDelivery = z.infer<typeof sendMessageDeliverySchema>;
  * for now" would invite every caller to check fields that cannot exist.
  */
 export const sendMessageResponseSchema = z.discriminatedUnion("delivery", [
+  z.object({
+    ok: z.literal(true),
+    delivery: z.literal("dispatched"),
+    childThreadIds: z.array(z.string().min(1)).min(1),
+  }),
   z.object({ ok: z.literal(true), delivery: z.literal("sent") }),
   z.object({
     ok: z.literal(true),

@@ -17,6 +17,7 @@ function collectPluginMentionResources(
     for (const mention of item.mentions) {
       const resource = mention.resource;
       if (resource.kind !== "plugin") continue;
+      if (resource.pluginId === "bb-agent-profiles") continue;
       const key = `${resource.pluginId}::${resource.itemId}`;
       if (seen.has(key)) continue;
       seen.add(key);

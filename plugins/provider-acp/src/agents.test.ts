@@ -312,6 +312,14 @@ describe("acpProviderDeclaration", () => {
     expect(byId.get("acp-cursor")?.capabilities.fork).toBe("none");
     expect(byId.get("acp-grok")?.capabilities.fork).toBe("none");
     expect(byId.get("acp-opencode")?.capabilities.fork).toBe("tip");
+    expect(byId.get("acp-kimi")?.capabilities.fork).toBe("tip");
+    expect(byId.get("acp-kimi")?.experimental_visibility).toBe("installed");
+    expect(byId.get("acp-kimi")?.experimental_bridgeOptions).toMatchObject({
+      acpLaunchSpec: {
+        command: "kimi",
+        args: ["acp"],
+      },
+    });
     expect(byId.get("acp-cursor")?.experimental_bridgeOptions).toMatchObject({
       acpDialect: "cursor",
       parameterizedModelPicker: true,

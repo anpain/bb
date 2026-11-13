@@ -1,9 +1,5 @@
-import { AsyncLocalStorage } from "node:async_hooks";
-import { release } from "node:os";
 import type { AppInstall } from "@bb/config/app-install";
-import { DEFAULTS } from "@bb/config/defaults";
 import type { ServerConfig } from "@bb/config/server";
-import { readOrCreateSecretFile } from "@bb/secret-storage";
 import type { AppSurface, RequestAppSurface } from "@bb/config/app-surface";
 import type {
   RecordTelemetryEventRequest,
@@ -11,15 +7,7 @@ import type {
 } from "@bb/server-contract";
 import type { ServerLogger } from "../../types.js";
 
-const POSTHOG_INGESTION_URL = "https://us.i.posthog.com/capture/";
-const TELEMETRY_ID_FILE_NAME = "telemetry-id";
-
 export type TelemetryAccessRoute = "connect" | "direct" | "loopback";
-
-const telemetryRequestStorage = new AsyncLocalStorage<{
-  appSurface: RequestAppSurface;
-  accessRoute: TelemetryAccessRoute | null;
-}>();
 
 export type TelemetryInitiator =
   | "user"
@@ -186,95 +174,18 @@ export function appInstallFromServerConfig(
   }
 }
 
-function appInstallProperties(install: AppInstall | null) {
-  if (install === null) return { install_kind: "unmanaged" };
-  if (install.kind !== "source") return { install_kind: install.kind };
-  return { install_kind: "source", source_origin: install.origin };
-}
-
 export function runWithTelemetryRequest<T>(
-  request: {
+  _request: {
     appSurface: RequestAppSurface;
     accessRoute: TelemetryAccessRoute | null;
   },
   callback: () => T,
 ): T {
-  return telemetryRequestStorage.run(request, callback);
+  return callback();
 }
 
 export async function createTelemetryService(
-  args: CreateTelemetryServiceArgs,
+  _args: CreateTelemetryServiceArgs,
 ): Promise<TelemetryService> {
-  if (
-    !args.enabled ||
-    args.apiKey.length === 0 ||
-    args.appVersion === DEFAULTS.appVersion
-  ) {
-    return noopTelemetryService;
-  }
-  const distinctId = await readOrCreateSecretFile({
-    bytes: 16,
-    dataDir: args.dataDir,
-    encoding: "hex",
-    fileName: TELEMETRY_ID_FILE_NAME,
-  });
-  let telemetryEnabled = args.telemetryEnabled;
-  const osRelease = release();
-  const commonProperties = {
-    ...appInstallProperties(args.appInstall),
-    app_version: args.appVersion,
-    arch: process.arch,
-    is_wsl:
-      process.platform === "linux" &&
-      osRelease.toLowerCase().includes("microsoft"),
-    node_version: process.version,
-    os_release: osRelease,
-    platform: process.platform,
-  };
-  const sharedProperties = new Map<string, string>();
-  return {
-    isEnabled: () => telemetryEnabled,
-    setEnabled(enabled: boolean): void {
-      telemetryEnabled = enabled;
-    },
-    featureFlagIdentity: () => ({ apiKey: args.apiKey, distinctId }),
-    setSharedProperty(name: string, value: string): void {
-      sharedProperties.set(name, value);
-    },
-    capture(event: TelemetryEvent): void {
-      if (!telemetryEnabled) return;
-      const request = telemetryRequestStorage.getStore();
-      const appSurface = request?.appSurface ?? args.appSurface;
-      const eventProperties = "properties" in event ? event.properties : {};
-      const body = JSON.stringify({
-        api_key: args.apiKey,
-        distinct_id: distinctId,
-        event: event.name,
-        properties: {
-          ...commonProperties,
-          ...Object.fromEntries(sharedProperties),
-          ...eventProperties,
-          app_surface: appSurface,
-          ...(request?.accessRoute
-            ? { access_route: request.accessRoute }
-            : {}),
-        },
-        timestamp: new Date().toISOString(),
-      });
-      fetch(POSTHOG_INGESTION_URL, {
-        body,
-        headers: { "content-type": "application/json" },
-        method: "POST",
-      }).catch((error: unknown) => {
-        args.logger.debug(
-          {
-            app_surface: appSurface,
-            err: error,
-            event: event.name,
-          },
-          "Telemetry event send failed",
-        );
-      });
-    },
-  };
+  return noopTelemetryService;
 }

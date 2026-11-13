@@ -715,6 +715,21 @@ function FollowUpPromptBoxWithComposer({
       onFocusCapture={handleComposerFocus}
       onPointerDownCapture={handleComposerPointerDown}
     >
+      {!isPromptBoxCompact ? (
+        <div
+          data-follow-up-environment=""
+          className="relative z-0 mx-6 -mb-3 flex min-h-14 min-w-0 select-none items-center gap-3 rounded-t-2xl border border-b-0 border-border bg-surface-raised px-4 pb-3 text-sm"
+        >
+          <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
+            {isCompactViewport ? compactEnvironmentSummary : environmentSummary}
+          </div>
+          {contextWindowUsage ? (
+            <div className="shrink-0">
+              <ThreadContextWindowIndicator usage={contextWindowUsage} />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       <PromptBoxWithScrollAnchor
         id={id}
         promptBoxRef={promptBoxRef}
@@ -811,25 +826,16 @@ function FollowUpPromptBoxWithComposer({
             </div>
           ) : null
         }
-        executionControls={executionControls}
-      />
-      {!isPromptBoxCompact ? (
-        <div
-          data-follow-up-composer-footer=""
-          className="mt-1 flex min-h-6 max-h-6 select-none max-md:mt-0 max-md:pointer-coarse:min-h-11 max-md:pointer-coarse:max-h-11 items-center justify-between gap-2 overflow-hidden pl-[15px] pr-3.5 opacity-100 transition-[max-height,min-height,margin-top,opacity] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
-        >
-          <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
-            {isCompactViewport ? compactEnvironmentSummary : environmentSummary}
-          </div>
-          <div className="flex shrink-0 items-center gap-2 max-md:gap-0">
-            {sessionOptionsControl}
+        executionControls={
+          <>
             {permissionControl}
-            {contextWindowUsage ? (
-              <ThreadContextWindowIndicator usage={contextWindowUsage} />
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+            <div className="ml-auto flex min-w-0 items-center gap-2">
+              {sessionOptionsControl}
+              {executionControls}
+            </div>
+          </>
+        }
+      />
     </div>
   );
 

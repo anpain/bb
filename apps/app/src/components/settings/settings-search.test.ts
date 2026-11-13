@@ -51,7 +51,7 @@ describe("searchSettings", () => {
 
   it("finds a setting by a word people remember instead of its title", () => {
     expect(searchTitles("telemetry")).toEqual([
-      "General › Share anonymous usage data",
+      "General › Anonymous usage telemetry",
     ]);
     expect(searchTitles("dark mode")).toEqual(["Appearance › Theme"]);
     expect(searchTitles("idle timeout")).toEqual([

@@ -6,7 +6,7 @@ import {
 import plugin from "./server.js";
 import { usageListMethod, usageFetchMethod } from "./usage-source-contract.js";
 
-it("lists cheaply, fetches only the selected source/provider, preserves failed measurements, and evicts removed resources", async () => {
+it("fetches all providers for an empty filter, scopes explicit filters, preserves failed measurements, and evicts removed resources", async () => {
   let enabled = true;
   let failure = false;
   let hasWork = true;
@@ -128,16 +128,17 @@ it("lists cheaply, fetches only the selected source/provider, preserves failed m
         {
           id: "source:pool",
           providers: [
-            { providerId: "codex", usage: null },
-            { providerId: "codex", usage: null },
-            { providerId: "claude-code", usage: null },
+            { providerId: "codex", usage: { status: "ok" } },
+            { providerId: "codex", usage: { status: "ok" } },
+            { providerId: "claude-code", usage: { status: "ok" } },
           ],
         },
       ],
     });
     expect(
-      rpc.mock.calls.every(([args]) => args.method === usageListMethod),
-    ).toBe(true);
+      rpc.mock.calls.filter(([args]) => args.method === usageFetchMethod),
+    ).toHaveLength(4);
+    rpc.mockClear();
     const target = {
       ...request,
       machineIds: ["source:pool"],
@@ -152,14 +153,11 @@ it("lists cheaply, fetches only the selected source/provider, preserves failed m
           args.input.resourceId,
           args.input.refresh,
         ]),
-    ).toEqual([
-      ["pool", "personal", false],
-      ["pool", "work", false],
-    ]);
+    ).toEqual([]);
     await host.harness.behavior.callRpc("getUsage", target);
     expect(
       rpc.mock.calls.filter(([args]) => args.method === usageFetchMethod),
-    ).toHaveLength(2);
+    ).toHaveLength(0);
     failure = true;
     expect(
       await host.harness.behavior.callRpc("getUsage", {
@@ -175,7 +173,7 @@ it("lists cheaply, fetches only the selected source/provider, preserves failed m
           providers: [
             { usage: { status: "ok" } },
             { usage: { status: "ok" } },
-            { usage: null },
+            { usage: { status: "ok" } },
           ],
         },
       ],
@@ -200,6 +198,7 @@ it("lists cheaply, fetches only the selected source/provider, preserves failed m
     await host.harness.behavior.callRpc("getUsage", {
       ...target,
       providerIds: ["claude-code"],
+      force: true,
     });
     expect(
       rpc.mock.calls
@@ -209,6 +208,7 @@ it("lists cheaply, fetches only the selected source/provider, preserves failed m
     await host.harness.behavior.callRpc("getUsage", {
       ...target,
       machineIds: null,
+      force: true,
     });
     expect(
       rpc.mock.calls
@@ -218,7 +218,17 @@ it("lists cheaply, fetches only the selected source/provider, preserves failed m
     enabled = false;
     expect(
       await host.harness.behavior.callRpc("getUsage", request),
-    ).toMatchObject({ machines: [{ id: "host", providers: [] }] });
+    ).toMatchObject({
+      machines: [
+        {
+          id: "host",
+          providers: [
+            { providerId: "codex", usage: null },
+            { providerId: "claude-code", usage: null },
+          ],
+        },
+      ],
+    });
   } finally {
     await host.harness.lifecycle.dispose();
   }

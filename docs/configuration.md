@@ -250,9 +250,9 @@ change the host-daemon protocol.
 | `BB_SERVER_PORT`               | `bb-app env`, environment, or `--server-port`      | Startup-only            | HTTP listener port. Defaults to `38886`.                                                                                                                                                                                                                                   |
 | `BB_HOST_DAEMON_PORT`          | `bb-app env`, environment, or `--host-daemon-port` | Startup-only            | Local host-daemon API port. Defaults to `38887`.                                                                                                                                                                                                                           |
 | `BB_LOG_LEVEL`                 | `bb-app config`                                    | Startup-only debugging  | `trace`, `debug`, `info`, `warn`, `error`, or `fatal`.                                                                                                                                                                                                                     |
-| `BB_TELEMETRY`                 | `bb-app env`, or environment                       | Startup-only            | `false` always disables anonymous usage telemetry, overriding the `telemetryEnabled` setting.                                                                                                                                                                              |
+| `BB_TELEMETRY`                 | `bb-app env`, or environment                       | Startup-only            | Legacy compatibility input; ignored. Anonymous usage telemetry is permanently disabled regardless of this value or saved settings.                                                                                                                                                                              |
 | `BB_SKIP_ONBOARDING`           | Environment                                        | Startup-only            | Default false. `1` marks first-run setup completed at startup when it is not yet, so the setup screen is skipped. Settings → General can still replay it. `pnpm dev`, `pnpm start:worktree`, and `pnpm desktop:worktree` default it to `1`; an explicit `0` retains setup. |
-| `BB_SETUP_GUIDE_VARIANT`       | Environment                                        | Startup-only QA         | `control` or `new` forces the first-run setup guide variant, ignoring telemetry and the `setup-guide-redesign` experiment. Unset by default. See [General settings](#general-settings).                                                                                    |
+| `BB_SETUP_GUIDE_VARIANT`       | Environment                                        | Startup-only QA         | `control` or `new` forces the first-run setup guide variant, ignoring a legacy saved assignment. Unset by default. See [General settings](#general-settings).                                                                                    |
 | `BB_PERF_DIAGNOSTICS`          | `bb-app env`, environment, or `--perf-diagnostics` | Startup-only            | Default false. Permits the `performanceDiagnostics` experiment; see [Experiments](#experiments).                                                                                                                                                                           |
 | `BB_QUERY_PLAN_AUDIT`          | Environment                                        | Startup-only debugging  | Default false. `1` logs `Slow SQLite query plan` for each query whose plan walks a large table or picks a weaker index; see [diagnostics](debugging-and-qa.md#slow-sqlite-query-plans). `pnpm dev`, `pnpm start:worktree`, and `pnpm desktop:worktree` default it to `1`. The `performanceDiagnostics` experiment also turns it on. |
 | `BB_CLI_ERROR_LOG`             | Environment of the `bb` process                    | Optional                | `0` stops the CLI recording failed invocations (command path, error code, no argument values) to `<dataDir>/logs/cli-errors.jsonl`. See `bb guide overview`.                                                                                                               |
@@ -289,7 +289,7 @@ for the command surface.
 | `managedBranchPrefix`                                                      | `bb/`                               | Settings → General → New branch prefix. Prefix for branches bb creates for worktrees and new checkout branches (`bb/fix-login-flow-thr_ab12cd34ef`); empty for none. At most 64 characters and must start a valid git branch name (no space or leading `-`). Existing branches and worktrees keep their names.                                                                                                                                                                                                                                 |
 | `providerOrder`                                                            | `[]`                                | Settings → Providers (move a provider up or down). JSON list of provider ids that lead the picker, such as `'["claude-code","codex"]'`; unlisted ids follow in plugin install order and unknown ids are ignored.                                                                                                                                                                                                                                                                                                                               |
 | `defaultProviderId`                                                        | `null`                              | Settings → Providers. Provider for new threads when neither caller nor project chose one; `null` means the first available provider in picker order.                                                                                                                                                                                                                                                                                                                                                                                           |
-| `telemetryEnabled`                                                         | `true`                              | Settings → General → Privacy & diagnostics → Share anonymous usage data. Takes effect immediately; `BB_TELEMETRY=false` overrides it.                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `telemetryEnabled`                                                         | `false`                             | Always `false`. Settings → General → Privacy & diagnostics shows anonymous usage telemetry as permanently disabled; saved values and `BB_TELEMETRY` cannot enable it.                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `earlyAdopter`                                                             | `false`                             | Settings → Experiments → Become an early adopter. Turns on experiments marked Early adopter unless you set them yourself; see [Experiments](#experiments).                                                                                                                                                                                                                                                                                                                                                                                     |
 | `machineServerUrl`, `defaultMachineAccess`, `machineGitCredentialsEnabled` | See [Multi-machine](#multi-machine) | Machine access and credential forwarding.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
@@ -340,147 +340,19 @@ when it was finished or skipped; `bb settings replay-onboarding`, or Settings �
 General → Setup guide, clears it so the guide shows again. The projects step
 lists what `bb project discover` and
 `bb.sdk.hosts.experimental_discoverRepos({ hostId })` return.
-The guide shown is `control` (current) or `new` (redesign), from the app's
-`GET /api/v1/system/setup-guide` request (`{ variant }`). The server resolves
-it once per run on the first request from the `setup-guide-redesign` PostHog
-flag, evaluated for the anonymous install id (3-second timeout). It is
-`control` when telemetry is off or unavailable, or when the evaluation fails,
-the flag is missing or disabled, or its variant is unknown. The assignment
-saved in `<dataDir>/setup-guide-assignment.json` is reused.
-`BB_SETUP_GUIDE_VARIANT` forces the variant for QA.
+The guide shown is `control` by default. A valid legacy assignment in
+`<dataDir>/setup-guide-assignment.json` is reused locally without a network
+request. `BB_SETUP_GUIDE_VARIANT` forces `control` or `new` for QA.
 
-**Anonymous usage telemetry.** PostHog events carry a random install id, app
-version, install kind, platform, OS release, architecture, and Node version.
-The server sends events such as `app_started`, `telemetry_disabled`, `thread_created`,
-`user_message_sent`, `turn_finished`, and `plugin_installed`. The app reports setup-guide and
-first-send events through `POST /api/v1/system/telemetry/events`
-(`sdk.system.experimental_recordTelemetryEvent`), such as `onboarding_started`,
-`onboarding_step_reached`, `onboarding_step_completed`,
-`onboarding_step_skipped`, `onboarding_finished`, `onboarding_agent_state`,
-`onboarding_sign_in`, `onboarding_left`, `onboarding_error`, `new_thread_submit` (started,
-accepted, or failed),
-`plugin_creation_started` (no properties; sent when you choose New plugin in
-the app or run `bb plugin new`, so it records intent, not a finished plugin),
-and `release_notes_opened` from Settings → Updates (`view` `inline` when the
-notes open under the bb row, `web` for the full notes on getbb.app).
-`onboarding_operation` records setup-guide work by `operation`: `import`
-(selected repos imported together, or one folder added through "Add a folder
-that isn't listed", with `item_count` 1), `remote_access` (`started` when
-getbb.app sign-in starts, a pairing code is submitted, or Turn on is pressed,
-not when the bb connect panel is merely opened), and `add_machine` (`started`
-when the machine setup command is shown). In both guides, Continue on the projects
-step counts as completed only when a project was selected or added during the
-guide (by either route), and Continue on the plugins step only when a featured
-plugin is on; otherwise each counts as skipped.
-`onboarding_exposed` (`entry` `first_run` or `replay`) marks the setup guide
-being shown: the server saves the flag assignment, adds `setup_guide_variant`
-and `setup_guide_source` (`override`, `flag`, or `default`), sets
-`setup_guide_variant` as a person property, and sends PostHog's
-`$feature_flag_called` when the flag decided the variant. The server adds
-`setup_guide_variant` to every setup-guide event (`onboarding_*` and onboarding
-`recommendation`), and once the flag assignment is known every event, including
-`turn_finished`, carries `$feature/setup-guide-redesign`.
-`onboarding_operation` records a setup-guide action's `started`,
-`succeeded`, or `failed` outcome with counts only, the same way in both
-guides. A Projects step `scan` adds `timed_out` (true when the repo scan ran
-out of time and the list may be partial) and `unreadable_count` (how many
-folders the scan was not allowed to open, such as macOS Documents or Desktop;
-never their paths). A failed Projects `import` reports `item_count` (repos
-selected) and `succeeded_count` (imported before the failure). Plugins step
-`install` (a featured plugin that wasn't installed yet), `enable`, and
-`disable` carry the plugin's public id in `resource_id`; `install` succeeds or
-fails when its install job finishes, not when the request is accepted, even
-if the guide moved to another step meanwhile; a cancelled install job records
-no outcome. `load`
-records only `failed`, once each time the Agent step's agent states or the
-Plugins step's catalog start failing to load; in the new guide the Agent step
-also records `timed_out` when its agent states haven't loaded after 10
-seconds and it offers Retry, once per attempt. `finish` records only `failed`,
-with the step the guide closed from, when saving that setup was finished
-fails. Every `failed` outcome except `remote_access` adds `failure_reason`:
-`no_host` (no computer was available: once per guide for `scan`, and each
-time the Agent step opens without one for agent `load`), `host_unavailable`, `timed_out`,
-`not_found`, `permission`, `command_failed` (the agent install command, plugin
-install job, or new machine's setup ran and failed), or `other`. A failed
-`remote_access` adds `failure_stage`: `sign_in` (getbb.app sign-in couldn't
-start or ended denied, expired, or failed), `pairing` (a pairing code was
-rejected), or `turn_on` (turning remote access on failed); a retry after a
-failure records a new `started`. A failed `sign_in` or `pairing` stage also
-adds `failure_detail`: `denied`, `expired`, `login_failed`, `rate_limited`,
-`service_unavailable`, `account_unavailable`, or `network` for sign-in, and
-the rejected code's reason (`invalid_code`, `expired_code`, `already_used`,
-`network`, `unauthorized`, `profile_unavailable`, `superseded`, or
-`account_unavailable`) for pairing; anything else is `other`. An agent
-`install` or `update` that fails with `command_failed` adds `failure_detail`,
-classified on this computer from the install's output, and `exit_code` when
-the command exited: `not_found` (the installer or a command it needs is
-missing), `permission`, `network`, `disk_full`, `npm_error`,
-`verification_failed` (the command exited 0 but the agent still isn't
-installed or updated), `unavailable` (the install is no longer offered),
-`in_progress` (another agent install was running), `signal`, `exit_nonzero`,
-or `other`. Only the class and the number are sent, never the output, paths,
-or messages. `add_machine` can fail before `started` when the setup command
-couldn't be prepared.
-`onboarding_left` (`step`, the step on screen, and `entry`) is sent at most
-once per guide, in either guide, when the page unloads (the browser's
-`pagehide`: closing the tab or window, reloading, or navigating away) while the
-guide is open and before `onboarding_finished`; switching tabs or apps doesn't
-count. It goes as a keepalive request so it survives the unload. In the
-desktop app, closing the window sends it, but quitting the app while a guide
-is open may not when the app runs its own bb server, which stops before the
-window unloads.
-`onboarding_error` (`step`, the step on screen, `entry`, and `kind`) is sent
-while a guide is open, in either guide, when the app hits an error: `render`
-(the guide itself crashed and the app showed its error screen), `uncaught` (an
-uncaught error anywhere in the app window), or `unhandled_rejection` (an
-unhandled promise rejection). It is sent at most once per `kind` and step and
-at most five times per guide, and carries no error message, stack, or file
-name. Crashes of the desktop app's main process, the bb server, or a machine's
-host daemon aren't reported.
-A failed `new_thread_submit` adds `failure_reason` (`host_unavailable`,
-`timed_out`, `not_found`, `permission`, or `other`), from the same mapping as
-setup-guide failures; `started` and `accepted` carry no reason.
-`onboarding_agent_state` (`agent_installed` and `agent_ready`, each `null`
-when unknown) also carries `agent_statuses`, an object from each shipped
-agent's public id the host reports (such as `claude-code` or `codex`) to its
-status: `ready`, `not_installed`, `unauthenticated`, `expired`,
-`unsupported_version`, or `unknown`. Custom agents are left out, and
-`agent_statuses` is absent when the agent states fail to load. It is sent
-again only when one of these values changes.
-`onboarding_sign_in` carries the agent's public id in `resource_id`
-(custom agents report `other`, as agent installs do). A `failed` sign-in adds
-`failure_reason`: `command_failed` (the sign-in command exited non-zero, with
-`failure_detail` `not_found` for exit 127, `permission` for 126, `signal` when
-killed, or `exit_nonzero`, plus `exit_code`; or the agent reported the
-sign-in failed, with `failure_detail` `login_failed`), `no_host`, `not_found`
-(the agent's state wasn't loaded), or `unsupported`
-(the agent has no sign-in command) when it couldn't start, and
-`host_unavailable`, `timed_out`, `not_found`, `permission`, or `other` when
-its terminal couldn't be created. A sign-in that couldn't start records only
-`failed`, without `started`.
-`bb plugin new` sends `plugin_creation_started` with `app_surface` `api`, skips
-it inside a bb agent thread (so an agent acting on New plugin isn't counted
-twice), and skips it silently when no bb server answers within 2 seconds. The
-route accepts only allow-listed events and values, plus a
-`release_version` of digits and dots (such as `0.47.0`): no custom provider ids,
-account details, prompts, release-note text, project or file names, terminal
-output, error messages, or session ids. Sign-in `exited` means the command exited before
-readiness was observed, not that authentication succeeded; `new_thread_submit`
-`accepted` means the thread was created, not that the provider answered.
-By default (`BB_FF_INITIATOR_TELEMETRY=false` turns it off), `thread_created` and `user_message_sent` also carry
-`initiator`: `user`, `agent`, `automation` (started by the automations
-plugin), `plugin` (any other plugin), or `system` (bb's own retries and follow-ups). Sends from a plugin carry its ID (the plugin SDK adds `originPluginId`), so automation
-runs into an existing thread report `automation`. `bb thread spawn` run inside a thread
-sends that thread as `senderThreadId`; the new thread reports `agent` when the sender has a
-turn running, and `user` otherwise.
-
-`turn_finished` sends `outcome` (`succeeded`, `failed`, or `stopped`),
-`error_category` (`none`, `auth`, `billing`, `rate_limit`, `limit_reached`,
-`provider_unavailable`, `start_failed`, `process_exited`, `host_lost`, or `other`),
-`provider` (a shipped built-in provider ID, otherwise `other`), and
-`install_turn_number`, in addition to the standard event properties. The stored
-per-install number increments atomically on each enabled finish. It pauses while
-telemetry is off and resumes at the next number when enabled again.
+**Anonymous usage telemetry.** This fork permanently disables bb usage
+telemetry. No usage events, telemetry-disabled notifications, telemetry feature
+flag requests, or exposure events leave the server, and no anonymous telemetry
+install id is created. Saved settings and environment variables cannot enable
+it. The `POST /api/v1/system/telemetry/events` compatibility route still
+validates its allow-listed events and performs local recommendation bookkeeping,
+but the telemetry service discards every event. `BB_POSTHOG_API_KEY`,
+`BB_TELEMETRY`, `BB_FF_INITIATOR_TELEMETRY`, and `telemetryEnabled` are retained
+only for compatibility and have no enabling effect.
 
 ## AI services
 
@@ -706,7 +578,7 @@ bb plugin config provider-acp set customAgents '[
 Each entry needs `id` (lowercase letters, digits, and dashes), `displayName`,
 and `command`. bb derives the provider id `acp-<id>`, which never changes once
 a thread has used it. `cursor` is reserved; an entry with an id bb lists only
-where the agent is installed (`opencode`, `omp`, `grok`, `hermes-agent`)
+where the agent is installed (`opencode`, `kimi`, `omp`, `grok`, `hermes-agent`)
 replaces the shipped agent and keeps its `nativeSkillRoots` unless it sets its
 own. Optional fields: `args`, `env`, `cwd`, `modelCli` (CLI model listing and
 selection), `reasoningCli` (launch-time reasoning flags), `nativeReasoning`
@@ -1689,3 +1561,48 @@ update message. Web browsers control their own handoff and may show a second
 prompt; BB cannot reliably detect missing apps in a browser. Executable web
 schemes, local-file launch schemes, and reserved editor-action schemes remain
 blocked.
+# Agent/model profiles
+
+Each profile exposes a named default-model picker with model-name/ID search,
+the saved model ID, and a catalog refresh action. Catalog preview does not change
+the chat's last-used execution settings. Choose a provider, select its model,
+enter comma-separated aliases, then save profiles.
+
+Local desktop packaging can set `BB_DESKTOP_SKIP_RUNTIME_VERIFICATION=1` to skip
+the after-pack npm smoke execution while still preparing native modules. This is
+for builds whose owner explicitly requests no runtime verification; it does not
+skip compilation or native-module preparation.
+
+Settings → Providers → Agent profiles stores named profiles in general settings
+(`agentProfiles`). Each profile has a unique `id`, `name`, `providerId`, explicit
+catalog `model` (null means not configured), `aliases`, and nullable
+`reasoningLevel`/`serviceTier`. Aliases are unique, case-insensitive words without
+`@`. Defaults include codex/кодекс, kimi/кими, claude/клод, and
+opencode/опенкод/опен. Multiple profiles may use the same provider.
+
+Use `bb settings agent-profiles show --json` and
+`bb settings agent-profiles replace profiles.json`, or the SDK's existing
+`system.config()` and `system.updateGeneralSettings()` methods. Explicit
+`@profile` recipients in `threads.send()` (including `bb thread tell`) create
+independent child tasks in the current workspace. The send response has
+`delivery: "dispatched"` and `childThreadIds`; this does not start a parent turn.
+Dispatch applies to follow-up messages in existing chats, not initial new-chat
+prompts. Each child uses its configured
+model, reports through existing parent notifications, and appears in the thread
+hierarchy with its status and results. Only message text is forwarded, not chat
+history or attachments. Code spans/fences, emails and file mentions do not dispatch.
+Configure a model before sending; unavailable catalogs/models fail rather than
+silently substituting a provider. Dispatch requires an existing chat workspace.
+
+OpenCode uses the installed `acp-opencode` provider and existing local auth. Its
+catalog, not a hard-coded model list, supplies choices such as
+`rurout/gpt-6.1-sol`. Its quota source reports OpenCode Go only where supplied;
+other OpenCode providers do not gain invented quota values.
+
+Kimi quota collection uses the installed CLI's loopback authenticated
+`/api/v1/oauth/usage` service, with a temporary port and no browser opening.
+The CLI retains ownership of OAuth credentials/refresh; bb never copies login
+credentials, starts login, or sends a model prompt to poll quotas. The short-lived
+service is stopped after collection and has Kimi telemetry disabled. CLI versions
+without this API report unavailable data. Windows and booster credits are shown
+only when supplied by that API.

@@ -1,5 +1,10 @@
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { createSetupGuideExperiment } from "../../src/services/system/setup-guide-experiment.js";
+import {
+  createSetupGuideExperiment,
+  SETUP_GUIDE_ASSIGNMENT_FILE_NAME,
+} from "../../src/services/system/setup-guide-experiment.js";
 import type { TelemetryService } from "../../src/services/system/telemetry.js";
 import { readJson } from "../helpers/json.js";
 import { withTestHarness, type TestAppHarness } from "../helpers/test-app.js";
@@ -12,46 +17,25 @@ function postEvent(harness: TestAppHarness, body: unknown) {
   });
 }
 
-async function useFlagVariant(harness: TestAppHarness) {
+async function useSavedVariant(harness: TestAppHarness) {
   const capture = vi.fn<TelemetryService["capture"]>();
-  const telemetry: TelemetryService = {
-    ...harness.deps.telemetry,
-    capture,
-    isEnabled: () => true,
-    featureFlagIdentity: () => ({ apiKey: "phc_test", distinctId: "install" }),
-  };
-  const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
-    new Response(
-      JSON.stringify({
-        flags: {
-          "setup-guide-redesign": {
-            key: "setup-guide-redesign",
-            enabled: true,
-            variant: "new",
-            metadata: { id: 1, version: 1 },
-          },
-        },
-        errorsWhileComputingFlags: false,
-      }),
-      { status: 200 },
-    ),
+  harness.deps.telemetry = { ...harness.deps.telemetry, capture };
+  await writeFile(
+    join(harness.config.dataDir, SETUP_GUIDE_ASSIGNMENT_FILE_NAME),
+    JSON.stringify({ guide: { variant: "new", source: "flag" } }),
   );
-  harness.deps.telemetry = telemetry;
   harness.deps.setupGuideExperiment = await createSetupGuideExperiment({
     dataDir: harness.config.dataDir,
-    fetch,
-    flagTimeoutMs: 1_000,
     logger: harness.deps.logger,
     override: null,
-    telemetry,
   });
   return { capture };
 }
 
 describe("setup guide route", () => {
-  it("serves the guide variant without exposing its source", async () => {
+  it("serves a saved guide variant without exposing its source", async () => {
     await withTestHarness(async (harness) => {
-      await useFlagVariant(harness);
+      await useSavedVariant(harness);
 
       const response = await harness.app.request("/api/v1/system/setup-guide");
 
@@ -60,35 +44,17 @@ describe("setup guide route", () => {
     });
   });
 
-  it("records exposure with the flag call and tags setup-guide events", async () => {
+  it("does not record exposures or annotate setup-guide events", async () => {
     await withTestHarness(async (harness) => {
-      const { capture } = await useFlagVariant(harness);
+      const { capture } = await useSavedVariant(harness);
 
       const exposure = await postEvent(harness, {
         name: "onboarding_exposed",
         properties: { entry: "first_run" },
       });
       expect(exposure.status).toBe(200);
-      expect(capture.mock.calls.map(([event]) => event)).toEqual([
-        {
-          name: "$feature_flag_called",
-          properties: {
-            $feature_flag: "setup-guide-redesign",
-            $feature_flag_response: "new",
-          },
-        },
-        {
-          name: "onboarding_exposed",
-          properties: {
-            entry: "first_run",
-            setup_guide_variant: "new",
-            setup_guide_source: "flag",
-            $set: { setup_guide_variant: "new" },
-          },
-        },
-      ]);
+      expect(capture).not.toHaveBeenCalled();
 
-      capture.mockClear();
       await postEvent(harness, {
         name: "recommendation",
         properties: {
@@ -114,7 +80,6 @@ describe("setup guide route", () => {
             action: "shown",
             surface: "onboarding",
             entry: "first_run",
-            setup_guide_variant: "new",
           },
         },
         { name: "new_thread_submit", properties: { outcome: "accepted" } },

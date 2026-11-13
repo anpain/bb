@@ -424,11 +424,10 @@ inputs or stopping capture. Preview audio is never saved or transcribed.
 
 Telemetry
 
-Anonymous usage telemetry is controlled by Settings → General → Privacy &
-diagnostics, `bb settings general telemetryEnabled false`, or SDK
-`system.updateGeneralSettings` with `telemetryEnabled`. The saved preference
-takes effect immediately. `BB_TELEMETRY=false` always disables telemetry, even
-when the saved preference is enabled.
+This fork permanently disables anonymous usage telemetry, telemetry-disabled
+events, and telemetry feature-flag requests. Settings → General → Privacy &
+diagnostics reports this state. The legacy `telemetryEnabled`, `BB_TELEMETRY`,
+and `BB_POSTHOG_API_KEY` inputs cannot enable telemetry.
 
 Mobile app downloads
 
@@ -478,3 +477,25 @@ include `localhost,127.0.0.1,::1` in `NO_PROXY`. `NODE_EXTRA_CA_CERTS` adds a PE
 bundle. `NODE_USE_SYSTEM_CA=0` and `NODE_USE_ENV_PROXY=0` opt out of the defaults.
 Restart bb after changes. Proxy support requires Node 22.21+, 24.5+, or 26;
 custom socket/agent libraries, including daemon WebSockets, can still bypass it.
+# Agent profiles and explicit dispatch
+
+The profile editor offers provider selection, model-name/ID search, a default
+model picker and catalog refresh. Select a model, enter its comma-separated
+aliases and save profiles; the saved model ID is shown below the picker.
+
+Configure named provider/model profiles in Settings → Providers → Agent profiles,
+or use `bb settings agent-profiles show --json` and
+`bb settings agent-profiles replace profiles.json` (a JSON array). The SDK uses
+`system.config().generalSettings.agentProfiles` and `system.updateGeneralSettings`.
+Choose an actual installed catalog model before dispatch. Aliases include
+codex/кодекс, kimi/кими, claude/клод, opencode/опенкод/опен; aliases are editable.
+`bb thread tell <thread-id> '@kimi review this'` uses the same server
+path as chat. Each explicit profile gets a separate linked child task, with
+existing thread status/results and parent notifications. Only the text is sent;
+no implicit history or attachments. Code, emails and path mentions are excluded.
+Missing configuration or models are errors, never silent substitutions.
+
+Provider usage is available in the sidebar footer (hover for remaining quota,
+click for all provider details/refresh), `bb settings usage --json`, and SDK
+`system.usageLimits({ refresh: true })`. Unknown is not zero. OpenCode's usage
+source reports Go quotas, not quotas for arbitrary providers behind OpenCode.

@@ -26,7 +26,7 @@ export function createDesktopReleaseInfo(
     channel,
     iconFileName: nightly ? "icon-nightly.png" : "icon.png",
     releaseTag,
-    updateReleaseBaseUrl: `https://github.com/get-bb/bb/releases/download/${releaseTag}/`,
+    updateReleaseBaseUrl: `https://github.com/yarxhe/bb/releases/download/${releaseTag}/`,
   };
 }
 
@@ -84,19 +84,7 @@ interface ResolveDesktopUpdateSupportArgs {
 }
 
 export function resolveDesktopUpdateSupport(
-  args: ResolveDesktopUpdateSupportArgs,
+  _args: ResolveDesktopUpdateSupportArgs,
 ): DesktopUpdateSupport {
-  if (args.platform === "macos" || args.platform === "windows") {
-    return { autoUpdate: true, versionCheck: true };
-  }
-
-  const appImagePath = args.env.APPIMAGE?.trim() ?? "";
-  if (appImagePath.length === 0) {
-    return { autoUpdate: false, versionCheck: true };
-  }
-
-  return {
-    autoUpdate: args.canReplaceAppImage(appImagePath),
-    versionCheck: true,
-  };
+  return { autoUpdate: false, versionCheck: true };
 }

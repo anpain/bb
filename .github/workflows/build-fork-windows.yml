@@ -1,0 +1,60 @@
+name: Build fork Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [privacy-kimi]
+    paths: [.github/workflows/build-fork-windows.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fork-windows-release
+  cancel-in-progress: false
+
+env:
+  CSC_IDENTITY_AUTO_DISCOVERY: "false"
+  TURBO_TELEMETRY_DISABLED: "1"
+  DO_NOT_TRACK: "1"
+  BB_TELEMETRY: "false"
+
+jobs:
+  windows:
+    if: github.repository == 'yarxhe/bb'
+    runs-on: windows-2025
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install pnpm
+        run: npm install --global pnpm@9.15.0 --ignore-scripts
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Build Windows installer
+        run: pnpm exec turbo run desktop:build:win --filter=@bb/desktop --output-logs=new-only
+      - name: Launch packaged app and verify renderer and preload
+        run: pnpm exec turbo run smoke:packaged --filter=@bb/desktop --force --output-logs=new-only
+      - name: Generate Windows update feed
+        run: pnpm exec turbo run desktop:version-feed --filter=@bb/desktop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bb-windows-x64
+          if-no-files-found: error
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.blockmap
+            apps/desktop/release/latest.yml
+            apps/desktop/release/desktop-version-windows.json
+      - name: Publish verified Windows artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh release view desktop-latest >/dev/null 2>&1; then
+            gh release create desktop-latest --target "$GITHUB_SHA" --title "BB fork desktop builds" --prerelease --notes $'Unsigned fork builds. Windows artifacts pass packaged-app startup smoke checks before upload. SmartScreen may warn.\n\n> AGENT GENERATED'
+          fi
+          gh release upload desktop-latest apps/desktop/release/*.exe apps/desktop/release/*.blockmap apps/desktop/release/latest.yml apps/desktop/release/desktop-version-windows.json --clobber

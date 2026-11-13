@@ -671,10 +671,10 @@ describe("ThreadTableOfContents", () => {
     const railTicks = () =>
       Array.from(
         document.querySelectorAll<HTMLElement>(
-          "[data-thread-toc] [aria-hidden] > span",
+          "[data-message-shortcuts] button",
         ),
       );
-    expect(railTicks()[0]?.classList.contains("w-5")).toBe(true);
+    expect(railTicks()[0]?.getAttribute("aria-current")).toBe("location");
 
     act(() => {
       positions[0] = { top: -30, bottom: -10 };
@@ -682,14 +682,14 @@ describe("ThreadTableOfContents", () => {
       fireEvent.scroll(scrollElement);
       vi.advanceTimersByTime(119);
     });
-    expect(railTicks()[0]?.classList.contains("w-5")).toBe(true);
-    expect(railTicks()[1]?.classList.contains("w-5")).toBe(false);
+    expect(railTicks()[0]?.getAttribute("aria-current")).toBe("location");
+    expect(railTicks()[1]?.hasAttribute("aria-current")).toBe(false);
 
     act(() => {
       vi.advanceTimersByTime(1);
     });
-    expect(railTicks()[0]?.classList.contains("w-5")).toBe(false);
-    expect(railTicks()[1]?.classList.contains("w-5")).toBe(true);
+    expect(railTicks()[0]?.hasAttribute("aria-current")).toBe(false);
+    expect(railTicks()[1]?.getAttribute("aria-current")).toBe("location");
   });
 
   it("opens consistently from pointer and keyboard activation and preserves focus", () => {
@@ -1277,10 +1277,10 @@ function placeRowElements(
 
 function activeRailTickIndexes(): number[] {
   return Array.from(
-    document.querySelectorAll<HTMLElement>(
-      "[data-thread-toc] [aria-hidden] > span",
-    ),
-  ).flatMap((tick, index) => (tick.classList.contains("w-5") ? [index] : []));
+    document.querySelectorAll<HTMLElement>("[data-message-shortcuts] button"),
+  ).flatMap((tick, index) =>
+    tick.getAttribute("aria-current") === "location" ? [index] : [],
+  );
 }
 
 describe("ThreadTableOfContents timeline item cache", () => {

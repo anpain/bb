@@ -365,11 +365,8 @@ export async function createTestAppHarness(
       }),
     setupGuideExperiment: await createSetupGuideExperiment({
       dataDir,
-      fetch: () => Promise.reject(new Error("no PostHog in tests")),
-      flagTimeoutMs: 1_000,
       logger,
       override: null,
-      telemetry,
     }),
     config,
     db,

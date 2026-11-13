@@ -915,6 +915,26 @@ export function applySendThreadMessageSuccess({
   result,
   transaction,
 }: ApplySendThreadMessageSuccessArgs): void {
+  if (result.delivery === "dispatched") {
+    if (transaction?.kind === "accepted-turn") {
+      removeOptimisticTimelineRow(
+        queryClient,
+        request.id,
+        transaction.optimisticRowId,
+      );
+      transaction.prediction.fail();
+    }
+    if (transaction?.kind === "queued-message") {
+      removeOptimisticQueuedMessage(
+        queryClient,
+        request.id,
+        transaction.optimisticQueuedMessageId,
+      );
+    }
+    invalidateThreadListQueries({ queryClient });
+    invalidateThreadQueueQueries({ queryClient, threadId: request.id });
+    return;
+  }
   const optimisticCreatedAt = transaction?.optimisticCreatedAt ?? Date.now();
   if (result.delivery === "queued") {
     const optimisticTimelineRowRemoved =

@@ -308,6 +308,33 @@ const DefaultNewThreadComposer = memo(function DefaultNewThreadComposer({
           {modeConfig.banner}
         </ComposerBannersSlot>
       </div>
+      <div
+        data-new-thread-environment=""
+        className="relative z-0 mx-6 -mb-3 flex min-h-14 min-w-0 select-none items-center gap-3 rounded-t-2xl border border-b-0 border-border bg-surface-raised px-4 pb-3 text-sm"
+      >
+        <EnvironmentSlot
+          projectless={project?.value === null}
+          environment={modeConfig.environment}
+          worktree={modeConfig.worktree}
+          environmentProviderInputsSlot={
+            modeConfig.environmentProviderInputsSlot
+          }
+          machineProviderInputsSlot={modeConfig.machineProviderInputsSlot}
+        />
+        {project ? (
+          <ProjectSelector
+            projects={project.projects}
+            value={project.value}
+            onChange={project.onChange}
+            allowNoProject={project.allowNoProject ?? false}
+            createProject={project.createProject}
+            disabled={project.disabled}
+            isLoading={project.isLoading}
+            showChevronWhenDisabled={project.showChevronWhenDisabled}
+            className="shrink-0"
+          />
+        ) : null}
+      </div>
       <ComposerBox
         id={id}
         promptBoxRef={promptBoxRef}
@@ -334,49 +361,24 @@ const DefaultNewThreadComposer = memo(function DefaultNewThreadComposer({
         surface="new-thread"
         minHeight={NEW_THREAD_PROMPT_BOX_MIN_HEIGHT}
         placeholder={placeholder}
-        executionControls={<ExecutionControls {...execution} />}
-      />
-      <div
-        data-new-thread-footer=""
-        className="mt-1 flex select-none items-center justify-between gap-2 px-3.5 max-md:mt-0 max-md:gap-1 max-md:px-1"
-      >
-        <div className="flex min-w-0 flex-1 items-center gap-1">
-          {project ? (
-            <ProjectSelector
-              projects={project.projects}
-              value={project.value}
-              onChange={project.onChange}
-              allowNoProject={project.allowNoProject ?? false}
-              createProject={project.createProject}
-              disabled={project.disabled}
-              isLoading={project.isLoading}
-              showChevronWhenDisabled={project.showChevronWhenDisabled}
-              className="shrink-0"
+        executionControls={
+          <>
+            <PermissionModePicker
+              value={modeConfig.permission.value}
+              options={modeConfig.permission.options}
+              onChange={modeConfig.permission.onChange}
+              supported={modeConfig.permission.supported}
+              disabled={permissionPickerDisabledByPlanMode}
+              showChevronWhenDisabled={permissionPickerDisabledByPlanMode}
+              displayOverride={permissionDisplayOverride}
             />
-          ) : null}
-          <EnvironmentSlot
-            projectless={project?.value === null}
-            environment={modeConfig.environment}
-            worktree={modeConfig.worktree}
-            environmentProviderInputsSlot={
-              modeConfig.environmentProviderInputsSlot
-            }
-            machineProviderInputsSlot={modeConfig.machineProviderInputsSlot}
-          />
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {modeConfig.sessionOptionsControl}
-          <PermissionModePicker
-            value={modeConfig.permission.value}
-            options={modeConfig.permission.options}
-            onChange={modeConfig.permission.onChange}
-            supported={modeConfig.permission.supported}
-            disabled={permissionPickerDisabledByPlanMode}
-            showChevronWhenDisabled={permissionPickerDisabledByPlanMode}
-            displayOverride={permissionDisplayOverride}
-          />
-        </div>
-      </div>
+            <div className="ml-auto flex min-w-0 items-center gap-2">
+              {modeConfig.sessionOptionsControl}
+              <ExecutionControls {...execution} />
+            </div>
+          </>
+        }
+      />
     </div>
   );
 });

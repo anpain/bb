@@ -36,6 +36,15 @@ export const SETTINGS_SEARCH_INDEX: Record<
   SettingsSectionId,
   SettingsSearchSection
 > = {
+  servers: {
+    keywords: ["local", "remote", "server", "execution", "connection"],
+    settings: [
+      {
+        title: "Execution mode",
+        keywords: ["switch", "computer", "add server"],
+      },
+    ],
+  },
   general: {
     keywords: ["preferences"],
     settings: [
@@ -139,7 +148,18 @@ export const SETTINGS_SEARCH_INDEX: Record<
           "вход",
         ],
       },
-      { title: "Agent profiles", keywords: ["aliases", "dispatch", "codex", "kimi", "claude", "opencode", "кодекс", "кими", "клод", "опенкод", "default model"] },
+      {
+        title: "Agent profiles",
+        keywords: [
+          "aliases",
+          "dispatch",
+          "codex",
+          "kimi",
+          "claude",
+          "opencode",
+          "default model",
+        ],
+      },
       {
         title: "Allow faster service tiers",
         keywords: ["fast mode", "priority", "speed"],

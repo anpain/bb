@@ -100,6 +100,7 @@ import {
   BB_DESKTOP_GET_SERVER_CHOICES_CHANNEL,
   BB_DESKTOP_SERVER_CHOICES_CHANGED_CHANNEL,
   BB_DESKTOP_SELECT_SERVER_CHANNEL,
+  BB_DESKTOP_ADD_SERVER_CHANNEL,
   BB_DESKTOP_APP_COMMAND_CHANNEL,
   BB_DESKTOP_OPEN_WINDOW_FIND_CHANNEL,
   BB_DESKTOP_RELOAD_WINDOW_CHANNEL,
@@ -446,6 +447,9 @@ const bbDesktopApi: BbDesktopApi = {
   },
   selectServer(id) {
     ipcRenderer.send(BB_DESKTOP_SELECT_SERVER_CHANNEL, id);
+  },
+  addServer() {
+    ipcRenderer.send(BB_DESKTOP_ADD_SERVER_CHANNEL);
   },
   get lastCheckedAt() {
     return currentInfo.lastCheckedAt;

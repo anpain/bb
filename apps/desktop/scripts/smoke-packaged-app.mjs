@@ -85,12 +85,16 @@ function renderSmokePage(expectedDesktopPlatform, expectedDesktopVersion) {
       reason = "missing window.bbDesktop.getInfo";
     } else {
       const info = await window.bbDesktop.getInfo();
+      const choices = await window.bbDesktop.listServerChoices();
       const expectedPlatform = ${JSON.stringify(expectedDesktopPlatform)};
       const expectedVersion = ${JSON.stringify(expectedDesktopVersion)};
       ok =
         window.bbDesktop.platform === expectedPlatform &&
         window.bbDesktop.version === expectedVersion &&
-        info.version === expectedVersion;
+        info.version === expectedVersion &&
+        choices.some((choice) => choice.kind === "local") &&
+        typeof window.bbDesktop.selectServer === "function" &&
+        typeof window.bbDesktop.addServer === "function";
       reason = ok ? "" : "unexpected desktop bridge info";
     }
   } catch (error) {

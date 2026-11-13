@@ -9,6 +9,7 @@ import { createConnectServerSync } from "../src/connect-server-sync.js";
 import {
   BB_DESKTOP_GET_SERVER_CHOICES_CHANNEL,
   BB_DESKTOP_SELECT_SERVER_CHANNEL,
+  BB_DESKTOP_ADD_SERVER_CHANNEL,
 } from "../src/desktop-window-command-ipc.js";
 
 const ipc = vi.hoisted(() => ({ handle: vi.fn(), on: vi.fn() }));
@@ -71,6 +72,7 @@ describe("server choice IPC", () => {
       list: () =>
         buildDesktopServerChoices(store, servers, "http://127.0.0.1:1234/app"),
       select: async () => undefined,
+      add: async () => undefined,
       onError: () => undefined,
     });
     const list = ipc.handle.mock.calls.find(
@@ -131,6 +133,7 @@ describe("server choice IPC", () => {
 
   it("accepts only inactive native choices from the application main frame", async () => {
     const select = vi.fn(async () => undefined);
+    const add = vi.fn(async () => undefined);
     const onError = vi.fn();
     registerServerChoiceIpc({
       applicationWindowWebContentsIds: new Set([7]),
@@ -152,8 +155,18 @@ describe("server choice IPC", () => {
         },
       ],
       select,
+      add,
       onError,
     });
+    const addRequest = ipc.on.mock.calls.find(
+      ([channel]) => channel === BB_DESKTOP_ADD_SERVER_CHANNEL,
+    )?.[1];
+    if (!addRequest) throw new Error("Missing add handler");
+    addRequest({ ...event, senderFrame: {} });
+    addRequest({ ...event, sender: { id: 99, mainFrame: frame } });
+    expect(add).not.toHaveBeenCalled();
+    addRequest(event);
+    expect(add).toHaveBeenCalledTimes(1);
     const request = ipc.on.mock.calls.find(
       ([channel]) => channel === BB_DESKTOP_SELECT_SERVER_CHANNEL,
     )?.[1];

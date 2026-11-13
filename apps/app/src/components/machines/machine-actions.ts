@@ -13,6 +13,7 @@ export type MachineActionId =
   | "retry-update"
   | "lifecycle"
   | "move-server"
+  | "change-server"
   | "remove";
 
 export type MachineAction = Extract<
@@ -36,6 +37,7 @@ export interface MachineActionsArgs {
   onRetryCleanup?: () => void;
   onMoveServerHere: () => void;
   onRemove?: () => void;
+  onChangeServer?: () => void;
 }
 
 export function machineActions(args: MachineActionsArgs): MachineAction[] {
@@ -91,7 +93,14 @@ export function machineActions(args: MachineActionsArgs): MachineAction[] {
     });
 
   const onRemove = args.onRemove;
-  if (onRemove !== undefined)
+  if (args.isPrimary && args.onChangeServer !== undefined)
+    actions.push({
+      id: "change-server",
+      label: "Change execution mode",
+      icon: "Laptop",
+      onSelect: args.onChangeServer,
+    });
+  else if (onRemove !== undefined)
     actions.push({
       id: "remove",
       label: "Remove machine",

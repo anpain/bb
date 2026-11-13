@@ -122,3 +122,21 @@ describe("buildDesktopServerChoices", () => {
     });
   });
 });
+
+it("keeps local execution available in settings when hidden in the native menu", async () => {
+  const store = createStore();
+  await store.setCustomServerUrl("https://remote.example");
+  await store.setShowBuiltinServer(false);
+  expect(
+    buildDesktopServerChoices(store, [], LOCAL_URL).some(
+      (s) => s.kind === "local",
+    ),
+  ).toBe(false);
+  expect(buildDesktopServerChoices(store, [], LOCAL_URL, true)).toContainEqual({
+    id: "builtin",
+    name: BUILTIN_SERVER_NAME,
+    origin: LOCAL_URL,
+    kind: "local",
+    active: false,
+  });
+});

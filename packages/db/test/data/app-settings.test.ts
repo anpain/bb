@@ -22,6 +22,19 @@ describe("app settings data", () => {
     db.$client.close();
   });
 
+  it("upgrades legacy default aliases while retaining edited and custom profiles", () => {
+    const profiles = defaultAppSettings.agentProfiles.map((profile) => ({
+      ...profile,
+      aliases: profile.id === "codex" ? ["codex", "кодекс"] :
+        profile.id === "claude" ? ["claude", "клод", "myclaude"] : profile.aliases,
+    }));
+    profiles.push({ ...profiles[0]!, id: "custom", aliases: ["свой"] });
+    setAppSettings(db, { ...defaultAppSettings, agentProfiles: profiles });
+    expect(getAppSettings(db).agentProfiles.map((profile) => profile.aliases)).toEqual([
+      ["codex"], ["kimi"], ["claude", "клод", "myclaude"], ["opencode"], ["свой"],
+    ]);
+  });
+
   it("defaults archive confirmation to enabled and persists opting out", () => {
     expect(getAppSettings(db).confirmThreadArchive).toBe(true);
     setAppSettings(db, { ...defaultAppSettings, confirmThreadArchive: false });

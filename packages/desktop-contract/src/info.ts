@@ -75,6 +75,7 @@ export interface BbDesktopApi extends BbDesktopInfo {
     listener: (choices: BbDesktopServerChoice[]) => void,
   ): () => void;
   selectServer?(id: string): void;
+  addServer?(): void;
   checkForUpdates(): Promise<BbDesktopInfo>;
   getInfo(): Promise<BbDesktopInfo>;
   focusWindow?(): void;

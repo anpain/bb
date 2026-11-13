@@ -6,6 +6,7 @@ import { ipcMain } from "electron";
 import {
   BB_DESKTOP_GET_SERVER_CHOICES_CHANNEL,
   BB_DESKTOP_SELECT_SERVER_CHANNEL,
+  BB_DESKTOP_ADD_SERVER_CHANNEL,
 } from "./desktop-window-command-ipc.js";
 
 export function registerServerChoiceIpc({
@@ -13,14 +14,24 @@ export function registerServerChoiceIpc({
   onListRequested,
   list,
   select,
+  add,
   onError,
 }: {
   applicationWindowWebContentsIds: ReadonlySet<number>;
   onListRequested(): void;
   list(): BbDesktopServerChoice[];
   select(id: string): Promise<void>;
+  add(): Promise<void>;
   onError(error: unknown): void;
 }): void {
+  ipcMain.on(BB_DESKTOP_ADD_SERVER_CHANNEL, (event) => {
+    if (
+      !applicationWindowWebContentsIds.has(event.sender.id) ||
+      event.senderFrame !== event.sender.mainFrame
+    )
+      return;
+    void add().catch(onError);
+  });
   ipcMain.handle(BB_DESKTOP_GET_SERVER_CHOICES_CHANNEL, (event) => {
     if (
       !applicationWindowWebContentsIds.has(event.sender.id) ||

@@ -205,6 +205,7 @@ export function MachineSettingsHeader({
   canMoveServerHere: boolean;
   onMoveServerHere: () => void;
 }) {
+  const navigate = useNavigate();
   return (
     <div className="space-y-3">
       <Link
@@ -251,6 +252,7 @@ export function MachineSettingsHeader({
               onRename,
               onReconnect,
               onMoveServerHere,
+              onChangeServer: () => void navigate("/settings/servers"),
             })}
           />
         </div>

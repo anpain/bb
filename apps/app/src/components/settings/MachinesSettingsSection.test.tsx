@@ -24,7 +24,6 @@ import { serverMoveStatusQueryKey } from "@/hooks/queries/query-keys";
 import { createQueryClientTestHarness } from "@/test/queryClientTestHarness";
 import { makeSystemConfig } from "@/test/fixtures/system-config";
 import { MachinesSettingsSection } from "./MachinesSettingsSection";
-import { focusWithKeyboard } from "@/test/keyboard-focus";
 import { LocationProbe } from "@/test/location-probe";
 
 vi.mock("@/lib/sdk", () => ({
@@ -707,31 +706,22 @@ describe("MachinesSettingsSection", () => {
     });
   });
 
-  it("disables removal of the server machine", async () => {
+  it("offers execution mode switching for the server machine", async () => {
     vi.mocked(sdk.system.config).mockResolvedValue(systemConfig());
     vi.mocked(sdk.hosts.list).mockResolvedValue([primaryHost, offlineHost]);
     stubSidebarBootstrapFetch();
-
     renderSection();
-
     await screen.findByText("MacBook Pro");
     await openHostMenu("MacBook Pro");
-
-    const removeItem = await screen.findByRole("menuitem", {
-      name: "Remove machine",
+    const change = await screen.findByRole("menuitem", {
+      name: "Change execution mode",
     });
-    expect(removeItem.getAttribute("aria-disabled")).toBe("true");
-    expect(removeItem.textContent).toBe("Remove machine");
-    focusWithKeyboard(removeItem);
+    expect(change.getAttribute("aria-disabled")).not.toBe("true");
     expect(
-      await screen.findByRole("tooltip", {
-        name: "The server machine can't be removed. Move the server to another machine first.",
-      }),
-    ).toBeDefined();
-    fireEvent.click(removeItem);
-    expect(
-      screen.queryByRole("heading", { name: "Remove MacBook Pro?" }),
+      screen.queryByRole("menuitem", { name: "Remove machine" }),
     ).toBeNull();
+    fireEvent.click(change);
+    expect(await screen.findByText("/settings/servers")).toBeDefined();
     expect(vi.mocked(sdk.hosts.delete)).not.toHaveBeenCalled();
   });
 
@@ -774,14 +764,12 @@ describe("MachinesSettingsSection", () => {
       expect(screen.queryByRole("menu")).toBeNull();
     });
     await openHostMenu("MacBook Pro");
-    focusWithKeyboard(
-      await screen.findByRole("menuitem", { name: "Remove machine" }),
-    );
     expect(
-      await screen.findByRole("tooltip", {
-        name: "The server machine can't be removed.",
-      }),
+      await screen.findByRole("menuitem", { name: "Change execution mode" }),
     ).toBeDefined();
+    expect(
+      screen.queryByRole("menuitem", { name: "Remove machine" }),
+    ).toBeNull();
   });
 
   it("keeps a dialog chosen from the row menu with the keyboard open", async () => {

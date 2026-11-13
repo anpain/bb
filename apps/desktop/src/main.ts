@@ -763,6 +763,7 @@ function listServerChoices() {
     serverTargetStore,
     listMenuConnectServers(),
     builtinServerUrl,
+    true,
   );
 }
 
@@ -2391,6 +2392,7 @@ function registerDesktopUpdateIpc(): void {
     onListRequested: () => connectServerSync?.onListRequested(),
     list: listServerChoices,
     select: setActiveServerTarget,
+    add: () => openSetServerUrlDialog(true),
     onError: (error) =>
       desktopLogger.error(`Could not switch server: ${String(error)}`),
   });

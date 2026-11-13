@@ -183,6 +183,7 @@ export function MachineRowContent({
                 onRetryCleanup,
                 onMoveServerHere,
                 onRemove,
+                onChangeServer: () => void navigate("/settings/servers"),
               })}
             />
             <ResourceRowDetailChevron />

@@ -28,6 +28,13 @@ Context variables set automatically inside a thread environment:
 Outside a thread the CLI targets http://127.0.0.1:38886; set BB_SERVER_URL (and
 BB_HOST_DAEMON_PORT) only for a deliberate non-default target.
 
+In bb Desktop, Settings → Execution mode switches between the embedded local
+server and saved remote servers; Add server opens the native address dialog.
+Each server keeps its own files, history, provider installations and sign-ins.
+The equivalent CLI target is `BB_SERVER_URL=http://127.0.0.1:38886` for local bb
+or the remote URL (for example `http://127.0.0.1:48886` for an SSH forward).
+The Node SDK uses `createNodeBbSdk({ baseUrl: "http://127.0.0.1:48886" })`.
+
 Run `bb status` to see your current context (resolved project and thread IDs).
 It also warns when an enabled plugin is not running (incompatible after a bb
 upgrade, failed to load, or missing); run `bb plugin list` for the detail.

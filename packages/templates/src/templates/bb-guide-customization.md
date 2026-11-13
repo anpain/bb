@@ -487,7 +487,7 @@ or use `bb settings agent-profiles show --json` and
 `bb settings agent-profiles replace profiles.json` (a JSON array). The SDK uses
 `system.config().generalSettings.agentProfiles` and `system.updateGeneralSettings`.
 Choose an actual installed catalog model before dispatch. Aliases include
-codex/кодекс, kimi/кими, claude/клод, opencode/опенкод/опен; aliases are editable.
+codex, kimi, claude, opencode; aliases are editable.
 `bb thread tell <thread-id> '@kimi review this'` uses the same server
 path as chat. Each explicit profile gets a separate linked child task, with
 existing thread status/results and parent notifications. Only the text is sent;

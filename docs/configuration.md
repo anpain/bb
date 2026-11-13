@@ -1535,8 +1535,9 @@ deleted while no build runs.
 
 Desktop Settings → Server → **Show This Mac** (or **Show This Computer** off macOS)
 defaults to checked and is disabled while This Mac/Computer is selected.
-Unchecking hides the built-in server from server choices
-while another server is active and alternatives exist. It stays listed when
+Unchecking hides the built-in server from the native menu
+while another server is active and alternatives exist. Settings → Execution mode
+always offers the local server. It stays listed when
 active or when it is the only choice. This setting does not stop the local
 runtime or change the active server.
 
@@ -1584,8 +1585,7 @@ Settings → Providers → Agent profiles stores named profiles in general setti
 (`agentProfiles`). Each profile has a unique `id`, `name`, `providerId`, explicit
 catalog `model` (null means not configured), `aliases`, and nullable
 `reasoningLevel`/`serviceTier`. Aliases are unique, case-insensitive words without
-`@`. Defaults include codex/кодекс, kimi/кими, claude/клод, and
-opencode/опенкод/опен. Multiple profiles may use the same provider.
+`@`. Defaults include codex, kimi, claude, and opencode. Multiple profiles may use the same provider.
 
 Use `bb settings agent-profiles show --json` and
 `bb settings agent-profiles replace profiles.json`, or the SDK's existing
@@ -1613,3 +1613,29 @@ credentials, starts login, or sends a model prompt to poll quotas. The short-liv
 service is stopped after collection and has Kimi telemetry disabled. CLI versions
 without this API report unavailable data. Windows and booster credits are shown
 only when supplied by that API.
+
+
+### Local and remote execution
+
+In bb Desktop, Settings → Execution mode selects **Local on this computer** or a
+saved remote server. **Add server** opens the native address dialog; an SSH
+forward such as `http://127.0.0.1:48886` is also a remote connection. Local mode
+uses the embedded bb server and this computer's files and provider CLIs. Remote
+mode uses the selected server's files and providers. Switching preserves both
+servers' separate histories, settings and account credentials; it does not copy
+data or sign in to providers. Cloud models require internet in either mode.
+This controls bb requests, not the computer's system proxy or VPN.
+
+The primary machine's menu offers **Change execution mode**. Remove machine
+revokes additional worker machines; the running server remains its primary host.
+A web browser uses the server at its current URL; use bb Desktop for the local
+runtime and saved connection picker.
+
+The CLI selects the same execution target with `BB_SERVER_URL` (local default
+`http://127.0.0.1:38886`, SSH-forwarded server `http://127.0.0.1:48886`). The Node
+SDK accepts `createNodeBbSdk({ baseUrl: "http://127.0.0.1:48886" })`. These target
+individual clients; the desktop saves its selection separately.
+
+Built-in agent profile aliases default to English names. Stored profiles with
+an unchanged legacy default alias list are upgraded when settings are read.
+Edited alias lists and custom profiles remain user configurable.

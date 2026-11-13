@@ -114,7 +114,27 @@ function parseAppSettingsRows(rows: readonly StoredSettingRow[]): AppSettings {
     if (value.success) values[key.data] = value.data;
   }
 
-  return appSettingsSchema.parse(values);
+  const settings = appSettingsSchema.parse(values);
+  const legacyAliases: Record<string, readonly string[]> = {
+    codex: ["codex", "кодекс"],
+    kimi: ["kimi", "кими"],
+    claude: ["claude", "клод"],
+    opencode: ["opencode", "опенкод", "опен"],
+  };
+  return {
+    ...settings,
+    agentProfiles: settings.agentProfiles.map((profile) => {
+      const legacy = legacyAliases[profile.id];
+      const standard = defaultAppSettings.agentProfiles.find(
+        (entry) => entry.id === profile.id && entry.providerId === profile.providerId,
+      );
+      return standard && legacy &&
+        profile.aliases.length === legacy.length &&
+        profile.aliases.every((alias, index) => alias === legacy[index])
+        ? { ...profile, aliases: [...standard.aliases] }
+        : profile;
+    }),
+  };
 }
 
 export function setAppSettings(db: DbConnection, settings: AppSettings): void {

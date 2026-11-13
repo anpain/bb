@@ -74,6 +74,7 @@ import { UpdatesSettingsSection } from "@/components/settings/UpdatesSettingsSec
 import { KeyboardSettingsSection } from "@/components/settings/KeyboardSettingsSection";
 import { BrowserSettingsSection } from "@/components/settings/BrowserSettingsSection";
 import { MachinesSettingsSection } from "@/components/settings/MachinesSettingsSection";
+import { ExecutionModeSettings } from "@/components/settings/ExecutionModeSettings";
 import { ProjectsSettingsSection } from "@/components/settings/ProjectsSettingsSection";
 import { ArchivedThreadsSettingsSection } from "@/components/settings/ArchivedThreadsSettingsSection";
 import { CliCommandSettingsSection } from "@/components/settings/CliCommandSettingsSection";
@@ -1418,6 +1419,8 @@ export function SettingsView() {
         <MachineAccessSettings />
       </>
     );
+  } else if (activeSection === "servers") {
+    content = <ExecutionModeSettings />;
   } else if (activeSection === "environment-variables") {
     content = <MachineEnvironmentSettings />;
   } else if (activeSection === "updates") {

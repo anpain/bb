@@ -14,10 +14,12 @@ export function buildDesktopServerChoices(
   store: ServerTargetStore | null,
   connectServers: readonly ConnectServerRef[],
   builtinServerUrl: string,
+  includeBuiltin = false,
 ): BbDesktopServerChoice[] {
   const target = store?.getTarget() ?? { kind: "builtin" };
   const customUrls = store?.getCustomServerUrls() ?? [];
   const showBuiltin =
+    includeBuiltin ||
     (store?.getShowBuiltinServer() ?? true) ||
     target.kind === "builtin" ||
     (connectServers.length === 0 && customUrls.length === 0);

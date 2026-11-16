@@ -17,6 +17,21 @@ window.addEventListener("DOMContentLoaded", () => {
     form.querySelectorAll<HTMLInputElement>("input[name=chat]"),
   );
   const remote = form.querySelector<HTMLInputElement>("input[name=remote]");
+  const search = form.querySelector<HTMLInputElement>("[data-search]");
+  const noMatches = form.querySelector<HTMLElement>("[data-no-matches]");
+  const rows = Array.from(
+    form.querySelectorAll<HTMLElement>("[data-chat]"),
+    (row) => ({ row, text: (row.textContent ?? "").toLocaleLowerCase() }),
+  );
+  search?.addEventListener("input", () => {
+    const terms = search.value.trim().toLocaleLowerCase().split(/\s+/u);
+    let hasMatches = false;
+    for (const { row, text } of rows) {
+      row.hidden = !terms.every((term) => text.includes(term));
+      hasMatches ||= !row.hidden;
+    }
+    if (noMatches !== null) noMatches.hidden = hasMatches;
+  });
   let busy = false;
   const selected = () =>
     choices
@@ -25,6 +40,8 @@ window.addEventListener("DOMContentLoaded", () => {
   const refresh = () => {
     const count = selected().length;
     submit.disabled = busy || count === 0 || count > 100;
+    submit.textContent =
+      count === 0 ? "Import selected" : `Import selected (${count})`;
     close.disabled = busy;
     for (const choice of choices) choice.disabled = busy;
     if (remote !== null) remote.disabled = busy;

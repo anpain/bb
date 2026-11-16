@@ -1016,7 +1016,9 @@ export function railUsageWindows(
       windows.filter((window) => /five.hour|5.hour|daily/iu.test(window.label)),
     ),
     worst(windows.filter((window) => /weekly/iu.test(window.label))) ??
-      worst(windows.filter((window) => /monthly/iu.test(window.label))),
+      worst(
+        windows.filter((window) => /monthly|^plan usage$/iu.test(window.label)),
+      ),
   ];
 }
 
@@ -1034,7 +1036,23 @@ function ProviderUsageRail({
   );
   const machine = useUsageMachine(snapshot);
   const groups = new Map<string, UsageProvider[]>();
-  for (const provider of machine?.providers ?? []) {
+  const hostMachine = machine?.id.startsWith("source:")
+    ? (snapshot.data?.machines.find(
+        (candidate) =>
+          !candidate.id.startsWith("source:") &&
+          candidate.status === "connected",
+      ) ?? null)
+    : machine;
+  const selectedProviderIds = new Set(
+    machine?.providers.map((provider) => provider.providerId),
+  );
+  const providers = [
+    ...(machine?.providers ?? []),
+    ...(hostMachine?.providers.filter(
+      (provider) => !selectedProviderIds.has(provider.providerId),
+    ) ?? []),
+  ];
+  for (const provider of providers) {
     if (provider.usage?.status === "not_installed") continue;
     const group = groups.get(provider.providerId) ?? [];
     group.push(provider);
@@ -1067,119 +1085,141 @@ function ProviderUsageRail({
   }
   return (
     <div className="flex flex-col items-center gap-4">
-      {[...groups].map(([id, accounts]) => {
-        const provider = accounts[0]!;
-        const windows = [0, 1].map((index) =>
-          accounts
-            .map(railUsageWindows)
-            .map((values) => values[index])
-            .reduce<UsageWindowValue | null>(
-              (worst, value) =>
-                value && (!worst || value.usedPercent > worst.usedPercent)
-                  ? value
-                  : worst,
-              null,
-            ),
-        );
-        return (
-          <Popover
-            key={id}
-            onOpenChange={(open) => {
-              if (!open || !machine) return;
-              void refreshUsage({
-                pluginId,
-                force: false,
-                machineIds: [machine.id],
-                maxAgeMs: CARD_MAX_AGE_MS,
-                providerIds: [id],
-              });
-            }}
-          >
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`${provider.displayName} usage: ${windows.map((window, index) => (window ? `${window.label}, ${Math.max(0, Math.min(100, 100 - window.usedPercent)).toFixed(0)}% remaining` : `${index === 0 ? "Short-period" : "Weekly"} limit not reported`)).join("; ")}`}
-                    className="relative flex size-(--bb-sidebar-control-size) items-center justify-center rounded-md p-0 data-[state=open]:bg-state-active"
-                  >
-                    <ProviderIcon
-                      providerKind="agent"
-                      provider={
-                        directory.providers.find(
-                          (entry) => entry.id === id,
-                        ) ?? {
-                          ...provider,
-                          id,
-                        }
-                      }
-                      className="size-4"
-                    />
-                    <svg
-                      viewBox="0 0 40 40"
-                      aria-hidden="true"
-                      className="pointer-events-none absolute size-8 overflow-visible"
-                      fill="none"
-                      strokeWidth="2.3"
-                      strokeLinecap="round"
+      {[...groups]
+        .flatMap(([id, accounts]) =>
+          accounts.map((provider, index) => ({
+            id,
+            provider,
+            marker: accounts.length > 1 ? index + 1 : null,
+          })),
+        )
+        .map(({ id, provider, marker }) => {
+          const accounts = [provider];
+          const windows = railUsageWindows(provider);
+          const accountName =
+            provider.accountLabel ??
+            (provider.usage?.status === "ok"
+              ? provider.usage.accountEmail
+              : null);
+          const label = `${provider.displayName}${marker === null ? "" : ` · ${accountName ?? `Account ${marker}`}`}`;
+          return (
+            <Popover
+              key={provider.id}
+              onOpenChange={(open) => {
+                if (!open) return;
+                void refreshUsage({
+                  pluginId,
+                  force: accounts.every(
+                    (account) => account.usage?.status !== "ok",
+                  ),
+                  machineIds: machine?.providers.some(
+                    (account) => account.id === provider.id,
+                  )
+                    ? [machine.id]
+                    : hostMachine === null
+                      ? null
+                      : [hostMachine.id],
+                  maxAgeMs: CARD_MAX_AGE_MS,
+                  providerIds: [id],
+                });
+              }}
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`${label} usage: ${windows.map((window, index) => (window ? `${window.label}, ${Math.max(0, Math.min(100, 100 - window.usedPercent)).toFixed(0)}% remaining` : `${index === 0 ? "Short-period" : "Weekly"} limit not reported`)).join("; ")}`}
+                      className="relative flex size-(--bb-sidebar-control-size) items-center justify-center rounded-md p-0 data-[state=open]:bg-state-active"
                     >
-                      {windows.map((window, index) => (
-                        <g key={index}>
-                          <path
-                            d={
-                              index === 0
-                                ? "M7 10 A17 17 0 0 1 33 10"
-                                : "M4 19 A16 16 0 1 0 36 19"
-                            }
-                            className="stroke-muted-foreground/30"
-                          />
-                          {window ? (
+                      <ProviderIcon
+                        providerKind="agent"
+                        provider={
+                          directory.providers.find(
+                            (entry) => entry.id === id,
+                          ) ?? {
+                            ...provider,
+                            id,
+                          }
+                        }
+                        className="size-4"
+                      />
+                      <svg
+                        viewBox="0 0 40 40"
+                        aria-hidden="true"
+                        className="pointer-events-none absolute size-8 overflow-visible"
+                        fill="none"
+                        strokeWidth="2.3"
+                        strokeLinecap="round"
+                      >
+                        {windows.map((window, index) => (
+                          <g key={index}>
                             <path
                               d={
                                 index === 0
                                   ? "M7 10 A17 17 0 0 1 33 10"
                                   : "M4 19 A16 16 0 1 0 36 19"
                               }
-                              className={cn(
-                                "stroke-current",
-                                usageToneTextClass(window.usedPercent),
-                              )}
-                              pathLength="100"
-                              strokeDasharray={`${Math.max(0, Math.min(100, 100 - window.usedPercent))} 100`}
+                              className="stroke-muted-foreground/30"
                             />
-                          ) : null}
-                        </g>
-                      ))}
-                    </svg>
-                  </Button>
-                </PopoverTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                {windows[0]
-                  ? `${windows[0].label} · ${Math.max(0, Math.min(100, 100 - windows[0].usedPercent)).toFixed(0)}% remaining`
-                  : `${provider.displayName} · Limit not reported`}
-              </TooltipContent>
-            </Tooltip>
-            <PopoverContent
-              side="right"
-              align="end"
-              mobileTitle={`${provider.displayName} usage`}
-              className="max-h-[min(32rem,80svh)] w-80 overflow-y-auto p-3"
-            >
-              <div className="grid gap-2">
-                <ProviderAccounts
-                  accounts={accounts}
-                  loading={snapshot.isRefreshing}
-                  unavailable={snapshot.error !== null}
-                  showProvider={true}
-                  framed={false}
-                />
-              </div>
-            </PopoverContent>
-          </Popover>
-        );
-      })}
+                            {window ? (
+                              <path
+                                d={
+                                  index === 0
+                                    ? "M7 10 A17 17 0 0 1 33 10"
+                                    : "M4 19 A16 16 0 1 0 36 19"
+                                }
+                                className={cn(
+                                  "stroke-current",
+                                  usageToneTextClass(window.usedPercent),
+                                )}
+                                pathLength="100"
+                                strokeDasharray={`${Math.max(0, Math.min(100, 100 - window.usedPercent))} 100`}
+                              />
+                            ) : null}
+                          </g>
+                        ))}
+                      </svg>
+                      {marker === null ? null : (
+                        <span
+                          aria-hidden="true"
+                          className="absolute -right-1 -bottom-1 flex size-3.5 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-2xs font-medium tabular-nums text-sidebar-foreground"
+                        >
+                          {marker}
+                        </span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  {accountName === null ? null : (
+                    <div className="font-medium">{accountName}</div>
+                  )}
+                  {windows[0]
+                    ? `${windows[0].label} · ${Math.max(0, Math.min(100, 100 - windows[0].usedPercent)).toFixed(0)}% remaining`
+                    : `${provider.displayName} · Limit not reported`}
+                </TooltipContent>
+              </Tooltip>
+              <PopoverContent
+                side="right"
+                align="end"
+                mobileTitle={`${label} usage`}
+                className="max-h-[min(32rem,80svh)] w-80 overflow-y-auto p-3"
+              >
+                <div className="grid gap-2">
+                  <ProviderAccounts
+                    accounts={accounts}
+                    loading={snapshot.isRefreshing}
+                    unavailable={snapshot.error !== null}
+                    showProvider={true}
+                    framed={false}
+                  />
+                </div>
+              </PopoverContent>
+            </Popover>
+          );
+        })}
     </div>
   );
 }

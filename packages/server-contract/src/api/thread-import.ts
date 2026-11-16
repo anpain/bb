@@ -7,14 +7,23 @@ export const chatImportRequestSchema = z
     providerId: chatImportProviderSchema,
     sourceId: z.string().min(1).max(256),
     title: z.string().trim().min(1).max(200),
+    projectId: z.string().min(1).optional(),
     messages: z
       .array(
         z
           .object({
             role: z.enum(["user", "assistant"]),
             text: z.string().min(1).max(chatImportMaxBytes),
+            images: z
+              .array(z.string().min(1).max(chatImportMaxBytes))
+              .max(100)
+              .optional(),
           })
-          .strict(),
+          .strict()
+          .refine(
+            (message) => message.role === "user" || !message.images?.length,
+            "Image attachments must belong to user messages",
+          ),
       )
       .min(1)
       .max(10_000),

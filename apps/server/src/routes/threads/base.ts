@@ -407,8 +407,8 @@ export function registerThreadBaseRoutes(app: Hono, deps: AppDeps): void {
     return context.json(toThreadResponseFromThread(deps, { thread }), 201);
   });
 
-  post(routes.importChat, (context, payload) =>
-    context.json(importChat(deps, payload), 201),
+  post(routes.importChat, async (context, payload) =>
+    context.json(await importChat(deps, payload), 201),
   );
 
   post(routes.fork, async (context, payload) => {

@@ -36,6 +36,8 @@ const CURSOR_DASHBOARD_URL =
 const CURSOR_KEYCHAIN_ACCOUNT = "cursor-user";
 const CURSOR_ACCESS_TOKEN_SERVICE = "cursor-access-token";
 const CURSOR_INSTALL_SCRIPT_URL = "https://cursor.com/install";
+const CURSOR_WINDOWS_INSTALL_SCRIPT_URL =
+  "https://cursor.com/install?win32=true";
 
 function cursorAuthFilePath(): string {
   if (process.platform === "win32") {
@@ -494,7 +496,10 @@ export async function getAcpProviderUsage(args: {
 
 export const CURSOR_ACP_MAINTENANCE: AcpMaintenanceDialect = {
   loginCommand: "cursor-agent login",
-  installer: () => downloadedInstallerCommand(CURSOR_INSTALL_SCRIPT_URL),
+  installer: () =>
+    downloadedInstallerCommand(CURSOR_INSTALL_SCRIPT_URL, {
+      powershellUrl: CURSOR_WINDOWS_INSTALL_SCRIPT_URL,
+    }),
   readAccount: async (command) => {
     const status = await readCursorCliAuthStatus(command);
     if (status !== null) return status ? { email: readAccountEmail() } : null;

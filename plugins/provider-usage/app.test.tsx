@@ -76,6 +76,116 @@ function threadOnMachine(
 }
 
 describe("provider usage footer disclosure", () => {
+  it("shows host provider limits alongside accounts from a shared pool", async () => {
+    const provider = (id: string, name: string): UsageProvider => ({
+      id,
+      providerId: id,
+      accountLabel: null,
+      displayName: name,
+      logoUrl: null,
+      icon: null,
+      strings: { iconTint: null },
+      signInHint: "Sign in",
+      expiredHint: "Sign in again",
+      usage: {
+        status: "ok",
+        accountEmail: null,
+        planLabel: "Pro",
+        windows: [
+          { label: "Plan usage", usedPercent: 12, resetsAt: null, cost: null },
+        ],
+      },
+    });
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        ok: true,
+        result: {
+          machines: [
+            {
+              id: "host-local",
+              displayName: "Local",
+              status: "connected",
+              error: null,
+              providers: [provider("acp-cursor", "Cursor")],
+            },
+            {
+              id: "source:account-pool",
+              displayName: "Account Pooler",
+              status: "connected",
+              error: null,
+              providers: [
+                {
+                  ...provider("codex", "Codex"),
+                  accountLabel: "personal@example.com",
+                },
+                {
+                  ...provider("codex", "Codex"),
+                  id: "codex-work",
+                  accountLabel: "work@example.com",
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const app = await loadPluginApp(() => import("./app"));
+    const mounted = await mountPluginContentScripts(app, {
+      pluginId: "bb--provider-usage",
+    });
+    try {
+      const item = app.experimentalSidebarFooterItems[0];
+      if (item?.kind !== "disclosure" || !item.experimental_railContent)
+        throw new Error("missing rail");
+      const Rail = item.experimental_railContent;
+      const rail = renderSlot(
+        {
+          component: () =>
+            createElement(
+              TooltipProvider,
+              null,
+              createElement(Rail, { providerIds: [] }),
+            ),
+        },
+        {},
+        { pluginId: "bb--provider-usage" },
+      );
+      const cursor = await waitFor(() =>
+        rail.getByRole("button", {
+          name: /Cursor usage:.*Plan usage, 88% remaining/u,
+        }),
+      );
+      const codexButtons = rail.getAllByRole("button", {
+        name: /Codex.*usage:/u,
+      });
+      expect(codexButtons).toHaveLength(2);
+      expect(codexButtons[0]?.textContent).toBe("1");
+      expect(codexButtons[1]?.textContent).toBe("2");
+      expect(codexButtons[0]?.getAttribute("aria-label")).toContain(
+        "personal@example.com",
+      );
+      expect(codexButtons[1]?.getAttribute("aria-label")).toContain(
+        "work@example.com",
+      );
+      fireEvent.click(cursor);
+      await waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith(
+          "/api/v1/plugins/bb--provider-usage/rpc/getUsage",
+          expect.objectContaining({
+            body: JSON.stringify({
+              force: false,
+              machineIds: ["host-local"],
+              maxAgeMs: 60_000,
+              providerIds: ["acp-cursor"],
+            }),
+          }),
+        ),
+      );
+    } finally {
+      await mounted.lifecycle.dispose();
+    }
+  });
   it("keeps missing periods unknown and preserves the monthly fallback label", () => {
     const provider: UsageProvider = {
       id: "account",
@@ -123,6 +233,12 @@ describe("provider usage footer disclosure", () => {
     expect(
       railUsageWindows(provider).map((window) => window?.label ?? null),
     ).toEqual([null, "Monthly limit"]);
+    provider.usage.windows = [
+      { label: "Plan usage", usedPercent: 0, resetsAt: null, cost: null },
+    ];
+    expect(
+      railUsageWindows(provider).map((window) => window?.label ?? null),
+    ).toEqual([null, "Plan usage"]);
     provider.usage = { status: "error", message: "Offline" };
     expect(railUsageWindows(provider)).toEqual([null, null]);
   });

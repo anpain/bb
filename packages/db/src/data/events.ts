@@ -1711,7 +1711,7 @@ export function listStoredEventRowMetadata(
 }
 
 export function listStoredEventRows(
-  db: DbConnection,
+  db: DbQueryConnection,
   args: ListStoredEventRowsArgs,
 ): StoredEventRow[] {
   if (args.types?.length === 0) {

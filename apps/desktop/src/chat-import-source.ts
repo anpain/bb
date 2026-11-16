@@ -1,4 +1,5 @@
 import { createReadStream } from "node:fs";
+import { createHash } from "node:crypto";
 import { lstat, readdir, readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -15,7 +16,9 @@ export interface SavedChat {
   title: string;
   cwd: string | null;
   updatedAt: number;
+  archived: boolean;
   path: string;
+  paths?: string[];
   root: string;
 }
 
@@ -33,7 +36,7 @@ const userMeta = z.object({
   payload: z.object({
     id: sessionId,
     cwd: z.string().optional(),
-    session_id: sessionId.optional(),
+    source: z.unknown().optional(),
   }),
 });
 const kimiMeta = z.object({
@@ -42,6 +45,7 @@ const kimiMeta = z.object({
   cwd: z.string().nullish(),
 });
 const maxFilesPerProvider = 500;
+const codexIndexEntry = z.object({ id: sessionId, thread_name: z.string() });
 
 function parsedLine(line: string): unknown {
   try {
@@ -63,7 +67,57 @@ function textContent(value: unknown): string {
 }
 
 function message(role: Message["role"], text: string): Message[] {
-  return text.trim() ? [{ role, text }] : [];
+  const images =
+    role === "user"
+      ? Array.from(
+          text.matchAll(
+            /(?:<image\b[^>]*\bpath="([^"]+)"|^## [^\r\n]+\.(?:png|jpe?g|gif|webp):\s*([^\r\n]+))/gimu,
+          ),
+          (match) => match[1] ?? match[2] ?? "",
+        ).filter(Boolean)
+      : [];
+  return text.trim()
+    ? [
+        {
+          role,
+          text,
+          ...(images.length ? { images: [...new Set(images)] } : {}),
+        },
+      ]
+    : [];
+}
+
+function contentImages(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((block: unknown) => {
+    const image = z
+      .object({
+        type: z.enum(["image_url", "input_image", "image"]),
+        image_url: z
+          .union([z.string(), z.object({ url: z.string() })])
+          .optional(),
+        url: z.string().optional(),
+      })
+      .safeParse(block);
+    if (!image.success) return [];
+    const reference =
+      typeof image.data.image_url === "string"
+        ? image.data.image_url
+        : (image.data.image_url?.url ?? image.data.url);
+    return reference ? [reference] : [];
+  });
+}
+
+function codexMessage(role: Message["role"], text: string): Message[] {
+  const trimmed = text.trimStart();
+  if (
+    role === "user" &&
+    /^(?:The following is the Codex agent history added since your last approval assessment|<environment_context>|<user_instructions>|# AGENTS\.md instructions)/u.test(
+      trimmed,
+    )
+  )
+    return [];
+  return message(role, text);
 }
 
 function codexMessages(row: Record<string, unknown>): {
@@ -78,11 +132,18 @@ function codexMessages(row: Record<string, unknown>): {
       const parsed = record.safeParse(data.item);
       if (parsed.success) {
         const item = parsed.data;
-        if (item.type === "UserMessage")
+        if (item.type === "UserMessage") {
+          const messages = codexMessage("user", textContent(item.content));
+          const images = contentImages(item.content);
+          if (messages[0] && images.length)
+            messages[0].images = [
+              ...new Set([...(messages[0].images ?? []), ...images]),
+            ];
           return {
-            preferred: message("user", textContent(item.content)),
+            preferred: messages,
             fallback: [],
           };
+        }
         if (item.type === "AgentMessage")
           return {
             preferred: message("assistant", textContent(item.content)),
@@ -91,13 +152,37 @@ function codexMessages(row: Record<string, unknown>): {
       }
     }
     if (data.type === "user_message" && typeof data.message === "string") {
-      return { preferred: [], fallback: message("user", data.message) };
+      return { preferred: [], fallback: codexMessage("user", data.message) };
     }
     if (data.type === "agent_message" && typeof data.message === "string") {
       return { preferred: [], fallback: message("assistant", data.message) };
     }
   }
   return { preferred: [], fallback: [] };
+}
+
+function codexResponseMessage(row: Record<string, unknown>): Message[] {
+  if (row.type !== "response_item") return [];
+  const parsed = z
+    .object({
+      type: z.literal("message"),
+      role: messageRole,
+      content: z.unknown(),
+    })
+    .safeParse(row.payload);
+  if (!parsed.success) return [];
+  const messages = codexMessage(
+    parsed.data.role,
+    textContent(parsed.data.content),
+  );
+  const images =
+    parsed.data.role === "user" ? contentImages(parsed.data.content) : [];
+  if (images.length) {
+    const item = messages[0];
+    if (item) item.images = [...new Set([...(item.images ?? []), ...images])];
+    else messages.push({ role: "user", text: "Image attachment", images });
+  }
+  return messages;
 }
 
 function kimiMessages(row: Record<string, unknown>): Message[] {
@@ -173,7 +258,23 @@ async function* filesAt(
   }
 }
 
-async function codexSessions(root: string): Promise<SavedChat[]> {
+async function readCodexTitles(home: string): Promise<Map<string, string>> {
+  const titles = new Map<string, string>();
+  const file = path.join(home, "session_index.jsonl");
+  await readLines(await safeFile(await realpath(home), file), (row) => {
+    const entry = codexIndexEntry.safeParse(row);
+    if (!entry.success) return;
+    const title = displayTitle(entry.data.thread_name);
+    if (title) titles.set(entry.data.id, title);
+  });
+  return titles;
+}
+
+async function codexSessions(
+  root: string,
+  titles: ReadonlyMap<string, string>,
+  archived: boolean,
+): Promise<SavedChat[]> {
   const chats: SavedChat[] = [];
   for await (const file of filesAt(
     root,
@@ -186,27 +287,41 @@ async function codexSessions(root: string): Promise<SavedChat[]> {
       let metadata: z.infer<typeof userMeta>["payload"] | undefined;
       let title = "";
       let rows = 0;
+      let subagent = false;
       await readLines(sourcePath, (row) => {
         rows += 1;
         const meta = userMeta.safeParse(row);
-        if (meta.success) metadata = meta.data.payload;
+        if (meta.success && metadata === undefined) {
+          metadata = meta.data.payload;
+          const source = record.safeParse(metadata.source);
+          subagent = source.success && "subagent" in source.data;
+          if (subagent) return false;
+          const indexedTitle = titles.get(metadata.id);
+          if (indexedTitle) {
+            title = indexedTitle;
+            return false;
+          }
+        }
         const entry = record.safeParse(row);
         if (entry.success) {
           const { preferred, fallback } = codexMessages(entry.data);
-          const user = [...preferred, ...fallback].find(
-            (item) => item.role === "user",
-          );
-          if (user) title = displayTitle(user.text);
+          const user = [
+            ...preferred,
+            ...fallback,
+            ...codexResponseMessage(entry.data),
+          ].find((item) => item.role === "user");
+          if (user && !title) title = displayTitle(user.text);
         }
         return rows < 80 && !(metadata && title);
       });
-      if (!metadata) return null;
+      if (!metadata || subagent || !title) return null;
       return {
         providerId: "codex",
         sourceId: metadata.id,
-        title: title || "Codex chat",
+        title,
         cwd: metadata.cwd ?? null,
         updatedAt: (await stat(sourcePath)).mtimeMs,
+        archived,
         path: sourcePath,
         root,
       };
@@ -238,6 +353,7 @@ async function kimiSessions(root: string): Promise<SavedChat[]> {
         title: displayTitle(meta.data.title ?? "") || "Kimi Code chat",
         cwd: meta.data.cwd ?? null,
         updatedAt: (await stat(sourcePath)).mtimeMs,
+        archived: false,
         path: sourcePath,
         root,
       };
@@ -253,6 +369,9 @@ export async function listSavedChats(
 ): Promise<SavedChat[]> {
   const codex = env.CODEX_HOME?.trim() || path.join(home, ".codex");
   const kimi = env.KIMI_CODE_HOME?.trim() || path.join(home, ".kimi-code");
+  const codexTitles = await readCodexTitles(codex).catch(
+    () => new Map<string, string>(),
+  );
   const scan = async (
     root: string,
     list: (root: string) => Promise<SavedChat[]>,
@@ -261,18 +380,30 @@ export async function listSavedChats(
     return info?.isDirectory() ? list(await realpath(root)) : [];
   };
   const lists = await Promise.all([
-    scan(path.join(codex, "sessions"), codexSessions),
-    scan(path.join(codex, "archived_sessions"), codexSessions),
+    scan(path.join(codex, "sessions"), (root) =>
+      codexSessions(root, codexTitles, false),
+    ),
+    scan(path.join(codex, "archived_sessions"), (root) =>
+      codexSessions(root, codexTitles, true),
+    ),
     scan(path.join(kimi, "sessions"), kimiSessions),
   ]);
-  const seen = new Set<string>();
+  const seen = new Map<string, SavedChat>();
   return lists
     .flat()
-    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .sort(
+      (a, b) =>
+        Number(a.archived) - Number(b.archived) || b.updatedAt - a.updatedAt,
+    )
     .filter((chat) => {
       const key = JSON.stringify([chat.providerId, chat.sourceId]);
-      if (seen.has(key)) return false;
-      seen.add(key);
+      const existing = seen.get(key);
+      if (existing) {
+        existing.paths ??= [existing.path];
+        existing.paths.push(chat.path);
+        return false;
+      }
+      seen.set(key, chat);
       return true;
     });
 }
@@ -280,36 +411,77 @@ export async function listSavedChats(
 export async function readSavedChat(
   chat: SavedChat,
 ): Promise<ChatImportRequest> {
-  const file = await safeFile(chat.root, chat.path);
-  const preferred: Message[] = [];
-  const fallback: Message[] = [];
-  let size = 0;
-  await readLines(file, (row) => {
-    const entry = record.safeParse(row);
-    if (!entry.success) return;
-    const messages =
-      chat.providerId === "codex"
-        ? codexMessages(entry.data)
-        : { preferred: kimiMessages(entry.data), fallback: [] };
-    for (const item of [...messages.preferred, ...messages.fallback])
-      size += Buffer.byteLength(item.text);
-    if (
-      size > chatImportMaxBytes * 2 ||
-      preferred.length + fallback.length > 20_000
-    ) {
-      throw new Error("Chat history exceeds the import limit.");
+  const entries: Array<{
+    message: Message;
+    timestamp: number;
+    stream: string;
+    order: number;
+  }> = [];
+  let order = 0;
+  for (const [fileIndex, candidate] of [...new Set(chat.paths ?? [chat.path])]
+    .reverse()
+    .entries()) {
+    const file = await safeFile(chat.root, candidate);
+    await readLines(file, (row) => {
+      const entry = record.safeParse(row);
+      if (!entry.success) return;
+      const parsedTimestamp =
+        typeof entry.data.timestamp === "string"
+          ? Date.parse(entry.data.timestamp)
+          : NaN;
+      const timestamp = Number.isFinite(parsedTimestamp) ? parsedTimestamp : 0;
+      const streams =
+        chat.providerId === "codex"
+          ? {
+              ...codexMessages(entry.data),
+              responses: codexResponseMessage(entry.data),
+            }
+          : { kimi: kimiMessages(entry.data) };
+      for (const [stream, messages] of Object.entries(streams)) {
+        for (const message of messages)
+          entries.push({
+            message,
+            timestamp,
+            stream: `${fileIndex}:${stream}`,
+            order: order++,
+          });
+      }
+      if (entries.length > 100_000)
+        throw new Error("Chat history exceeds the import limit.");
+    });
+  }
+  entries.sort((a, b) => a.timestamp - b.timestamp || a.order - b.order);
+  const occurrences = new Map<string, number>();
+  const seen = new Map<string, Message>();
+  const messages: Message[] = [];
+  let bytes = 0;
+  for (const { message, stream } of entries) {
+    const hash = createHash("sha256")
+      .update(JSON.stringify([message.role, message.text]))
+      .digest("hex");
+    const occurrenceKey = `${stream}:${hash}`;
+    const occurrence = occurrences.get(occurrenceKey) ?? 0;
+    occurrences.set(occurrenceKey, occurrence + 1);
+    const key = `${hash}:${occurrence}`;
+    const previous = seen.get(key);
+    if (previous) {
+      const images = [
+        ...new Set([...(previous.images ?? []), ...(message.images ?? [])]),
+      ];
+      if (images.length) previous.images = images;
+      continue;
     }
-    preferred.push(...messages.preferred);
-    fallback.push(...messages.fallback);
-  });
+    bytes += Buffer.byteLength(message.text);
+    if (bytes > chatImportMaxBytes)
+      throw new Error("Chat history exceeds the import limit.");
+    seen.set(key, message);
+    messages.push(message);
+  }
   const parsed = chatImportRequestSchema.safeParse({
     providerId: chat.providerId,
     sourceId: chat.sourceId,
     title: chat.title,
-    messages:
-      preferred.some((item) => item.role === "user") || fallback.length === 0
-        ? preferred
-        : fallback,
+    messages,
   });
   if (
     !parsed.success ||

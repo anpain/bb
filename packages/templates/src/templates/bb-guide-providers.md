@@ -75,6 +75,10 @@ Settings → Providers → Provider installation manages the CLI executable on t
 server machine. Removed providers remain available to install again. Removing
 a CLI retains saved credentials and chat history. Removal is available for
 writable npm installations and supported user-local Cursor and Claude installs.
+Cursor uses its native PowerShell installer on Windows and its shell installer
+on Linux and macOS. The same machine selection applies to Desktop, CLI and SDK.
+Kimi's npm CLI requires Node.js 22.19 or later and Git Bash on Windows. Set
+`KIMI_SHELL_PATH` if Git Bash is installed in a custom location.
 SDK clients use `hosts.providerCliStatus({ hostId })` to inspect `installAction`
 and `removeAction`, then `hosts.installProviderCli({ hostId, provider, actionKind:
 "install" | "remove" })`. Both CLI commands accept `--host` as an alias for

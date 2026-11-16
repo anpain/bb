@@ -487,12 +487,15 @@ export function parseProviderUserMessage(
   ) {
     return null;
   }
-  const text = decoded.item.content
-    .flatMap((part) => (part.type === "text" ? [part.text] : []))
-    .join("");
-  if (text.length === 0) {
+  const input = parsePromptInput(
+    decoded.item.content.map((part) =>
+      part.type === "text" ? { ...part, mentions: [] } : part,
+    ),
+  );
+  if (input === null) {
     return null;
   }
+  const text = input.text;
   const imported = decoded.providerThreadId === `imported:${decoded.threadId}`;
   return {
     kind: "user",
@@ -518,6 +521,9 @@ export function parseProviderUserMessage(
     },
     text,
     mentions: [],
+    ...(input.localImages + input.webImages + input.localFiles > 0
+      ? { attachments: buildAttachments(input) }
+      : {}),
   };
 }
 

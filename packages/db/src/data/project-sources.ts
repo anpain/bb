@@ -1,7 +1,7 @@
 import { hostPathEquals } from "./host-path-sql.js";
 import { and, asc, count, desc, eq, inArray, isNull, ne, notInArray } from "drizzle-orm";
 import type { ProjectSource } from "@bb/domain";
-import type { DbConnection } from "../connection.js";
+import type { DbConnection, DbQueryConnection } from "../connection.js";
 import type { DbNotifier } from "../notifier.js";
 import { hosts, projectSources } from "../schema.js";
 import { createProjectSourceId } from "../ids.js";
@@ -202,7 +202,7 @@ export function updateProjectSource(
 }
 
 export function getProjectSourceByHost(
-  db: DbConnection,
+  db: DbQueryConnection,
   projectId: string,
   hostId: string,
 ) {

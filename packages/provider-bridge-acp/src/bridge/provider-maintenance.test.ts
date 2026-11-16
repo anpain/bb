@@ -222,7 +222,18 @@ describe("ACP provider maintenance", () => {
       ),
     ).toMatchObject({
       available: true,
-      command: { command: "sh" },
+      command:
+        process.platform === "win32"
+          ? {
+              command: "powershell.exe",
+              displayCommand: "irm https://cursor.com/install?win32=true | iex",
+            }
+          : {
+              command: "sh",
+              displayCommand: expect.stringContaining(
+                "https://cursor.com/install",
+              ),
+            },
       verification: { kind: "installed" },
     });
     expect(

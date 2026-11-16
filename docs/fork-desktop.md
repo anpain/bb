@@ -26,6 +26,17 @@ Version 0.49.7 includes selectable chat import, per-chat and per-model Codex
 accounts, favorite profiles, and account limit details. See the
 [changelog](../CHANGELOG.md#0497) for the full release notes.
 
+Press **Alt** on Windows to reveal the menu. Open **File → Import chats…** to
+find local Codex and Kimi Code sessions. Search by title, project, provider or
+the displayed ID suffix. Codex titles come from its local thread index when
+available. Archived sessions are labeled, and background agent sessions are
+excluded. Local imports reuse the original project folder when it exists and
+otherwise go into **Personal**. Available image files are copied into bb.
+Repeated imports refresh a chat while its history consists entirely of imported
+messages. Once you continue it in bb, another import reports a conflict.
+When a remote bb is connected, you can also copy the selected chats and images
+into **Personal** there.
+
 The earlier 0.49.6 Linux and Windows artifacts were built from commit `fcfbc89`.
 
 ## Verification for 0.49.6 on 2026-11-13

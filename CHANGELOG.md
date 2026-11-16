@@ -1,6 +1,15 @@
 # Changelog
 
-Fork history for 0.49.0–0.49.8 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
+Fork history for 0.49.0–0.49.9 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
+
+## 0.49.9
+
+- Import chats in a larger, resizable window with search by title, project, provider or ID. Codex names come from its local thread index. Repeated session IDs appear once, background agents are excluded, and archived chats are labeled.
+- Combine Codex event formats and resumed files into one complete conversation. Re-import to refresh history while it contains only imported messages.
+- Attach local imports to existing source project folders and copy available image attachments. Report missing image files in the import result.
+- Install Cursor on native Windows with its PowerShell installer.
+- Show Cursor plan usage alongside Codex accounts from Account Pooler, and refresh missing usage when its card opens.
+- Give each provider account its own sidebar icon, numbered marker, tooltip and quota card.
 
 ## 0.49.8
 

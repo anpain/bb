@@ -1181,6 +1181,22 @@ remote bb server keep their own rules and accounts.
 
 Provider CLI binaries are managed in Settings → Providers → Provider installation
 or with `bb provider install|remove <providerId> --machine <id-or-name>`.
+Cursor uses its PowerShell installer on native Windows and its shell installer
+on Linux and macOS.
+Kimi Code's npm installation requires Node.js 22.19 or later. Its Windows CLI
+uses Git Bash. For a custom Git installation, set `KIMI_SHELL_PATH` to the
+absolute path of `bash.exe`.
+
+### Importing local chat history
+
+In Desktop, open **File → Import chats…**. Windows shows the menu when you press
+**Alt**. The import window lists Codex and Kimi Code transcripts on this computer
+with their titles, folders, dates and IDs. Background agent sessions are hidden.
+Local imports reuse an existing source project folder when available. Images
+are copied from available local references. The result reports missing files.
+Re-import refreshes the same chat until you continue it in bb. Remote copies go
+into Personal on the selected server and include their own uploaded images.
+For CLI and SDK input and attachment uploads, see `bb guide threads`.
 Removal retains account credentials and chat history. User-local native Cursor
 and Claude installations and writable npm installations offer automatic removal.
 For a Linux service that installs npm CLIs, set `NPM_CONFIG_PREFIX` to a writable

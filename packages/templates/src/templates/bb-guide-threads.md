@@ -26,9 +26,14 @@ Importing chat history:
 
   The JSON file contains providerId ("codex" or "acp-kimi"), sourceId, title,
   and messages (an ordered array of {"role":"user"|"assistant","text":"..."}).
-  Import creates a text transcript in Personal on the server targeted by the
-  CLI. Importing the same providerId and sourceId again returns the existing
-  bb thread. It does not start an agent or move the original provider session.
+  An optional projectId selects an existing project on the target server.
+  User messages may include images as an array of paths returned by that
+  project's attachment upload endpoint. Use projects.uploadAttachment() in the
+  SDK first.
+  Importing the same providerId and sourceId refreshes the existing chat while
+  it contains only imported history. Continuing the chat in bb makes a changed
+  source import return a conflict. Import creates a transcript without starting
+  an agent or resuming the original provider session.
   SDK callers use threads.importChat with the same fields.
 
 Spawning:

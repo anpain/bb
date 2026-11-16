@@ -1,10 +1,17 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
   createThread,
+  createEnvironment,
+  findProjectEnvironmentByHostPath,
+  getProjectSourceByHost,
   getPersonalProject,
   getThread,
   getThreadPluginMetadata,
   noopNotifier,
+  listStoredEventRows,
+  deleteThreadEventSuffixInTransaction,
+  patchThreadPluginMetadata,
+  threads,
   type AppendStoredThreadEventArgs,
 } from "@bb/db";
 import {
@@ -12,6 +19,8 @@ import {
   GENERATED_ID_SUFFIX_LENGTH,
   turnScope,
 } from "@bb/domain";
+import { eq } from "drizzle-orm";
+import { z } from "zod";
 import type {
   ChatImportRequest,
   ChatImportResponse,
@@ -20,20 +29,38 @@ import { ApiError } from "../../errors.js";
 import type { AppDeps } from "../../types.js";
 import { emitPluginThreadCreated } from "../plugins/plugin-thread-events.js";
 import { appendThreadEventsInTransaction } from "./thread-events.js";
+import { ensureAttachmentReferenceExists } from "../projects/attachments.js";
+import { requirePrimaryHostId } from "../hosts/primary-host.js";
+import { requirePublicProject } from "../lib/entity-lookup.js";
 
 const metadataNamespace = "bb.core.chat-import";
 
-export function importChat(
-  deps: Pick<AppDeps, "db" | "hub">,
+export async function importChat(
+  deps: Pick<AppDeps, "db" | "hub" | "config">,
   request: ChatImportRequest,
-): ChatImportResponse {
-  const project = getPersonalProject(deps.db);
+): Promise<ChatImportResponse> {
+  const project =
+    request.projectId === undefined
+      ? getPersonalProject(deps.db)
+      : requirePublicProject(deps.db, request.projectId);
   if (!project)
     throw new ApiError(
       409,
       "invalid_request",
       "Personal project is not available",
     );
+  for (const message of request.messages) {
+    for (const image of message.images ?? [])
+      await ensureAttachmentReferenceExists(
+        deps.db,
+        deps.config.dataDir,
+        project.id,
+        image,
+      );
+  }
+  const contentHash = createHash("sha256")
+    .update(JSON.stringify(request.messages))
+    .digest("hex");
   const source = createHash("sha256")
     .update(JSON.stringify([request.providerId, request.sourceId]))
     .digest();
@@ -43,35 +70,123 @@ export function importChat(
     (byte) => GENERATED_ID_ALPHABET[byte % GENERATED_ID_ALPHABET.length],
   ).join("");
   const threadId = `thr_${suffix}`;
+  let alreadyImported = false;
+  let previousProjectId: string | null = null;
 
   const created = deps.db.transaction(
     (tx) => {
       const existing = getThread(tx, threadId);
       if (existing !== null) {
+        alreadyImported = true;
+        previousProjectId = existing.projectId;
+        const metadata = getThreadPluginMetadata(
+          tx,
+          threadId,
+          metadataNamespace,
+        ).metadata;
         if (
-          getThreadPluginMetadata(tx, threadId, metadataNamespace).metadata
-            .fingerprint === fingerprint &&
+          metadata.fingerprint === fingerprint &&
           existing.deletedAt === null
         ) {
-          return null;
+          if (
+            metadata.contentHash === contentHash &&
+            existing.projectId === project.id
+          )
+            return null;
+          const rows = listStoredEventRows(tx, { threadId });
+          const importEvent = z.object({
+            providerThreadId: z.string().nullable(),
+          });
+          const sourceId = `imported:${threadId}`;
+          if (
+            existing.status !== "idle" ||
+            rows.some((row) => {
+              if (
+                !["turn/started", "turn/completed", "item/completed"].includes(
+                  row.type,
+                )
+              )
+                return true;
+              const value = importEvent.safeParse(JSON.parse(row.data));
+              return (
+                !value.success ||
+                (value.data.providerThreadId !== sourceId &&
+                  !(
+                    row.type === "turn/completed" &&
+                    value.data.providerThreadId === null
+                  ))
+              );
+            })
+          )
+            throw new ApiError(
+              409,
+              "invalid_request",
+              "This imported chat has new bb activity. Its history cannot be replaced by a source import.",
+            );
+          deleteThreadEventSuffixInTransaction(tx, {
+            threadId,
+            cutoffSequence: 1,
+            oldMaxSequence: rows.at(-1)?.sequence ?? 0,
+          });
+        } else {
+          throw new ApiError(
+            409,
+            "invalid_request",
+            "This import already has a conflicting or deleted thread",
+          );
         }
-        throw new ApiError(
-          409,
-          "invalid_request",
-          "This import already has a conflicting or deleted thread",
-        );
       }
-      const thread = createThread(tx, noopNotifier, {
-        id: threadId,
-        projectId: project.id,
-        providerId: request.providerId,
-        title: request.title,
-        status: "idle",
-        pluginMetadata: {
+      const source =
+        project.kind === "personal"
+          ? null
+          : getProjectSourceByHost(tx, project.id, requirePrimaryHostId(deps));
+      const environment =
+        source === null
+          ? null
+          : (findProjectEnvironmentByHostPath(
+              tx,
+              project.id,
+              source.hostId,
+              source.path,
+            ) ??
+            createEnvironment(tx, noopNotifier, {
+              projectId: project.id,
+              hostId: source.hostId,
+              path: source.path,
+              providerOwnsPath: false,
+              status: "ready",
+            }));
+      if (existing !== null) {
+        tx.update(threads)
+          .set({
+            projectId: project.id,
+            environmentId: environment?.id ?? null,
+            title: request.title,
+            updatedAt: Date.now(),
+          })
+          .where(eq(threads.id, threadId))
+          .run();
+        patchThreadPluginMetadata(deps.db, {
+          threadId,
           pluginId: metadataNamespace,
-          metadata: { fingerprint },
-        },
-      });
+          set: { contentHash },
+          remove: [],
+        });
+      }
+      const thread =
+        existing ??
+        createThread(tx, noopNotifier, {
+          id: threadId,
+          projectId: project.id,
+          environmentId: environment?.id ?? null,
+          providerId: request.providerId,
+          title: request.title,
+          status: "idle",
+          pluginMetadata: {
+            pluginId: metadataNamespace,
+            metadata: { fingerprint, contentHash },
+          },
+        });
       const events: AppendStoredThreadEventArgs[] = [];
       const providerThreadId = `imported:${threadId}`;
       let scope = turnScope(randomUUID());
@@ -110,7 +225,13 @@ export function importChat(
                 ? {
                     type: "userMessage",
                     id: randomUUID(),
-                    content: [{ type: "text", text: message.text }],
+                    content: [
+                      { type: "text", text: message.text },
+                      ...(message.images ?? []).map((path) => ({
+                        type: "localImage" as const,
+                        path,
+                      })),
+                    ],
                   }
                 : {
                     type: "agentMessage",
@@ -128,11 +249,19 @@ export function importChat(
   );
 
   if (created !== null) {
-    deps.hub.notifyThread(threadId, ["thread-created"], {
-      projectId: project.id,
-    });
+    deps.hub.notifyThread(
+      threadId,
+      alreadyImported
+        ? ["history-rewritten", "environment-changed", "title-changed"]
+        : ["thread-created"],
+      {
+        projectId: project.id,
+      },
+    );
     deps.hub.notifyProject(project.id, ["threads-changed"]);
-    emitPluginThreadCreated(created);
+    if (previousProjectId !== null && previousProjectId !== project.id)
+      deps.hub.notifyProject(previousProjectId, ["threads-changed"]);
+    if (!alreadyImported) emitPluginThreadCreated(created);
   }
-  return { threadId, alreadyImported: created === null };
+  return { threadId, alreadyImported };
 }

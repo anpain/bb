@@ -10,6 +10,8 @@ interface CreateDesktopDialogWindowArgs {
   preloadPath: string;
   title: string;
   width: number;
+  height?: number;
+  resizable?: boolean;
 }
 
 export const DESKTOP_DIALOG_BASE_CSS = `    :root {
@@ -49,14 +51,26 @@ export const DESKTOP_DIALOG_BASE_CSS = `    :root {
 export function createDesktopDialogWindow(
   args: CreateDesktopDialogWindowArgs,
 ): BrowserWindow {
+  const workArea =
+    args.height === undefined
+      ? null
+      : args.parentWindow === null
+        ? screen.getPrimaryDisplay().workAreaSize
+        : screen.getDisplayMatching(args.parentWindow.getBounds()).workAreaSize;
   return new BrowserWindow({
     fullscreenable: false,
-    height: DIALOG_FALLBACK_CONTENT_HEIGHT,
+    height:
+      args.height === undefined || workArea === null
+        ? DIALOG_FALLBACK_CONTENT_HEIGHT
+        : clampDialogContentHeight({
+            contentHeight: args.height,
+            workAreaHeight: workArea.height,
+          }),
     maximizable: false,
     minimizable: false,
     modal: args.parentWindow !== null,
     parent: args.parentWindow ?? undefined,
-    resizable: false,
+    resizable: args.resizable ?? false,
     show: false,
     title: args.title,
     useContentSize: true,
@@ -66,7 +80,10 @@ export function createDesktopDialogWindow(
       preload: args.preloadPath,
       sandbox: true,
     },
-    width: args.width,
+    width:
+      workArea === null
+        ? args.width
+        : Math.min(args.width, workArea.width - DIALOG_WORK_AREA_MARGIN),
   });
 }
 
@@ -106,9 +123,8 @@ function fitDialogToContent(
   contentHeight: number,
 ): void {
   const [width] = dialogWindow.getContentSize();
-  const workAreaHeight = screen.getDisplayMatching(
-    dialogWindow.getBounds(),
-  ).workAreaSize.height;
+  const workAreaHeight = screen.getDisplayMatching(dialogWindow.getBounds())
+    .workAreaSize.height;
   const height = clampDialogContentHeight({ contentHeight, workAreaHeight });
   const wasResizable = dialogWindow.isResizable();
   dialogWindow.setResizable(true);
@@ -130,6 +146,10 @@ export function showDesktopDialogHtml(
   }
 
   dialogWindow.webContents.once("did-finish-load", () => {
+    if (dialogWindow.isResizable()) {
+      showOnce();
+      return;
+    }
     void (async () => {
       const contentHeight = await measureDialogContentHeight(dialogWindow);
       if (contentHeight !== null && !dialogWindow.isDestroyed()) {

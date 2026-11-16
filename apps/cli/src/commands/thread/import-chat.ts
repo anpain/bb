@@ -14,7 +14,7 @@ export function registerImportChatCommand(
 ): void {
   thread
     .command("import-chat <file>")
-    .description("Import one Codex or Kimi transcript JSON into Personal")
+    .description("Import or refresh a Codex or Kimi transcript JSON")
     .option("--json", "Print the result as JSON")
     .action(
       action(async (file: string, options: { json?: boolean }) => {

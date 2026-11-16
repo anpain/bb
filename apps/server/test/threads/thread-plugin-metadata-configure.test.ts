@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { createThread, setAppSettings } from "@bb/db";
+import { createThread, listEvents, setAppSettings } from "@bb/db";
 import {
   defaultAppSettings,
   encodeClientTurnRequestIdNumber,
@@ -188,7 +188,18 @@ describe("thread plugin metadata in agent configuration", () => {
         harness,
         ({ command }) =>
           command.type === "thread.start" && command.threadId === started.id,
-      );
+        5_000,
+      ).catch((error: unknown) => {
+        const failures = listEvents(harness.db, { threadId: started.id })
+          .filter((event) => event.type === "system/error")
+          .map((event) => event.data);
+        throw new Error(
+          `Saved profile failed to start: ${failures.join(", ")}`,
+          {
+            cause: error,
+          },
+        );
+      });
       expect(queued.command).toMatchObject({
         type: "thread.start",
         options: { model: "gpt-5", reasoningLevel: "high" },

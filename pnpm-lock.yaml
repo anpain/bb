@@ -3419,6 +3419,9 @@ importers:
 
   plugins/account-pool:
     dependencies:
+      '@bb/server-contract':
+        specifier: workspace:*
+        version: link:../../packages/server-contract
       '@bb/shared-ui':
         specifier: workspace:*
         version: link:../../packages/shared-ui

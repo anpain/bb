@@ -44,10 +44,7 @@ import {
   formatModelLoadErrorTitle,
   ModelLoadErrorMessage,
 } from "./model-load-error-message";
-import type {
-  ModelNavRow,
-  MoreModelsOpenedBy,
-} from "./ModelReasoningPicker";
+import type { ModelNavRow, MoreModelsOpenedBy } from "./ModelReasoningPicker";
 
 const MENU_ROW_FOCUS_VISIBLE_CLASS =
   "focus-visible:bg-state-hover focus-visible:text-foreground";
@@ -77,6 +74,7 @@ export interface ModelReasoningMenuProps {
   selectionBlocked: boolean;
   onModelSelect: (model: string) => void;
   showReasoningSection: boolean;
+  accountControl?: ReactNode;
   reasoningValue: ReasoningLevel | "";
   reasoningOptions: readonly PickerOption<ReasoningLevel>[];
   onReasoningSelect: (level: ReasoningLevel) => void;
@@ -113,6 +111,7 @@ export function ModelReasoningMenu({
   selectionBlocked,
   onModelSelect,
   showReasoningSection,
+  accountControl,
   reasoningValue,
   reasoningOptions,
   onReasoningSelect,
@@ -300,6 +299,7 @@ export function ModelReasoningMenu({
           </>
         ) : null}
 
+        {accountControl}
         {singleServiceTier ? (
           <>
             <div className="shrink-0 border-t border-border" />

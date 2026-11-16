@@ -1,6 +1,12 @@
 import { defineRpcContract, type PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import {
+  codexPoolAccountIdSchema,
+  codexPoolModelSelectionSchema,
+  codexPoolRoutingSchema,
+  codexPoolThreadSelectionSchema,
+} from "@bb/server-contract";
+import {
   accountAddInputSchema,
   accountPoolConfigSchema,
   accountPoolConfigSetInputSchema,
@@ -28,7 +34,32 @@ import type { PoolOperations } from "./operations.js";
 import type { ClaudeOAuthLogin } from "./oauth-login.js";
 import type { CodexDeviceLogin } from "./codex-device-login.js";
 
+export interface CodexPoolRouting {
+  get(threadId: string | null): Promise<z.infer<typeof codexPoolRoutingSchema>>;
+  validate(accountId: string | null): Promise<void>;
+  setThread(
+    input: z.infer<typeof codexPoolThreadSelectionSchema>,
+  ): Promise<void>;
+  setModel(input: z.infer<typeof codexPoolModelSelectionSchema>): Promise<void>;
+}
+
 export const accountPoolRpcContract = defineRpcContract({
+  "codexRouting.get": {
+    input: z.object({ threadId: z.string().min(1).nullable() }),
+    output: codexPoolRoutingSchema,
+  },
+  "codexRouting.validate": {
+    input: z.object({ accountId: codexPoolAccountIdSchema }),
+    output: z.null(),
+  },
+  "codexRouting.setThread": {
+    input: codexPoolThreadSelectionSchema,
+    output: z.null(),
+  },
+  "codexRouting.setModel": {
+    input: codexPoolModelSelectionSchema,
+    output: z.null(),
+  },
   "account.add": {
     input: accountAddInputSchema,
     output: accountSchema,
@@ -118,8 +149,22 @@ export function createRpcHandlers(
   login: ClaudeOAuthLogin,
   codexLogin: CodexDeviceLogin,
   config: AccountPoolConfigController,
+  codexRouting: CodexPoolRouting,
 ): PluginRpcHandlers<typeof accountPoolRpcContract> {
   return {
+    "codexRouting.get": ({ threadId }) => codexRouting.get(threadId),
+    "codexRouting.validate": async ({ accountId }) => {
+      await codexRouting.validate(accountId);
+      return null;
+    },
+    "codexRouting.setThread": async (input) => {
+      await codexRouting.setThread(input);
+      return null;
+    },
+    "codexRouting.setModel": async (input) => {
+      await codexRouting.setModel(input);
+      return null;
+    },
     "account.add": (input) => operations.add(input),
     "account.list": () => operations.list(),
     "account.remove": async ({ id }) => ({

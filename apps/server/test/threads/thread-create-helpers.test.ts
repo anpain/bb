@@ -4,6 +4,7 @@ import {
   createProject,
   createThreadSection,
   deleteThreadSection,
+  getThreadPluginMetadata,
   noopNotifier,
   upsertHost,
 } from "@bb/db";
@@ -110,6 +111,7 @@ describe("createThreadRecord", () => {
           name: "Managers",
         });
         if (section.status !== "created") throw new Error("Expected section");
+        const codexAccountId = "11111111-1111-4111-8111-111111111111";
         const thread = createThreadRecord(
           { db, hub: noopNotifier },
           {
@@ -121,7 +123,11 @@ describe("createThreadRecord", () => {
               pinned: true,
               input: [],
               origin: "app",
-              pluginMetadata: null,
+              codexAccountId,
+              pluginMetadata: {
+                pluginId: "issue-launcher",
+                metadata: { issue: "BB-1" },
+              },
               projectId: project.id,
               providerId: "codex",
               startedOnBehalfOf: null,
@@ -134,6 +140,12 @@ describe("createThreadRecord", () => {
         expect(thread.sectionId).toBe(section.section.id);
         expect(thread.pinnedAt).not.toBeNull();
         expect(thread.pinSortKey).not.toBeNull();
+        expect(
+          getThreadPluginMetadata(db, thread.id, "account-pool").metadata,
+        ).toEqual({ codexAccountId });
+        expect(
+          getThreadPluginMetadata(db, thread.id, "issue-launcher").metadata,
+        ).toEqual({ issue: "BB-1" });
       } finally {
         db.$client.close();
       }

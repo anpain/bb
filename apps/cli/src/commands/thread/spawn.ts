@@ -63,6 +63,8 @@ interface ThreadSpawnCommandOptions {
   title?: string;
   lifecycleOwnerThread?: string;
   serviceTier?: string;
+  codexAccount?: string;
+  profile?: string;
   option?: string[];
   permissionMode?: string;
   plan?: boolean;
@@ -368,6 +370,7 @@ export function registerSpawnCommand(
     .option("--parent-thread <id>", "Parent thread ID for worker thread links")
     .option("--parent-self", "Parent the new thread to BB_THREAD_ID")
     .option("--provider <id>", PROVIDER_HELP)
+    .option("--profile <id>", "Use an Agent profile from this bb server")
     .option(
       "--model <model>",
       "Model ID for the thread. Omit to use the project's remembered default for the resolved provider",
@@ -378,6 +381,10 @@ export function registerSpawnCommand(
     )
     .option("--title <title>", "Thread title")
     .option("--service-tier <tier>", SERVICE_TIER_HELP)
+    .option(
+      "--codex-account <id>",
+      "Use a specific Account Pooler Codex account for this chat",
+    )
     .option(
       "--option <option=value>",
       "Choose a value for an option the provider's model lists (see bb provider models); use true or false for an on/off option (repeatable)",
@@ -603,6 +610,12 @@ export function registerSpawnCommand(
             origin: "cli",
             projectId,
             ...(providerId ? { providerId } : {}),
+            ...(opts.profile === undefined
+              ? {}
+              : { agentProfileId: opts.profile }),
+            ...(opts.codexAccount === undefined
+              ? {}
+              : { codexAccountId: opts.codexAccount }),
             ...(opts.model ? { model: opts.model } : {}),
             input,
             ...(reasoningLevel ? { reasoningLevel } : {}),

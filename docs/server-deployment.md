@@ -25,9 +25,9 @@ source and templates needed to reproduce deployment are committed.
 ## 1. Get a built fork package
 
 Open [Build fork Linux server](https://github.com/anpain/bb/actions/workflows/build-fork-server.yml),
-select a successful run for `privacy-kimi`, and download **bb-server-linux-x64**.
+select a successful run for `main`, and download **bb-server-linux-x64**.
 Extract the ZIP; it contains `bb-app-<version>.tgz`. Use the artifact from a run
-whose commit contains the changes you want. The current version is 0.49.6.
+whose commit contains the changes you want. The current version is 0.49.7.
 
 GitHub requires signing in to download Actions artifacts. Alternatively, from
 an authenticated GitHub CLI, run `gh run download RUN_ID --repo anpain/bb --name
@@ -36,7 +36,7 @@ bb-server-linux-x64 --dir bb-server`, using the successful run's ID.
 Upload the package from PowerShell, replacing the key, user, host and filename:
 
 ```powershell
-scp -i "$env:USERPROFILE\.ssh\your_key" .\bb-server\bb-app-0.49.6.tgz user@your-server:/tmp/
+scp -i "$env:USERPROFILE\.ssh\your_key" .\bb-server\bb-app-0.49.7.tgz user@your-server:/tmp/
 ssh -i "$env:USERPROFILE\.ssh\your_key" user@your-server
 ```
 
@@ -50,9 +50,9 @@ On the VPS:
 ```bash
 sudo apt-get update
 sudo apt-get install -y ca-certificates curl xz-utils git python3 make g++
-git clone --branch privacy-kimi https://github.com/anpain/bb.git bb-source
+git clone --branch main https://github.com/anpain/bb.git bb-source
 cd bb-source
-sudo bash scripts/server/install.sh --package /tmp/bb-app-0.49.6.tgz
+sudo bash scripts/server/install.sh --package /tmp/bb-app-0.49.7.tgz
 ```
 
 The installer downloads an official Node 22 x64 archive if necessary and checks

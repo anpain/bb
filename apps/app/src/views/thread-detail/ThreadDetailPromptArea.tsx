@@ -1,4 +1,8 @@
 import { createCoreComposerActions } from "@/lib/plugin-composer-handle";
+import { useCodexPoolRouting } from "@/hooks/useCodexPoolRouting";
+import { useApplyAgentProfile } from "@/hooks/useApplyAgentProfile";
+import { useSystemConfig } from "@/hooks/queries/system-queries";
+import { codexAccountControl } from "@/components/pickers/CodexAccountSelection";
 import { visibleQueuedMessages } from "@/lib/queued-system-notice";
 import { useQueuedMessagesExpanded } from "@/components/promptbox/banner/queued-messages-expanded";
 import type { MachineRemovalStatus } from "@/lib/machine-removal-display";
@@ -503,6 +507,13 @@ export function ThreadDetailPromptArea({
   const unarchiveThread = useUnarchiveThread();
   const restoreThreadEnvironment = useRestoreThreadEnvironment();
   const createThread = useCreateThread();
+  const {
+    routing: codexRouting,
+    changeAccount: changeCodexAccount,
+    changeAccountAsync: changeCodexAccountAsync,
+    saving: savingCodexAccount,
+    error: codexAccountError,
+  } = useCodexPoolRouting(thread.id, thread.providerId === "codex");
   const projectName = useProjectDisplayName(
     thread.projectId === PERSONAL_PROJECT_ID ? undefined : thread.projectId,
   );
@@ -744,6 +755,28 @@ export function ThreadDetailPromptArea({
       setSelectedModel(model);
     },
     [fallbackIdentity, setSelectedModel],
+  );
+  const agentProfiles = useSystemConfig().data?.generalSettings.agentProfiles;
+  const {
+    mutate: applyFavorite,
+    isPending: applyingFavorite,
+    error: favoriteError,
+  } = useApplyAgentProfile(
+    thread.environmentId === null
+      ? executionOptionsRouting
+      : { environmentId: thread.environmentId },
+    liveSessionOptionSelections,
+    async (selection, profile) => {
+      if (selection.providerId === "codex") {
+        const accountId = profile.codexAccountId ?? null;
+        if (accountId !== (codexRouting?.accountId ?? null))
+          await changeCodexAccountAsync(accountId);
+      }
+      if (fallbackIdentity !== null)
+        setOverriddenFallbackIdentity(fallbackIdentity);
+      setProviderModelReasoning(selection);
+      if (profile.serviceTier !== null) setServiceTier(profile.serviceTier);
+    },
   );
   const sourceThreadDisplayTitle = getThreadDisplayTitle({
     id: thread.id,
@@ -1235,6 +1268,8 @@ export function ThreadDetailPromptArea({
 
   const submitFollowUpDraft = useCallback(
     async ({ sendAt, pluginSubmission }: ComposerSubmitExtras = {}) => {
+      if (savingCodexAccount || applyingFavorite)
+        throw new Error("Wait for the Codex account selection to save.");
       const submittedDraft = promptDraft.getCurrent();
       const submittedInput = promptDraftToInput(submittedDraft);
       if (isHandoffSelection) {
@@ -1307,6 +1342,7 @@ export function ThreadDetailPromptArea({
       }
     },
     [
+      applyingFavorite,
       compactFirst,
       createHandoffThread,
       effectiveSelectedModel,
@@ -1314,6 +1350,7 @@ export function ThreadDetailPromptArea({
       isDefaultExecutionOptionsLoading,
       isHandoffSelection,
       promptDraft,
+      savingCodexAccount,
       sendMessage,
       setBottomAttachmentError,
       thread.id,
@@ -1542,6 +1579,30 @@ export function ThreadDetailPromptArea({
   ]);
   const bottomExecutionConfig = useMemo(
     () => ({
+      favorites: isHandoffSelection
+        ? undefined
+        : {
+            profiles: (agentProfiles ?? []).filter(
+              (profile) =>
+                profile.favorite &&
+                profile.model &&
+                profile.providerId === thread.providerId,
+            ),
+            onSelect: applyFavorite,
+            pending: applyingFavorite || savingCodexAccount,
+            error: favoriteError?.message,
+          },
+      codexAccount:
+        selectedProviderId === "codex" && !isHandoffSelection
+          ? codexAccountControl(
+              codexRouting,
+              effectiveSelectedModel || selectedModel,
+              codexRouting?.accountId ?? null,
+              changeCodexAccount,
+              savingCodexAccount,
+              codexAccountError,
+            )
+          : undefined,
       providerRouting:
         thread.environmentId === null
           ? executionOptionsRouting
@@ -1593,6 +1654,14 @@ export function ThreadDetailPromptArea({
           }),
     }),
     [
+      agentProfiles,
+      applyFavorite,
+      applyingFavorite,
+      favoriteError,
+      changeCodexAccount,
+      codexAccountError,
+      codexRouting,
+      savingCodexAccount,
       pickerSessionOptionSections,
       sessionOptionChoices.choose,
       effectiveSelectedModel,

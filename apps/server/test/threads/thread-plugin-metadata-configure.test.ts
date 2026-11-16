@@ -2,8 +2,12 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { createThread } from "@bb/db";
-import { encodeClientTurnRequestIdNumber, type JsonObject } from "@bb/domain";
+import { createThread, setAppSettings } from "@bb/db";
+import {
+  defaultAppSettings,
+  encodeClientTurnRequestIdNumber,
+  type JsonObject,
+} from "@bb/domain";
 import {
   buildExecutionOptions,
   buildThreadStartCommand,
@@ -136,6 +140,61 @@ async function withIssueLauncher(
 }
 
 describe("thread plugin metadata in agent configuration", () => {
+  it("uses a saved profile when starting a normal chat through the API", async () => {
+    await withTestHarness(async (harness) => {
+      const workspacePath = "/tmp/favorite-profile-project";
+      const { host } = seedHostSession(harness.deps, {
+        id: "host-favorite-profile",
+      });
+      const { project } = seedProjectWithSource(harness.deps, {
+        hostId: host.id,
+        path: workspacePath,
+      });
+      const environment = seedEnvironment(harness.deps, {
+        hostId: host.id,
+        projectId: project.id,
+        path: workspacePath,
+      });
+      setAppSettings(harness.db, {
+        ...defaultAppSettings,
+        agentProfiles: [
+          {
+            id: "review",
+            name: "Review",
+            providerId: "codex",
+            model: "gpt-5",
+            aliases: [],
+            reasoningLevel: "high",
+            serviceTier: null,
+            favorite: true,
+          },
+        ],
+      });
+      const response = await harness.app.request("/api/v1/threads", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          projectId: project.id,
+          origin: "cli",
+          agentProfileId: "review",
+          environment: { type: "reuse", environmentId: environment.id },
+          input: textInput("Review this"),
+        }),
+      });
+      expect(response.status, await response.clone().text()).toBe(201);
+      const started = await response.json();
+      expect(started.providerId).toBe("codex");
+      const queued = await waitForQueuedCommand(
+        harness,
+        ({ command }) =>
+          command.type === "thread.start" && command.threadId === started.id,
+      );
+      expect(queued.command).toMatchObject({
+        type: "thread.start",
+        options: { model: "gpt-5", reasoningLevel: "high" },
+      });
+    });
+  });
   it("configures the first thread.start from the creation seed without serializing it", async () => {
     await withIssueLauncher(async ({ server, readObservations }) => {
       const { host } = seedHostSession(server.deps, {

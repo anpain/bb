@@ -6,7 +6,8 @@ Keep a Claude Code or Codex thread running when one account hits its limit. The 
 - Accounts run one after another in priority order, with ties following the order added. New conversations stay on the current fallback even when an earlier account recovers. Existing conversations keep their account until the provider refuses it.
 - Drag handles (or Space and arrow keys) set the account order within each provider in settings, as does `bb pool account reorder <claude|codex> <id>...`.
 - Live limit windows per account and model family in settings, and the same numbers from `bb pool status`.
-- A routing switch per provider and a bypass per thread, so one thread can go straight to its own credentials.
+- Codex supports strict account selection per chat and model.
+- A routing switch per provider and a per-thread bypass.
 
 ## How it works
 

@@ -53,6 +53,72 @@ afterEach(() => {
 });
 
 describe("ExecutionControls", () => {
+  it("shows the configured Codex account and allows a chat override", () => {
+    const onChange = vi.fn();
+    renderExecutionControls({
+      ...makeExecutionControlsProps(),
+      codexAccount: {
+        accountId: null,
+        label: "Work",
+        defaultLabel: "Default · Work",
+        accounts: [
+          { id: "work", label: "Work", enabled: true },
+          {
+            id: "personal",
+            label: "Personal",
+            enabled: true,
+            windows: [
+              {
+                minutes: 300,
+                remainingPercent: 72,
+                resetAt: 1_900_000_000_000,
+              },
+            ],
+          },
+        ],
+        onChange,
+      },
+    });
+    const trigger = screen.getByRole("button", {
+      name: "Provider, model and reasoning",
+    });
+    expect(trigger.textContent).toContain("Work");
+    fireEvent.click(trigger);
+    const accounts = screen.getByRole("combobox", { name: "Account" });
+    expect(accounts).toHaveProperty("value", "");
+    expect(
+      screen.getByRole("option", { name: "Personal · 5h 72% left" }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByText("Account limits"));
+    expect(screen.getByText(/5h 72% left · Resets/u)).toBeTruthy();
+    fireEvent.change(accounts, { target: { value: "personal" } });
+    expect(onChange).toHaveBeenCalledWith("personal");
+  });
+
+  it("offers a favorite profile before the list of models", () => {
+    const onSelect = vi.fn();
+    const profile = {
+      id: "work",
+      name: "Work setup",
+      providerId: "codex",
+      model: "gpt-5",
+      aliases: [],
+      reasoningLevel: "high" as const,
+      serviceTier: null,
+      favorite: true,
+      codexAccountId: "11111111-1111-4111-8111-111111111111",
+    };
+    renderExecutionControls({
+      ...makeExecutionControlsProps(),
+      favorites: { profiles: [profile], onSelect, pending: false },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Provider, model and reasoning" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Work setup/u }));
+    expect(onSelect).toHaveBeenCalledWith(profile);
+  });
+
   it("hides provider tabs when the provider is locked", () => {
     renderExecutionControls(makeExecutionControlsProps());
 

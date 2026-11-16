@@ -3,7 +3,7 @@ name: Build fork Linux server
 on:
   workflow_dispatch:
   push:
-    branches: [privacy-kimi]
+    branches: [main, privacy-kimi]
 
 permissions:
   contents: read
@@ -44,8 +44,14 @@ jobs:
           test/system/setup-guide.test.ts
           test/system/provider-states.test.ts
           test/system/execution-options.test.ts
+          test/threads/thread-create-helpers.test.ts
+          test/threads/thread-plugin-metadata-configure.test.ts
           test/public/public-provider-installations.test.ts
           test/public/public-chat-import.test.ts
+      - name: Test Account Pooler routing
+        run: >-
+          pnpm exec turbo run test --filter=bb-plugin-account-pool --output-logs=new-only --
+          src/server.test.ts app.test.tsx
       - name: Test the host provider request limit
         run: >-
           pnpm exec turbo run test --filter=@bb/host-daemon --output-logs=new-only --

@@ -8,6 +8,7 @@ import {
   isSqliteForeignKeyConstraint,
 } from "@bb/db";
 import type { DbNotifier } from "@bb/db";
+import { CODEX_POOL_PLUGIN_ID } from "@bb/server-contract";
 import type { HostDaemonCommand } from "@bb/host-daemon-contract";
 import type { LocalPathProjectSource } from "@bb/domain";
 import type { AppDeps } from "../../types.js";
@@ -114,7 +115,25 @@ export function createThreadRecord(
       lifecycleOwnerThreadId: args.request.lifecycleOwnerThreadId,
       originKind: args.request.originKind,
       originPluginId: args.request.originPluginId ?? null,
-      pluginMetadata: args.request.pluginMetadata,
+      pluginMetadata:
+        args.request.codexAccountId === undefined
+          ? args.request.pluginMetadata
+          : [
+              ...(args.request.pluginMetadata === null ||
+              args.request.pluginMetadata.pluginId === CODEX_POOL_PLUGIN_ID
+                ? []
+                : [args.request.pluginMetadata]),
+              {
+                pluginId: CODEX_POOL_PLUGIN_ID,
+                metadata: {
+                  ...(args.request.pluginMetadata?.pluginId ===
+                  CODEX_POOL_PLUGIN_ID
+                    ? args.request.pluginMetadata.metadata
+                    : {}),
+                  codexAccountId: args.request.codexAccountId,
+                },
+              },
+            ],
       visibility: args.request.visibility,
       parentNotifications: args.request.parentNotifications,
       // Every thread starts `pending`, with no exception to parameterise.

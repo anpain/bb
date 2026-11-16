@@ -329,7 +329,10 @@ export interface CreateThreadInput {
   sourceThreadId?: string | null;
   originKind?: ThreadOriginKind | null;
   originPluginId?: string | null;
-  pluginMetadata?: { pluginId: string; metadata: JsonObject } | null;
+  pluginMetadata?:
+    | { pluginId: string; metadata: JsonObject }
+    | { pluginId: string; metadata: JsonObject }[]
+    | null;
   startupContext?: string;
   visibility?: ThreadVisibility;
   parentNotifications?: ThreadParentNotifications;
@@ -423,16 +426,15 @@ export function createThread(
         titleFallback: createdThread.titleFallback,
         updatedAt: now,
       });
-      if (
-        input.pluginMetadata !== undefined &&
-        input.pluginMetadata !== null &&
-        Object.keys(input.pluginMetadata.metadata).length > 0
-      ) {
-        insertThreadPluginMetadata(tx, {
-          threadId: createdThread.id,
-          pluginId: input.pluginMetadata.pluginId,
-          metadata: input.pluginMetadata.metadata,
-        });
+      const metadata = Array.isArray(input.pluginMetadata)
+        ? input.pluginMetadata
+        : input.pluginMetadata == null
+          ? []
+          : [input.pluginMetadata];
+      for (const entry of metadata) {
+        if (Object.keys(entry.metadata).length > 0) {
+          insertThreadPluginMetadata(tx, { threadId: createdThread.id, ...entry });
+        }
       }
       return createdThread;
     },

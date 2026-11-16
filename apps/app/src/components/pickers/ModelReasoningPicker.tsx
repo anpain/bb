@@ -13,6 +13,7 @@ import type {
 } from "@bb/server-contract";
 import {
   resolveServiceTierOptions,
+  type AgentProfile,
   type ProviderOptionDescriptor,
   type ReasoningLevel,
   type ServiceTier,
@@ -55,6 +56,10 @@ import {
   splitModelLabelTag,
 } from "./model-picker-menu";
 import { ModelReasoningMenu } from "./ModelReasoningMenuSplit";
+import {
+  CodexAccountSelection,
+  type CodexAccountSelectionProps,
+} from "./CodexAccountSelection";
 import { searchPickerOptions } from "@bb/shared-ui/picker-search";
 import { useResetPickerScroll } from "@bb/shared-ui/hooks/use-reset-picker-scroll";
 import { formatModelLoadErrorText } from "./model-load-error-message";
@@ -179,6 +184,13 @@ export function buildModelNavRows({
 }
 
 interface ModelReasoningPickerProps {
+  favorites?: {
+    profiles: readonly AgentProfile[];
+    onSelect: (profile: AgentProfile) => void;
+    pending: boolean;
+    error?: string;
+  };
+  codexAccount?: CodexAccountSelectionProps & { label: string | null };
   providerRouting?: SystemProvidersQuery;
   providerOptions: readonly ProviderPickerOption[];
   selectedProviderId: string;
@@ -213,6 +225,8 @@ interface ModelReasoningPickerProps {
 }
 
 export function ModelReasoningPicker({
+  favorites,
+  codexAccount,
   providerOptions,
   providerRouting,
   selectedProviderId,
@@ -932,6 +946,7 @@ export function ModelReasoningPicker({
     selectedServiceTierOption
       ? ` (${selectedServiceTierOption.label} mode)`
       : "",
+    codexAccount?.label ? ` · ${codexAccount.label}` : "",
   ].join("");
   const trigger = (
     <Button
@@ -1011,6 +1026,14 @@ export function ModelReasoningPicker({
                 data-promptbox-hide-compact=""
               >
                 {triggerReasoningLabel}
+              </span>
+            ) : null}
+            {selectedProviderId === "codex" && codexAccount?.label ? (
+              <span
+                className="max-w-24 truncate text-subtle-foreground"
+                data-promptbox-hide-compact=""
+              >
+                · {codexAccount.label}
               </span>
             ) : null}
           </>
@@ -1121,6 +1144,42 @@ export function ModelReasoningPicker({
           </div>
         ) : null}
 
+        {favorites &&
+        favorites.profiles.length > 0 &&
+        !handoffMode &&
+        !isPreviewing ? (
+          <div className="shrink-0 border-b border-border p-1">
+            <div className="px-2 py-1 text-xs text-muted-foreground">
+              Favorites
+            </div>
+            <div className="max-h-28 overflow-y-auto">
+              {favorites.profiles.map((profile) => (
+                <button
+                  key={profile.id}
+                  type="button"
+                  disabled={favorites.pending}
+                  onClick={() => favorites.onSelect(profile)}
+                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-state-hover focus-visible:bg-state-hover disabled:opacity-50"
+                >
+                  <span className="min-w-0 flex-1 truncate">
+                    {profile.name}
+                  </span>
+                  <span className="max-w-32 truncate text-muted-foreground">
+                    {profile.model}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {favorites.error ? (
+              <p
+                role="alert"
+                className="px-2 py-1 text-xs text-destructive-text"
+              >
+                {favorites.error}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         {showSearchInput ? (
           <ModelSearchInput
             inputRef={searchInputRef}
@@ -1161,6 +1220,14 @@ export function ModelReasoningPicker({
           selectionBlocked={previewSelectionBlocked}
           onModelSelect={handleModelSelect}
           showReasoningSection={showReasoningSection}
+          accountControl={
+            codexAccount !== undefined &&
+            activeProviderId === "codex" &&
+            !isPreviewing &&
+            !handoffMode ? (
+              <CodexAccountSelection {...codexAccount} />
+            ) : null
+          }
           reasoningValue={activeReasoningValue}
           reasoningOptions={activeReasoningOptions}
           onReasoningSelect={handleReasoningSelect}

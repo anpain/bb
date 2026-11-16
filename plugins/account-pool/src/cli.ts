@@ -7,6 +7,11 @@ import {
 } from "@get-bb/plugin-sdk";
 import { setTimeout as wait } from "node:timers/promises";
 import {
+  codexPoolModelSelectionSchema,
+  codexPoolThreadSelectionSchema,
+} from "@bb/server-contract";
+import type { CodexPoolRouting } from "./rpc.js";
+import {
   accountAddInputSchema,
   accountIdInputSchema,
   accountPriorityInputSchema,
@@ -249,6 +254,7 @@ export function registerPoolCli(
   login: ClaudeOAuthLogin,
   codexLogin: CodexDeviceLogin,
   config: AccountPoolConfigController,
+  codexRouting: CodexPoolRouting,
 ): void {
   async function startLogin(
     provider: PoolProvider,
@@ -733,6 +739,70 @@ export function registerPoolCli(
                       enabled: parsed.enabled,
                     })
                   : `${parsed.enabled ? "Enabled" : "Disabled"} ${parsed.provider} Account Pooler routing.\n`,
+              };
+            }),
+        }),
+        "codex-thread": cliCommand({
+          summary: "Show or set a Codex chat's account",
+          positionals: [
+            { name: "thread", description: "Chat ID", required: true },
+            { name: "account", description: "Account UUID or default" },
+          ],
+          options: { json: JSON_OPTION },
+          run: (input) =>
+            attempt(async () => {
+              const { thread, account } = input.positionals;
+              if (account !== undefined) {
+                await codexRouting.setThread(
+                  codexPoolThreadSelectionSchema.parse({
+                    threadId: thread,
+                    accountId: account === "default" ? null : account,
+                  }),
+                );
+              }
+              const result = await codexRouting.get(thread);
+              return {
+                exitCode: 0,
+                stdout: input.options.json
+                  ? json({ threadId: thread, accountId: result.accountId })
+                  : `${result.accountId ?? "Default"}\n`,
+              };
+            }),
+        }),
+        "codex-model": cliCommand({
+          summary: "List or set default Codex accounts by model",
+          positionals: [
+            { name: "model", description: "Codex model ID" },
+            { name: "account", description: "Account UUID or auto" },
+          ],
+          options: { json: JSON_OPTION },
+          run: (input) =>
+            attempt(async () => {
+              const { model, account } = input.positionals;
+              if (model !== undefined)
+                codexPoolModelSelectionSchema.shape.model.parse(model);
+              if (account !== undefined) {
+                await codexRouting.setModel(
+                  codexPoolModelSelectionSchema.parse({
+                    model,
+                    accountId: account === "auto" ? null : account,
+                  }),
+                );
+              }
+              const { rules } = await codexRouting.get(null);
+              const selected =
+                model === undefined
+                  ? rules
+                  : rules.filter((rule) => rule.model === model);
+              return {
+                exitCode: 0,
+                stdout: input.options.json
+                  ? json(selected)
+                  : selected.length === 0
+                    ? "No matching Codex model rules.\n"
+                    : selected
+                        .map((rule) => `${rule.model}\t${rule.accountId}\n`)
+                        .join(""),
               };
             }),
         }),

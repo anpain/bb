@@ -486,6 +486,9 @@ Configure named provider/model profiles in Settings → Providers → Agent prof
 or use `bb settings agent-profiles show --json` and
 `bb settings agent-profiles replace profiles.json` (a JSON array). The SDK uses
 `system.config().generalSettings.agentProfiles` and `system.updateGeneralSettings`.
+Set `favorite: true` with a model to show the profile in the provider's model
+menu. Favorites can use an empty `aliases` array. Set `codexAccountId` to an
+Account Pooler account UUID for Codex profiles. Omit it to use model routing.
 Choose an actual installed catalog model before dispatch. Aliases include
 codex, kimi, claude, opencode; aliases are editable.
 `bb thread tell <thread-id> '@kimi review this'` uses the same server

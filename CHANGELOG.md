@@ -1,6 +1,20 @@
 # Changelog
 
-Fork history for 0.49.0–0.49.6 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
+Fork history for 0.49.0–0.49.7 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
+
+## 0.49.7
+
+### Codex accounts and profiles
+
+- Choose a Codex account per chat in the model menu, or set a default account per model in Account Pooler. A chat selection takes precedence. bb reports when the assigned account is unavailable or reaches a limit.
+- View remaining Codex account limits and reset times in the model menu when reported by the provider.
+- Save named favorite profiles with a model, reasoning level and optional Codex account. Select them from the model menu or start a chat with `bb thread spawn --profile <id>`. Optional aliases use the same profile when starting child tasks.
+
+### Desktop and server
+
+- Import selected Codex and Kimi Code conversations from this computer into **Personal**. When connected to another bb server, optionally copy the same chats there. Import preserves message text and skips duplicates.
+- Open **Add server** directly from the machine access settings in bb Desktop.
+- Include the Linux server installer and systemd templates, Windows SSH tunnel helper, and deployment guide in the fork.
 
 ## 0.49.6
 

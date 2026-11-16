@@ -1,6 +1,8 @@
 import type { ToolCallResponse } from "@bb/domain";
 import type { HostDaemonContributedEnvEntry } from "@bb/host-daemon-contract";
 import type { ExperimentalPluginProviderEnvContext } from "@get-bb/plugin-sdk";
+import { CODEX_POOL_PLUGIN_ID } from "@bb/server-contract";
+import { ApiError } from "../../errors.js";
 import type {
   PluginAgentConfigurationContext,
   PluginAgentToolContext,
@@ -28,6 +30,9 @@ type PluginAgentContributions = Pick<
       | "resolveAgentConfiguration"
       | "resolveProviderEnv"
       | "resolveProviderEnvHealth"
+      | "getRpcHandler"
+      | "invokeRpcHandler"
+      | "resolveRpcCaller"
     >
   >;
 
@@ -95,6 +100,36 @@ export async function resolvePluginProviderEnvHealth(args: {
       hostId: args.hostId,
     },
   });
+}
+
+export async function validateCodexPoolAccount(
+  accountId: string,
+): Promise<void> {
+  const service = contributions;
+  const method = "codexRouting.validate";
+  const lookup = service?.getRpcHandler?.(CODEX_POOL_PLUGIN_ID, method);
+  const caller = service?.resolveRpcCaller?.(undefined);
+  if (
+    !service?.invokeRpcHandler ||
+    lookup?.outcome !== "found" ||
+    !caller?.ok
+  ) {
+    throw new ApiError(
+      409,
+      "invalid_request",
+      "Enable Account Pooler on this bb server to choose a Codex account.",
+    );
+  }
+  const result = await service.invokeRpcHandler(
+    lookup.owner,
+    method,
+    lookup.value,
+    { accountId },
+    caller.caller,
+    AbortSignal.timeout(5_000),
+  );
+  if (!result.ok)
+    throw new ApiError(409, "invalid_request", result.error.message);
 }
 
 export function findPluginAgentTool(

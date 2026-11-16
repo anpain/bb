@@ -1170,6 +1170,13 @@ older builds are not migrated. Provider routing is persisted per provider and
 defaults on; `bb pool routing <claude|codex> --off` stops it. See the
 `account-pool` skill for accounts, ordering, and routing.
 
+For Codex, **Account** in a chat's model picker overrides the server's
+**Account Pooler → Default accounts by model** rule. Models without a rule
+use the automatic pool. Explicit chat and model assignments are strict.
+If the assigned account is unavailable or has exhausted its quota, change
+the chat's account or clear the model rule and retry. Local bb and each
+remote bb server keep their own rules and accounts.
+
 ### Provider CLI installation
 
 Provider CLI binaries are managed in Settings → Providers → Provider installation
@@ -1586,6 +1593,16 @@ Settings → Providers → Agent profiles stores named profiles in general setti
 catalog `model` (null means not configured), `aliases`, and nullable
 `reasoningLevel`/`serviceTier`. Aliases are unique, case-insensitive words without
 `@`. Defaults include codex, kimi, claude, and opencode. Multiple profiles may use the same provider.
+
+Set `favorite: true` on a profile with a model to show it in **Favorites**
+at the top of that provider's model menu. Favorites can omit aliases.
+`codexAccountId` optionally pins a Codex profile to an account in this
+server's Account Pooler. Clearing it uses the model's default routing.
+Selecting a favorite applies it to the current draft or chat. An alias
+uses the same account setting when launching a child task. Start a new
+chat with `bb thread spawn --profile <id>` or pass `agentProfileId` to
+`sdk.threads.spawn()`; explicit model, reasoning, tier and account
+options can override profile values for that provider.
 
 Use `bb settings agent-profiles show --json` and
 `bb settings agent-profiles replace profiles.json`, or the SDK's existing

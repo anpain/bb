@@ -39,6 +39,7 @@ import {
 } from "@bb/domain";
 import type { CallerExecutionInputSource } from "@bb/domain";
 import { THREAD_EVENT_LIST_PAGE_SIZE } from "../common.js";
+import { codexPoolAccountIdSchema } from "./account-pool-routing.js";
 import { providerCommandSchema } from "./projects.js";
 import {
   timelineConversationRowSchema,
@@ -131,6 +132,11 @@ export const createThreadRequestSchema = z
   .object({
     projectId: z.string().min(1),
     providerId: z.string().min(1).optional(),
+    codexAccountId: codexPoolAccountIdSchema.optional(),
+    agentProfileId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .optional(),
     origin: threadCreateOriginSchema,
     originPluginId: z.string().min(1).optional(),
     pluginMetadata: pluginMetadataSchema.optional(),

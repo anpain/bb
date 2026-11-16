@@ -1804,6 +1804,7 @@ export interface ExperimentalPluginProviderEnvContext {
   threadId: string | null;
   projectId: string | null;
   hostId: string;
+  experimental_model?: string;
 }
 
 export interface ExperimentalPluginProviderEnvEntry {

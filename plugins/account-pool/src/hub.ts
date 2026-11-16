@@ -215,8 +215,18 @@ export class AccountPoolHub {
     routePath: string,
   ): Promise<Response> {
     const adapter = this.adapter(provider);
-    const hostId = await this.authenticate(request);
-    if (hostId === null) {
+    const hostId =
+      provider === "claude" ? await this.authenticate(request) : null;
+    const identity =
+      provider === "codex"
+        ? await this.options.hubTokens.authenticateCodex(
+            request.headers.get(HUB_TOKEN_HEADER) ??
+              readBearer(request.headers.get("authorization")),
+          )
+        : hostId === null
+          ? null
+          : { hostId, accountId: null };
+    if (identity === null) {
       return adapter.errorResponse(401, "Invalid Account Pooler bearer token.");
     }
     if (!this.accepting)
@@ -226,13 +236,20 @@ export class AccountPoolHub {
       );
     const parent = this.options.getParentRoute();
     if (parent !== null) {
+      if (identity.accountId !== null) {
+        return adapter.errorResponse(
+          409,
+          "The selected Codex account belongs to this bb server. Switch Account Pooler to isolate mode or clear the selection.",
+        );
+      }
       return this.forwardToParent(request, adapter, routePath, parent);
     }
     return this.forward(
       request,
       new Uint8Array(await request.arrayBuffer()),
       adapter,
-      hostId,
+      identity.hostId,
+      identity.accountId,
     );
   }
 
@@ -442,6 +459,7 @@ export class AccountPoolHub {
     body: Uint8Array,
     adapter: ProviderAdapter,
     hostId: string,
+    accountId: string | null,
   ): Promise<Response> {
     const signal = AbortSignal.any([request.signal, this.stopped.signal]);
     const attempted = new Set<string>();
@@ -455,8 +473,17 @@ export class AccountPoolHub {
     let failure: FailureSummary | null = null;
     let usageRefreshed = false;
     const accounts = (await this.options.accounts.list()).filter(
-      (account) => account.provider === adapter.provider,
+      (account) =>
+        account.provider === adapter.provider &&
+        (accountId === null || account.id === accountId),
     );
+    const accountLabel = accounts[0]?.label ?? "the selected account";
+    if (accountId !== null && !accounts[0]?.enabled) {
+      return adapter.errorResponse(
+        409,
+        `Codex account "${accountLabel}" is unavailable. Select a different account or use Default in the model menu.`,
+      );
+    }
     const candidateIds = new Set(accounts.map((account) => account.id));
     const parsed = adapter.parseRequest(body, request.headers);
     const family = parsed.family;
@@ -476,11 +503,12 @@ export class AccountPoolHub {
           candidateIds,
           attempted,
           family,
-          affinityKey,
-          parentAffinityKey,
+          accountId === null ? affinityKey : null,
+          accountId === null ? parentAffinityKey : null,
           previousAccountId,
           routing,
           signal,
+          accountId !== null,
         );
         if (
           !usageRefreshed &&
@@ -762,10 +790,17 @@ export class AccountPoolHub {
       }
       signal.throwIfAborted();
       return failure === null
-        ? this.noEligibleResponse(accounts, family, adapter)
+        ? this.noEligibleResponse(
+            accounts,
+            family,
+            adapter,
+            accountId === null ? null : accountLabel,
+          )
         : adapter.errorResponse(
             failure.status,
-            failure.message,
+            accountId === null
+              ? failure.message
+              : `Codex account "${accountLabel}": ${failure.message} Select a different account or use Default in the model menu.`,
             failure.headers,
           );
     } catch (error) {
@@ -885,6 +920,7 @@ export class AccountPoolHub {
     previousAccountId: string | null,
     routing: RoutingAttempt,
     signal: AbortSignal,
+    strictAccount: boolean,
   ): Promise<SelectedAccount | null> {
     const accounts = (await this.options.accounts.list()).sort(
       (left, right) => left.priority - right.priority,
@@ -928,6 +964,12 @@ export class AccountPoolHub {
       ) ?? usable;
     const pinnable = eligible === usable ? usable : accepted;
     const unattempted = eligible.filter(isUnattempted);
+    if (strictAccount) {
+      const selected = unattempted[0];
+      return selected === undefined
+        ? null
+        : { ...selected, keepAffinity: true, accept: () => {} };
+    }
     const candidates = unattempted.filter(
       ({ quota }) => quota.heldUntil === null || quota.heldUntil <= now,
     );
@@ -1341,9 +1383,12 @@ export class AccountPoolHub {
   async retryAvailability(
     provider: PoolProvider,
     family: ModelFamily,
+    accountId: string | null = null,
   ): Promise<RetryAvailability> {
     const parent = this.options.getParentRoute();
     if (parent !== null) {
+      if (accountId !== null)
+        return { kind: "unavailable", reason: "source-unavailable" };
       try {
         const response = await this.options.fetch(
           `${parent.baseUrl}/retry-availability?provider=${provider}&family=${family}`,
@@ -1361,7 +1406,9 @@ export class AccountPoolHub {
       return { kind: "unavailable", reason: "source-unavailable" };
     }
     const accounts = (await this.options.accounts.list()).filter(
-      (account) => account.provider === provider,
+      (account) =>
+        account.provider === provider &&
+        (accountId === null || account.id === accountId),
     );
     return this.accountAvailability(accounts, family);
   }
@@ -1406,6 +1453,7 @@ export class AccountPoolHub {
     accounts: readonly Account[],
     family: ModelFamily,
     adapter: ProviderAdapter,
+    accountLabel: string | null,
   ): Response {
     if (!accounts.some((account) => account.enabled)) {
       return adapter.errorResponse(
@@ -1423,9 +1471,11 @@ export class AccountPoolHub {
     );
     return adapter.errorResponse(
       429,
-      next === undefined
-        ? "No Account Pooler account is currently eligible."
-        : `No Account Pooler account is currently eligible. Next account is expected to be available at ${new Date(next).toISOString()} (in ${retryAfter} seconds).`,
+      accountLabel !== null
+        ? `Codex account "${accountLabel}" is currently unavailable or rate limited.${next === undefined ? "" : ` Available again at ${new Date(next).toISOString()}.`} Select a different account or clear its rule in Account Pooler settings.`
+        : next === undefined
+          ? "No Account Pooler account is currently eligible."
+          : `No Account Pooler account is currently eligible. Next account is expected to be available at ${new Date(next).toISOString()} (in ${retryAfter} seconds).`,
       { "retry-after": String(retryAfter) },
     );
   }

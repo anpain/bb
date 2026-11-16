@@ -2,13 +2,20 @@
 import {
   cleanup,
   fireEvent,
-  render,
+  render as renderReact,
   waitFor,
   within,
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { defaultAppSettings } from "@bb/domain";
 import { AgentProfilesSettings } from "./AgentProfilesSettings";
+import { createQueryClientTestHarness } from "@/test/queryClientTestHarness";
+
+function render(element: Parameters<typeof renderReact>[0]) {
+  return renderReact(element, {
+    wrapper: createQueryClientTestHarness().wrapper,
+  });
+}
 
 const catalog = vi.hoisted(() => ({ refetch: vi.fn() }));
 vi.mock("@/hooks/queries/system-queries", () => ({
@@ -174,7 +181,7 @@ it("cancels edits without persisting and adds an alias with a selected model", a
   });
   fireEvent.click(dialog.getByRole("button", { name: "Cancel" }));
   expect(onChange).not.toHaveBeenCalled();
-  fireEvent.click(view.getByRole("button", { name: "Add alias" }));
+  fireEvent.click(view.getByRole("button", { name: "Add profile" }));
   const add = within(await view.findByRole("dialog"));
   fireEvent.change(add.getByRole("textbox", { name: "Aliases" }), {
     target: { value: "@new" },
@@ -184,12 +191,50 @@ it("cancels edits without persisting and adds an alias with a selected model", a
     { button: 0, ctrlKey: false },
   );
   fireEvent.click(await view.findByRole("menuitem", { name: /Other model/u }));
-  fireEvent.click(add.getByRole("button", { name: "Add alias" }));
+  fireEvent.click(add.getByRole("button", { name: "Add profile" }));
   await waitFor(() =>
     expect(onChange).toHaveBeenCalledWith({
       agentProfiles: [
         profile,
         expect.objectContaining({ aliases: ["new"], model: "other/model" }),
+      ],
+    }),
+  );
+});
+
+it("saves a named favorite without requiring an alias", async () => {
+  const onChange = vi.fn().mockResolvedValue(undefined);
+  const view = render(
+    <AgentProfilesSettings
+      settings={{ ...defaultAppSettings, agentProfiles: [profile] }}
+      disabled={false}
+      onChange={onChange}
+    />,
+  );
+  const dialog = await change(view);
+  fireEvent.change(dialog.getByRole("textbox", { name: "Profile name" }), {
+    target: { value: "Review" },
+  });
+  fireEvent.change(dialog.getByRole("textbox", { name: "Aliases" }), {
+    target: { value: "" },
+  });
+  fireEvent.click(dialog.getByRole("switch", { name: "Show in Favorites" }));
+  fireEvent.pointerDown(
+    dialog.getByRole("button", { name: "Choose default profile model" }),
+    { button: 0, ctrlKey: false },
+  );
+  fireEvent.click(await view.findByRole("menuitem", { name: /GPT Sol/u }));
+  fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
+  await waitFor(() =>
+    expect(onChange).toHaveBeenCalledWith({
+      agentProfiles: [
+        {
+          ...profile,
+          name: "Review",
+          aliases: [],
+          favorite: true,
+          model: "rurout/gpt-6.1-sol",
+        },
       ],
     }),
   );

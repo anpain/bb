@@ -1,5 +1,6 @@
 import {
   createHash,
+  createHmac,
   randomBytes,
   randomUUID,
   timingSafeEqual,
@@ -9,6 +10,10 @@ import path from "node:path";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import type { PluginKvStorage } from "@get-bb/plugin-sdk";
+import {
+  codexPoolAccountIdSchema,
+  codexPoolModelRuleSchema,
+} from "@bb/server-contract";
 import {
   accountSchema,
   accountSecretSchema,
@@ -29,6 +34,7 @@ const accountsSchema = z.array(accountSchema);
 const HUB_TOKEN_PREFIX = "hub-token-";
 const HUB_TOKEN_GRACE_MS = 10 * 60 * 1_000;
 const HUB_TOKEN_LAST_USED_PERSIST_MS = 60 * 1_000;
+const CODEX_MODEL_RULE_PREFIX = "routing.codex.model:";
 const REJECTED_REFRESH_PREFIX = "rejected-refresh:";
 const rejectedRefreshSchema = z
   .object({
@@ -360,6 +366,43 @@ export class HubTokenStore {
     });
   }
 
+  scopeToCodexAccount(token: string, accountId: string): string {
+    const signature = createHmac("sha256", token)
+      .update(`codex-account:${accountId}`)
+      .digest("base64url");
+    return `${accountId}.${signature}`;
+  }
+
+  async authenticateCodex(presented: string | null): Promise<{
+    hostId: string;
+    accountId: string | null;
+  } | null> {
+    if (presented === null) return null;
+    if (!presented.includes(".")) {
+      const hostId = await this.authenticate(presented);
+      return hostId === null ? null : { hostId, accountId: null };
+    }
+    const [id] = presented.split(".", 1);
+    const account = codexPoolAccountIdSchema.safeParse(id);
+    if (!account.success || presented.length !== 80) return null;
+    await this.initialize();
+    for (const host of this.readAll()) {
+      const matched = [
+        host.value,
+        ...host.previous.map((prior) => prior.value),
+      ].find((token) =>
+        safeTokenEqual(
+          presented,
+          this.scopeToCodexAccount(token, account.data),
+        ),
+      );
+      if (matched === undefined) continue;
+      const hostId = await this.authenticate(matched);
+      return hostId === null ? null : { hostId, accountId: account.data };
+    }
+    return null;
+  }
+
   async rotate(hostId: string): Promise<HubTokenSummary> {
     await this.initialize();
     return this.serialized(hostId, async () => {
@@ -559,6 +602,35 @@ export class RoutingStore {
     enabled: boolean,
   ): Promise<void> {
     await this.kv.set(`routing.${provider}`, enabled);
+  }
+
+  async codexModelAccount(model: string): Promise<string | null> {
+    const rule = codexPoolModelRuleSchema
+      .nullable()
+      .parse((await this.kv.get(CODEX_MODEL_RULE_PREFIX + model)) ?? null);
+    return rule?.accountId ?? null;
+  }
+
+  async listCodexModelRules() {
+    const rules = await Promise.all(
+      (await this.kv.list(CODEX_MODEL_RULE_PREFIX)).map(async (key) =>
+        codexPoolModelRuleSchema
+          .nullable()
+          .parse((await this.kv.get(key)) ?? null),
+      ),
+    );
+    return rules
+      .filter((rule) => rule !== null)
+      .sort((a, b) => a.model.localeCompare(b.model));
+  }
+
+  async setCodexModelAccount(
+    model: string,
+    accountId: string | null,
+  ): Promise<void> {
+    const key = CODEX_MODEL_RULE_PREFIX + model;
+    if (accountId === null) await this.kv.delete(key);
+    else await this.kv.set(key, { model, accountId });
   }
 
   async setBypassed(threadId: string, bypassed: boolean): Promise<void> {

@@ -72,6 +72,8 @@ Spawning:
     --machine <id-or-name>         Run on a machine (--host is an alias)
     --service-tier <tier>          Service tier id the provider lists for the model, such as
                                    default or fast (see `bb provider models`)
+    --profile <id>                Start with a saved Agent profile (SDK: agentProfileId)
+    --codex-account <id>          Pin a Codex chat to an Account Pooler account UUID
     --option <option=value>        Choose a value for an option the provider's model lists, applied
                                    before the first message; true or false for an on/off option
                                    (repeatable; see `bb provider models`)

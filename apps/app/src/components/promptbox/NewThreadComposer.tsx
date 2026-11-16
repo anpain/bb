@@ -1,4 +1,7 @@
 import { createCoreComposerActions } from "@/lib/plugin-composer-handle";
+import { useCodexPoolRouting } from "@/hooks/useCodexPoolRouting";
+import { useApplyAgentProfile } from "@/hooks/useApplyAgentProfile";
+import { codexAccountControl } from "@/components/pickers/CodexAccountSelection";
 import {
   readPendingAttachmentUploads,
   usePendingAttachmentUploads,
@@ -266,6 +269,7 @@ export function resolveSubmittedExecutionSources(
 }
 
 export interface NewThreadComposerSubmission extends NewThreadRequest {
+  codexAccountId?: CreateThreadRequest["codexAccountId"];
   pluginSubmission?: CreateThreadRequest["pluginSubmission"];
   sendAt?: number;
 }
@@ -1672,7 +1676,41 @@ export function NewThreadComposer({
     submissionEnvironmentUnavailable: submissionEnvironment === null,
   });
   const submissionReadinessReason = submissionBlocker?.message ?? null;
+  const [codexAccountId, setCodexAccountId] = useState<string | null>(null);
+  const { routing: codexRouting } = useCodexPoolRouting(
+    null,
+    selectedProviderId === "codex",
+  );
+  const {
+    mutate: applyFavorite,
+    isPending: applyingFavorite,
+    error: favoriteError,
+  } = useApplyAgentProfile(
+    executionOptionsRouting,
+    sessionOptionSelections,
+    (selection, profile) => {
+      if (
+        profile.codexAccountId != null &&
+        (!codexRouting?.enabled ||
+          !codexRouting.accounts.some(
+            (account) =>
+              account.id === profile.codexAccountId && account.enabled,
+          ))
+      ) {
+        throw new Error(
+          `${profile.name}: the saved Codex account is unavailable.`,
+        );
+      }
+      snapshotDraftBeforeOptionChange();
+      setProviderModelReasoning(selection);
+      if (profile.serviceTier !== null) setServiceTier(profile.serviceTier);
+      if (profile.providerId === "codex")
+        setCodexAccountId(profile.codexAccountId ?? null);
+    },
+  );
+  const agentProfiles = systemConfigQuery.data?.generalSettings.agentProfiles;
   const submitDisabledReason =
+    (applyingFavorite ? "Applying the favorite profile…" : null) ??
     submissionReadinessReason ??
     (promptInputEmpty ? "Enter a prompt or attach a file." : null);
   const submitDraft = useCallback(
@@ -1684,6 +1722,7 @@ export function NewThreadComposer({
       const input = promptDraftToInput(submittedDraft);
       if (
         blockedReason !== null ||
+        applyingFavorite ||
         submissionReadinessReason !== null ||
         input.length === 0 ||
         isSubmittingRef.current ||
@@ -1694,6 +1733,7 @@ export function NewThreadComposer({
       ) {
         throw new Error(
           blockedReason ??
+            (applyingFavorite ? "Applying the favorite profile…" : null) ??
             submissionReadinessReason ??
             (input.length === 0
               ? "Type a message first."
@@ -1707,6 +1747,9 @@ export function NewThreadComposer({
       const request: NewThreadComposerSubmission = {
         projectId,
         providerId: selectedProviderId,
+        ...(selectedProviderId === "codex" && codexAccountId !== null
+          ? { codexAccountId }
+          : {}),
         model: selectedThreadModel,
         reasoningLevel,
         permissionMode,
@@ -1730,6 +1773,7 @@ export function NewThreadComposer({
         promptDraft.clearIfCurrentMatches(submittedDraft);
       try {
         await onSubmit(request);
+        setCodexAccountId(null);
         clearReuseEnvironment();
       } catch (submitError) {
         if (clearedSubmittedDraft) {
@@ -1742,7 +1786,9 @@ export function NewThreadComposer({
       }
     },
     [
+      applyingFavorite,
       clearReuseEnvironment,
+      codexAccountId,
       executionInputSources,
       onSubmit,
       permissionMode,
@@ -2114,6 +2160,27 @@ export function NewThreadComposer({
           }}
           execution={{
             providerRouting: executionOptionsRouting,
+            favorites: {
+              profiles: (agentProfiles ?? []).filter(
+                (profile) =>
+                  profile.favorite &&
+                  profile.model &&
+                  profile.providerId === selectedProviderId,
+              ),
+              onSelect: applyFavorite,
+              pending: applyingFavorite || isSubmitting,
+              error: favoriteError?.message,
+            },
+            codexAccount:
+              selectedProviderId === "codex"
+                ? codexAccountControl(
+                    codexRouting,
+                    selectedThreadModel,
+                    codexAccountId,
+                    setCodexAccountId,
+                    isSubmitting,
+                  )
+                : undefined,
             provider: {
               options: providerOptions,
               selectedId: selectedProviderId,
@@ -2156,13 +2223,19 @@ export function NewThreadComposer({
     },
     [
       activeModel,
+      agentProfiles,
+      applyFavorite,
+      applyingFavorite,
       attachmentError,
+      codexAccountId,
+      codexRouting,
       commandSource,
       defaultMentionLinkResolver,
       effectiveEnvironmentValue,
       environmentProviders,
       environmentProvidersByHostId,
       executionOptionsRouting,
+      favoriteError,
       handleAttachFiles,
       handleModelChange,
       handlePermissionChange,
@@ -2206,6 +2279,7 @@ export function NewThreadComposer({
       reuseThreadOptions,
       selectedModel,
       selectedProviderId,
+      selectedThreadModel,
       serviceTier,
       serviceTierSupportByProvider,
       sidebarNavigationSettled,

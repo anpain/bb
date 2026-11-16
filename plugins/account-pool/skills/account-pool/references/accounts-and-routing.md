@@ -24,6 +24,8 @@ bb pool config set <anthropicUpstreamBaseUrl|codexUpstreamBaseUrl|switchThreshol
 bb pool parent [proxy|isolate]
 bb pool token rotate --machine <id-or-name>
 bb pool bypass <thread-id> [--off]
+bb pool codex-thread <thread-id> [<account-uuid>|default]
+bb pool codex-model [<model-id> [<account-uuid>|auto]]
 ```
 
 Every command accepts `--json` and `--help`. `bb pool --help` lists the
@@ -32,6 +34,23 @@ and rules, including which flags cannot be combined. Unknown commands, unknown
 flags, and stray arguments are rejected with the nearest suggestion rather than
 ignored, and a failing invocation that carries `--json` also prints
 `{"ok":false,"error":{"code","message","hint"}}` on stdout.
+
+Choose a Codex account for a new chat with
+`bb thread spawn --provider codex --codex-account <account-uuid> …` or pass
+`codexAccountId` to `sdk.threads.spawn()`. Existing chats can use the model
+menu or `bb pool codex-thread`. The SDK's `plugins.callRpc` on `account-pool`
+accepts `codexRouting.get` with `{threadId}` (or `null` for the thread ID),
+`codexRouting.setThread` with `{threadId, accountId}`, and
+`codexRouting.setModel` with `{model, accountId}`. Set `accountId` to
+`null` to clear the assignment. The chat assignment wins over a model rule,
+then automatic pool routing applies. Pinned accounts stop on an unavailable
+account rather than switching automatically. Changes apply to the next turn
+that starts, including turns that are still queued. A parent-proxied bb uses
+the parent pool's automatic routing.
+
+The Codex account picker and `codexRouting.get` show reported limit windows,
+remaining percentages and reset times. An unreported or expired window has
+no estimate until the provider reports another observation.
 
 Claude `--login` starts a PKCE session, prints a browser URL and session ID,
 then exits. Pipe the manual callback code to `account login-complete` with that

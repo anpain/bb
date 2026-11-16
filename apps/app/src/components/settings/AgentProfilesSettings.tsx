@@ -22,6 +22,9 @@ import {
   DropdownMenuTrigger,
 } from "@bb/shared-ui/dropdown-menu";
 import { ProviderIcon } from "@/components/plugin/ProviderIcon";
+import { CodexAccountSelection } from "@/components/pickers/CodexAccountSelection";
+import { useCodexPoolRouting } from "@/hooks/useCodexPoolRouting";
+import { Switch } from "@bb/shared-ui/switch";
 import {
   SettingsSection,
   SettingsRow,
@@ -34,6 +37,28 @@ import {
 } from "@/hooks/queries/system-queries";
 
 type Profile = AppSettings["agentProfiles"][number];
+
+function ProfileCodexAccount({
+  profile,
+  onChange,
+  disabled,
+}: {
+  profile: Profile;
+  onChange: (value: Profile) => void;
+  disabled: boolean;
+}) {
+  const { routing } = useCodexPoolRouting(null, true);
+  if (!routing?.accounts.length && !profile.codexAccountId) return null;
+  return (
+    <CodexAccountSelection
+      accountId={profile.codexAccountId ?? null}
+      defaultLabel="Default for model"
+      accounts={routing?.enabled ? routing.accounts : []}
+      onChange={(codexAccountId) => onChange({ ...profile, codexAccountId })}
+      disabled={disabled}
+    />
+  );
+}
 
 function ProfileDialog({
   initial,
@@ -49,6 +74,7 @@ function ProfileDialog({
   onClose(): void;
 }) {
   const [profile, setProfile] = useState(initial);
+  const [name, setName] = useState(creating ? "" : initial.name);
   const [aliases, setAliases] = useState(
     initial.aliases.map((alias) => `@${alias}`).join(", "),
   );
@@ -81,9 +107,10 @@ function ProfileDialog({
     >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{creating ? "Add alias" : "Change alias"}</DialogTitle>
+          <DialogTitle>{creating ? "Add profile" : "Edit profile"}</DialogTitle>
           <DialogDescription>
-            Choose the agent and model called by your @mention.
+            Save a model for the Favorites menu or use an @alias to launch a
+            child task.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -102,7 +129,7 @@ function ProfileDialog({
             const next = {
               ...profile,
               aliases: nextAliases,
-              name: creating ? nextAliases[0] || profile.name : profile.name,
+              name: name.trim() || nextAliases[0] || profile.name,
             };
             setSaving(true);
             setError(null);
@@ -112,7 +139,7 @@ function ProfileDialog({
               setError(
                 cause instanceof Error
                   ? cause.message
-                  : "Alias could not be saved.",
+                  : "Profile could not be saved.",
               );
             } finally {
               setSaving(false);
@@ -120,16 +147,34 @@ function ProfileDialog({
           }}
         >
           <label className="grid gap-2 text-xs font-medium">
+            Profile name
+            <Input
+              value={name}
+              disabled={busy}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2 text-xs font-medium">
+            Show in Favorites
+            <Switch
+              checked={profile.favorite ?? false}
+              disabled={busy}
+              onCheckedChange={(favorite) =>
+                setProfile({ ...profile, favorite })
+              }
+            />
+          </label>
+          <label className="grid gap-2 text-xs font-medium">
             Aliases
             <Input
               aria-label="Aliases"
-              placeholder="@opencode, @опен"
+              placeholder="@work, @review"
               value={aliases}
               disabled={busy}
               onChange={(event) => setAliases(event.target.value)}
             />
             <span className="font-normal text-muted-foreground">
-              Separate alternative names with commas.
+              Optional for favorites. Separate aliases with commas.
             </span>
           </label>
           <div className="grid gap-2">
@@ -169,6 +214,7 @@ function ProfileDialog({
                         model: null,
                         reasoningLevel: null,
                         serviceTier: null,
+                        codexAccountId: null,
                       });
                       setSearch("");
                     }}
@@ -331,6 +377,13 @@ function ProfileDialog({
               </p>
             ) : null}
           </div>
+          {profile.providerId === "codex" ? (
+            <ProfileCodexAccount
+              profile={profile}
+              onChange={setProfile}
+              disabled={busy}
+            />
+          ) : null}
           {catalog.isError || catalog.data?.modelLoadError ? (
             <p role="status" className="text-xs text-muted-foreground">
               Model catalog unavailable. Check provider authentication or
@@ -352,7 +405,7 @@ function ProfileDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={busy}>
-              {saving ? "Saving…" : creating ? "Add alias" : "Save changes"}
+              {saving ? "Saving…" : creating ? "Add profile" : "Save changes"}
             </Button>
           </DialogFooter>
         </form>
@@ -395,7 +448,7 @@ function ProfileRow({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <span className="whitespace-nowrap text-sm font-medium">
-            {provider?.displayName ?? profile.providerId}
+            {profile.name}
           </span>
           <span
             className="relative -top-1.5 inline-flex flex-wrap gap-1"
@@ -407,8 +460,10 @@ function ProfileRow({
           </span>
         </div>
         <p className="truncate text-xs text-muted-foreground">
+          {provider?.displayName ?? profile.providerId} ·{" "}
           {model?.displayName ?? profile.model ?? "Provider default"}
           {profile.reasoningLevel ? ` · ${profile.reasoningLevel}` : ""}
+          {profile.favorite ? " · Favorite" : ""}
         </p>
       </div>
       <DropdownMenu>
@@ -462,7 +517,7 @@ export function AgentProfilesSettings({
   return (
     <SettingsSection
       title="Agent profiles"
-      description="Choose which agent and model your @aliases call. Only message text is forwarded, not attachments or chat history."
+      description="Save favorite execution settings and choose which agents your @aliases call."
       action={
         <Button
           variant="outline"
@@ -474,7 +529,7 @@ export function AgentProfilesSettings({
               profile: {
                 ...defaultAgentProfiles[0],
                 id: crypto.randomUUID(),
-                name: "New alias",
+                name: "New profile",
                 aliases: [],
                 model: null,
                 reasoningLevel: null,
@@ -484,7 +539,7 @@ export function AgentProfilesSettings({
           }}
         >
           <Icon name="Plus" className="size-4" />
-          Add alias
+          Add profile
         </Button>
       }
     >

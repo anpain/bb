@@ -383,6 +383,7 @@ describe("bb thread spawn command output", () => {
   });
 
   it("bb thread spawn forwards explicit execution overrides", async () => {
+    const codexAccountId = "11111111-1111-4111-8111-111111111111";
     vi.stubEnv("BB_PROJECT_ID", "proj-1");
     const thread: domain.Thread = fixtures.makeThread({
       id: "thread-overrides",
@@ -407,6 +408,10 @@ describe("bb thread spawn command output", () => {
         "codex",
         "--model",
         "gpt-5",
+        "--codex-account",
+        codexAccountId,
+        "--profile",
+        "work",
         "--reasoning-level",
         "high",
         "--service-tier",
@@ -424,6 +429,8 @@ describe("bb thread spawn command output", () => {
         originKind: null,
         projectId: "proj-1",
         providerId: "codex",
+        codexAccountId,
+        agentProfileId: "work",
         model: "gpt-5",
         reasoningLevel: "high",
         permissionMode: "auto",

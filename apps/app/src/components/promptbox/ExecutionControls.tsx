@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, type ComponentProps } from "react";
 import type {
   PermissionMode,
   ProviderOptionDescriptor,
@@ -69,6 +69,8 @@ export interface ExecutionAgentOptionsConfig {
 }
 
 export interface ExecutionControlsProps {
+  codexAccount?: ComponentProps<typeof ModelReasoningPicker>["codexAccount"];
+  favorites?: ComponentProps<typeof ModelReasoningPicker>["favorites"];
   providerRouting?: SystemProvidersQuery;
   provider: ExecutionProviderConfig;
   model: ExecutionModelConfig;
@@ -80,6 +82,8 @@ export interface ExecutionControlsProps {
 }
 
 export const ExecutionControls = memo(function ExecutionControls({
+  codexAccount,
+  favorites,
   provider,
   providerRouting,
   model,
@@ -110,6 +114,8 @@ export const ExecutionControls = memo(function ExecutionControls({
     <>
       {showModelPicker ? (
         <ModelReasoningPicker
+          codexAccount={codexAccount}
+          favorites={favorites}
           providerOptions={provider.options ?? []}
           providerRouting={providerRouting}
           selectedProviderId={selectedProviderId}

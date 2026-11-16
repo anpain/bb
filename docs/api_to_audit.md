@@ -475,6 +475,12 @@ with a `null` thread and project. Each entry is a literal or a
 server-relative path the host expands. Conflicts resolve in plugin load
 order, and the values override the shell environment.
 
+The experimental context field `experimental_model` carries the resolved
+model for a thread session or turn and is absent for model catalog requests.
+Account Pooler uses it to apply Codex model defaults. Before stabilizing,
+verify that model-dependent contributions behave consistently for starts,
+resumes, model changes, and provider commands.
+
 Docs: `providers.md`.
 
 **Audit before stabilizing.**

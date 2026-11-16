@@ -2,7 +2,13 @@ import {
   resolveHostEnvironment,
   mergeHostAndProviderEnvironment,
 } from "../hosts/host-environment.js";
-import { getEnvironment, getHost, getProject } from "@bb/db";
+import {
+  getEnvironment,
+  getHost,
+  getProject,
+  getThreadPluginMetadata,
+} from "@bb/db";
+import { CODEX_POOL_PLUGIN_ID } from "@bb/server-contract";
 import { PLUGIN_DYNAMIC_INSTRUCTIONS_MAX_CHARS } from "@get-bb/plugin-sdk/internal/host-policy";
 import type {
   DynamicTool,
@@ -185,19 +191,40 @@ export async function resolveThreadRuntimeCommandConfig(
     skillIdsByPlugin,
   });
   markTurnTraceSpan("runtimeConfig.pluginConfig");
+  const pluginEnv = await resolvePluginProviderEnv({
+    providerId: args.thread.providerId,
+    context: {
+      threadId: args.thread.id,
+      projectId: project.id,
+      hostId: host.id,
+      experimental_model: args.model,
+    },
+  });
+  if (
+    args.thread.providerId === "codex" &&
+    getThreadPluginMetadata(deps.db, args.thread.id, CODEX_POOL_PLUGIN_ID)
+      .metadata.codexAccountId != null &&
+    !pluginEnv.some(
+      (entry) =>
+        entry.name === "CODEX_POOL_AUTH_TOKEN" &&
+        typeof entry.value === "string" &&
+        entry.value.includes(".") &&
+        "plugin" in entry.source &&
+        entry.source.plugin === CODEX_POOL_PLUGIN_ID,
+    )
+  ) {
+    throw new ApiError(
+      409,
+      "invalid_request",
+      "Account Pooler is unavailable. Enable it or clear this chat's Codex account.",
+    );
+  }
   const contributedEnv = mergeHostAndProviderEnvironment(
     await resolveHostEnvironment(deps, {
       hostId: host.id,
       projectId: project.id,
     }),
-    await resolvePluginProviderEnv({
-      providerId: args.thread.providerId,
-      context: {
-        threadId: args.thread.id,
-        projectId: project.id,
-        hostId: host.id,
-      },
-    }),
+    pluginEnv,
   );
   markTurnTraceSpan("runtimeConfig.env");
   const injectedSkillSources = (

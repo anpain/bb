@@ -16,6 +16,8 @@ import type {
 
 export interface ThreadCreateServiceRequestInput {
   environment: CreateThreadEnvironmentArgs;
+  codexAccountId?: CreateThreadRequest["codexAccountId"];
+  agentProfileId?: CreateThreadRequest["agentProfileId"];
   executionInputSources?: CreateThreadRequest["executionInputSources"];
   /**
    * Epoch ms the first message should dispatch at. Present ⇒ the thread is

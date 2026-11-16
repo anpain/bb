@@ -25,6 +25,8 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   definePluginApp,
+  experimental_ProviderModelPicker as ProviderModelPicker,
+  type ExperimentalProviderModelPickerValue,
   experimental_copyToClipboard,
   useBbNavigate,
   useRealtime,
@@ -56,6 +58,8 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { ResourceRowDetailChevron } from "@/components/ui/resource-list";
 import { Switch } from "@/components/ui/switch";
+import type { z } from "zod";
+import type { codexPoolModelRulesSchema } from "@bb/server-contract";
 import type {
   AccountSummary,
   AccountPoolConfig,
@@ -883,6 +887,120 @@ function ConfigFieldRow({
   );
 }
 
+function CodexModelRules({
+  accounts,
+}: {
+  accounts: readonly AccountSummary[];
+}) {
+  const rpc = useRpc<typeof accountPoolRpcContract>();
+  const [rules, setRules] = useState<z.infer<typeof codexPoolModelRulesSchema>>(
+    [],
+  );
+  const [selection, setSelection] =
+    useState<ExperimentalProviderModelPickerValue>({
+      providerId: "codex",
+      model: "",
+      reasoningLevel: "medium",
+    });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const reload = useCallback(async () => {
+    try {
+      const routing = await rpc.call("codexRouting.get", { threadId: null });
+      setRules(routing.rules);
+    } catch (error) {
+      setError(errorText(error));
+    }
+  }, [rpc]);
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+  useRealtime(ACCOUNT_POOL_ACCOUNTS_CHANGED, () => void reload());
+  async function save(model: string, accountId: string | null) {
+    setSaving(true);
+    setError(null);
+    try {
+      await rpc.call("codexRouting.setModel", { model, accountId });
+      await reload();
+    } catch (error) {
+      setError(errorText(error));
+    } finally {
+      setSaving(false);
+    }
+  }
+  const selectedAccount =
+    rules.find((rule) => rule.model === selection.model)?.accountId ?? "";
+  if (accounts.length === 0 && rules.length === 0 && error === null)
+    return null;
+  return (
+    <SettingsSection
+      title="Default accounts by model"
+      description="A chat can override its model’s default account."
+      action={null}
+    >
+      <div className="flex flex-wrap items-center gap-2 py-2">
+        <ProviderModelPicker
+          value={selection}
+          onChange={setSelection}
+          allowProviderChange={false}
+        />
+        <select
+          aria-label="Default account for selected Codex model"
+          value={selectedAccount}
+          disabled={!selection.model || saving}
+          onChange={(event) =>
+            void save(selection.model, event.target.value || null)
+          }
+          className="max-w-full rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+        >
+          <option value="">Automatic</option>
+          {selectedAccount &&
+          !accounts.some((account) => account.id === selectedAccount) ? (
+            <option value={selectedAccount} disabled>
+              Removed account
+            </option>
+          ) : null}
+          {accounts.map((account) => (
+            <option
+              key={account.id}
+              value={account.id}
+              disabled={!account.enabled}
+            >
+              {account.label}
+              {account.enabled ? "" : " (disabled)"}
+            </option>
+          ))}
+        </select>
+      </div>
+      {rules.map(({ model, accountId }) => (
+        <div
+          key={model}
+          className="flex items-center justify-between gap-2 border-t border-border py-2 text-sm"
+        >
+          <span className="min-w-0 break-words">
+            {model} ·{" "}
+            {accounts.find((account) => account.id === accountId)?.label ??
+              "Removed account"}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={saving}
+            onClick={() => void save(model, null)}
+          >
+            Clear
+          </Button>
+        </div>
+      ))}
+      {error === null ? null : (
+        <p role="alert" className="text-xs text-destructive-text">
+          {error}
+        </p>
+      )}
+    </SettingsSection>
+  );
+}
+
 function AccountPoolSettings() {
   const rpc = useRpc<typeof accountPoolRpcContract>();
   const navigate = useBbNavigate();
@@ -1377,6 +1495,13 @@ function AccountPoolSettings() {
             </SettingsSection>
           );
         })}
+        {status !== null && !proxying ? (
+          <CodexModelRules
+            accounts={accounts.filter(
+              (account) => account.provider === "codex",
+            )}
+          />
+        ) : null}
         <Collapsible className="rounded-lg border border-border px-4">
           <CollapsibleTrigger className="flex w-full items-center gap-2 py-2.5 text-sm font-medium text-foreground">
             <Icon

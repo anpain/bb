@@ -4,7 +4,12 @@ import {
   admitAfterPathClaimsSettle,
   assertEnvironmentPathAvailable,
 } from "../environments/path-admission.js";
-import { markThreadDeleted, getEnvironment, getThread } from "@bb/db";
+import {
+  markThreadDeleted,
+  getAppSettings,
+  getEnvironment,
+  getThread,
+} from "@bb/db";
 import {
   describeSessionOptionConflict,
   modelSessionOptionConflict,
@@ -67,6 +72,7 @@ import {
   getEnvironmentProvider,
   listEnvironmentCompositions,
 } from "../plugins/plugin-environment-provider-registry.js";
+import { validateCodexPoolAccount } from "../plugins/plugin-agent-contributions.js";
 
 type ThreadCreateDeps = LoggedPendingInteractionWorkSessionDeps;
 
@@ -617,7 +623,43 @@ export async function createThreadFromRequest(
     );
   }
   const pluginMetadata = resolveCreateThreadPluginMetadata(rawRequestInput);
-  const requestInput = { ...rawRequestInput };
+  const { agentProfileId, ...requestInput } = rawRequestInput;
+  if (agentProfileId !== undefined) {
+    const profile = getAppSettings(deps.db).agentProfiles.find(
+      (candidate) => candidate.id === agentProfileId,
+    );
+    if (!profile?.model)
+      throw new ApiError(
+        400,
+        "invalid_request",
+        `Agent profile "${agentProfileId}" has no configured model.`,
+      );
+    if (
+      requestInput.providerId !== undefined &&
+      requestInput.providerId !== profile.providerId
+    )
+      throw new ApiError(
+        400,
+        "invalid_request",
+        "The requested provider differs from the agent profile.",
+      );
+    requestInput.providerId = profile.providerId;
+    requestInput.model ??= profile.model;
+    requestInput.reasoningLevel ??= profile.reasoningLevel ?? undefined;
+    requestInput.serviceTier ??= profile.serviceTier ?? undefined;
+    requestInput.codexAccountId ??= profile.codexAccountId ?? undefined;
+    requestInput.executionInputSources = {
+      ...requestInput.executionInputSources,
+      providerId: "explicit",
+      model: "explicit",
+      ...(requestInput.reasoningLevel === undefined
+        ? {}
+        : { reasoningLevel: "explicit" }),
+      ...(requestInput.serviceTier === undefined
+        ? {}
+        : { serviceTier: "explicit" }),
+    };
+  }
   requestInput.input = (
     await appendPluginMentionContext({ input: requestInput.input })
   ).input;
@@ -812,6 +854,16 @@ export async function createThreadFromRequest(
   });
   if (catalogDefault !== null) {
     request.providerId = catalogDefault.providerId;
+  }
+  if (request.codexAccountId !== undefined) {
+    if (request.providerId !== "codex") {
+      throw new ApiError(
+        400,
+        "invalid_request",
+        "A Codex account requires the Codex provider.",
+      );
+    }
+    await validateCodexPoolAccount(request.codexAccountId);
   }
   assertProviderAcceptsPromptActions(deps.providerRegistry, {
     input: request.input,

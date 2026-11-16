@@ -77,6 +77,7 @@ function sdkStubs() {
       ],
     },
     threads: {
+      getPluginMetadata: async () => ({}),
       events: {
         list: async () => [
           {
@@ -118,11 +119,13 @@ async function resolveToken(
 async function resolveCodexToken(
   host: ReturnType<typeof createFakePluginHost>,
   hostId = "host-one",
+  model?: string,
 ): Promise<{ token: string; baseUrl: string }> {
   const entries = await host.harness.behavior.resolveProviderEnv("codex", {
     threadId: "thread-codex",
     projectId: "project-one",
     hostId,
+    ...(model === undefined ? {} : { experimental_model: model }),
   });
   const token = entries.find((entry) => entry.name === "CODEX_POOL_AUTH_TOKEN");
   const baseUrl = entries.find(
@@ -136,6 +139,174 @@ async function resolveCodexToken(
   }
   return { token: token.value, baseUrl: baseUrl.value.serverPath };
 }
+
+it("keeps strict Codex account routing separate from automatic routing", async () => {
+  const used: string[] = [];
+  let timestamp = Date.now();
+  const fixture = await createOAuthRequestFixture(
+    "codex",
+    async (input, init) => {
+      if (new URL(String(input)).pathname === "/responses") {
+        used.push(new Headers(init?.headers).get("chatgpt-account-id") ?? "");
+      }
+      return Response.json(
+        { id: "ok" },
+        {
+          headers: {
+            "x-codex-primary-used-percent": "28",
+            "x-codex-primary-window-minutes": "300",
+            "x-codex-primary-reset-after-seconds": "600",
+            "x-codex-secondary-used-percent": "40",
+            "x-codex-secondary-window-minutes": "10080",
+            "x-codex-secondary-reset-after-seconds": "604800",
+          },
+        },
+      );
+    },
+    () => timestamp,
+  );
+  const alternate = await addExistingAccount(
+    {
+      host: fixture.host,
+      logins: {
+        codexLogin: async () => ({
+          accessToken: "alternate-access",
+          refreshToken: "alternate-refresh",
+          accountId: "alternate-workspace",
+          email: "alternate@example.com",
+          idToken: null,
+          expiresAt: Date.now() + 60 * 60 * 1_000,
+        }),
+      },
+    },
+    "codex",
+    { priority: 200 },
+  );
+  const { behavior } = fixture.host.harness;
+  let manualAccountId: string | null = null;
+  fixture.host.harness.sdk.stub("threads.get", async () => ({
+    providerId: "codex",
+  }));
+  fixture.host.harness.sdk.stub("threads.getPluginMetadata", async () =>
+    manualAccountId === null ? {} : { codexAccountId: manualAccountId },
+  );
+  fixture.host.harness.sdk.stub(
+    "threads.updatePluginMetadata",
+    async ({ set }: { set?: { codexAccountId: string } }) => {
+      manualAccountId = set?.codexAccountId ?? null;
+      return {};
+    },
+  );
+  await behavior.callRpc("codexRouting.setModel", {
+    model: "gpt-configured",
+    accountId: alternate.id,
+  });
+  const selected = await resolveCodexToken(
+    fixture.host,
+    "host-one",
+    "gpt-configured",
+  );
+  expect(selected.token).not.toContain(fixture.key);
+  const send = (token: string) =>
+    behavior.fetchHttp("POST", "/v1/responses", {
+      headers: { "x-bb-account-pool-token": token },
+      body: JSON.stringify({ model: "gpt-configured", input: [] }),
+    });
+  const routed = await send(selected.token);
+  expect(routed.status).toBe(200);
+  await routed.text();
+  expect(used).toEqual(["alternate-workspace"]);
+  expect(
+    await behavior.callRpc("codexRouting.get", { threadId: null }),
+  ).toMatchObject({
+    accounts: expect.arrayContaining([
+      expect.objectContaining({
+        id: alternate.id,
+        status: "ready",
+        windows: [
+          {
+            minutes: 300,
+            remainingPercent: 72,
+            resetAt: timestamp + 600_000,
+          },
+          {
+            minutes: 10080,
+            remainingPercent: 60,
+            resetAt: timestamp + 604_800_000,
+          },
+        ],
+      }),
+    ]),
+  });
+  timestamp += 601_000;
+  expect(
+    await behavior.callRpc("codexRouting.get", { threadId: null }),
+  ).toMatchObject({
+    accounts: expect.arrayContaining([
+      expect.objectContaining({
+        id: alternate.id,
+        windows: [expect.objectContaining({ minutes: 10080, remainingPercent: 60 })],
+      }),
+    ]),
+  });
+  await behavior.callRpc("codexRouting.setThread", {
+    threadId: "thread-codex",
+    accountId: fixture.account.id,
+  });
+  const manual = await resolveCodexToken(
+    fixture.host,
+    "host-one",
+    "gpt-configured",
+  );
+  const manualResponse = await send(manual.token);
+  expect(manualResponse.status).toBe(200);
+  await manualResponse.text();
+  expect(used).toEqual(["alternate-workspace", fixture.account.codexAccountId]);
+  await behavior.callRpc("codexRouting.setThread", {
+    threadId: "thread-codex",
+    accountId: null,
+  });
+  const clearedThread = await behavior.runCli([
+    "codex-thread",
+    "thread-codex",
+    "--json",
+  ]);
+  expect(clearedThread.exitCode).toBe(0);
+  expect(JSON.parse(clearedThread.stdout)).toEqual({
+    threadId: "thread-codex",
+    accountId: null,
+  });
+
+  const tampered = await send(
+    selected.token.replace(alternate.id, fixture.account.id),
+  );
+  expect(tampered.status).toBe(401);
+  await tampered.text();
+  await behavior.callRpc("account.disable", { id: alternate.id });
+  const unavailable = await send(selected.token);
+  expect(unavailable.status).toBe(409);
+  expect(await unavailable.text()).toContain("Select a different account");
+  expect(used).toHaveLength(2);
+  const cleared = await behavior.runCli([
+    "codex-model",
+    "gpt-configured",
+    "auto",
+    "--json",
+  ]);
+  expect(cleared.exitCode).toBe(0);
+  expect(JSON.parse(cleared.stdout)).toEqual([]);
+  expect(
+    (await resolveCodexToken(fixture.host, "host-one", "gpt-configured")).token,
+  ).toBe(fixture.key);
+  const automatic = await send(fixture.key);
+  expect(automatic.status).toBe(200);
+  await automatic.text();
+  expect(used).toEqual([
+    "alternate-workspace",
+    fixture.account.codexAccountId,
+    fixture.account.codexAccountId,
+  ]);
+});
 
 beforeEach(() => {
   vi.stubEnv(PARENT_URL_ENV, undefined);
@@ -1917,7 +2088,10 @@ describe("Account Pool plugin", () => {
   });
 
   it("lists Claude models through the hub with a pooled account's credentials", async () => {
-    const seen: Array<{ url: string | undefined; authorization: string | undefined }> = [];
+    const seen: Array<{
+      url: string | undefined;
+      authorization: string | undefined;
+    }> = [];
     const upstream = await startUpstream(async (request, response) => {
       await readRequestBody(request);
       seen.push({
@@ -3988,9 +4162,7 @@ describe("Account Pool plugin", () => {
     const upstreamKey = (init: RequestInit | undefined) => {
       const headers = new Headers(init?.headers);
       return (
-        headers.get("x-api-key") ??
-        headers.get("authorization")?.slice(7) ??
-        ""
+        headers.get("x-api-key") ?? headers.get("authorization")?.slice(7) ?? ""
       );
     };
 
@@ -5340,10 +5512,10 @@ describe("Account Pool plugin", () => {
               : reason === "network error"
                 ? ["sk-first", "sk-first", "sk-first", "sk-first"]
                 : [
-                  "sk-first",
-                  "sk-second",
-                  reason === "family quota" ? "sk-first" : "sk-second",
-                ],
+                    "sk-first",
+                    "sk-second",
+                    reason === "family quota" ? "sk-first" : "sk-second",
+                  ],
           );
         } finally {
           finishOld();
@@ -6459,7 +6631,10 @@ describe("sequential pool recovery", () => {
         fetch: async (_input, init) => {
           attempts.push(new Headers(init?.headers).get("x-api-key"));
           return outage
-            ? Response.json({}, { status: 503, headers: { "retry-after": "0" } })
+            ? Response.json(
+                {},
+                { status: 503, headers: { "retry-after": "0" } },
+              )
             : Response.json({});
         },
       },

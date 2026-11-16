@@ -3,15 +3,42 @@ import { completedTurnDisplaySchema } from "./completed-turn-display.js";
 import { isValidGitBranchName } from "./git-checkout.js";
 import { reasoningLevelSchema, serviceTierSchema } from "./shared-types.js";
 
-export const agentProfileSchema = z.object({
-  id: z.string().regex(/^[a-z0-9-]+$/),
-  name: z.string().trim().min(1),
-  providerId: z.string().min(1),
-  model: z.string().min(1).nullable(),
-  aliases: z.array(z.string().regex(/^[\p{L}\p{N}_-]+$/u)).min(1),
-  reasoningLevel: reasoningLevelSchema.nullable().default(null),
-  serviceTier: serviceTierSchema.nullable().default(null),
-});
+export const agentProfileSchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9-]+$/),
+    name: z.string().trim().min(1),
+    providerId: z.string().min(1),
+    model: z.string().min(1).nullable(),
+    aliases: z.array(z.string().regex(/^[\p{L}\p{N}_-]+$/u)),
+    reasoningLevel: reasoningLevelSchema.nullable().default(null),
+    serviceTier: serviceTierSchema.nullable().default(null),
+    favorite: z.boolean().optional(),
+    codexAccountId: z.string().uuid().nullable().optional(),
+  })
+  .superRefine((profile, context) => {
+    if (!profile.favorite && profile.aliases.length === 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["aliases"],
+        message: "Add an alias or show this profile in Favorites.",
+      });
+    }
+    if (profile.favorite && profile.model === null) {
+      context.addIssue({
+        code: "custom",
+        path: ["model"],
+        message: "Choose a model before favoriting this profile.",
+      });
+    }
+    if (profile.codexAccountId != null && profile.providerId !== "codex") {
+      context.addIssue({
+        code: "custom",
+        path: ["codexAccountId"],
+        message: "A Codex account requires the Codex provider.",
+      });
+    }
+  });
+export type AgentProfile = z.infer<typeof agentProfileSchema>;
 export const agentProfilesSchema = z
   .array(agentProfileSchema)
   .superRefine((profiles, context) => {

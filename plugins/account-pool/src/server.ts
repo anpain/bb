@@ -3,7 +3,7 @@ import {
   retryAvailabilityMethod,
   type RetryAvailability,
 } from "./retry-contract.js";
-import { modelFamily } from "./quota.js";
+import { accountStatus, modelFamily } from "./quota.js";
 import { modelFamilySchema } from "./contracts.js";
 import { registerUsageSource } from "./usage-source.js";
 import {
@@ -12,7 +12,15 @@ import {
 } from "./upstream-transport.js";
 import path from "node:path";
 import { z } from "zod";
-import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import type {
+  BbPluginApi,
+  ExperimentalPluginProviderEnvContext,
+} from "@get-bb/plugin-sdk";
+import {
+  codexPoolAccountIdSchema,
+  type codexPoolModelSelectionSchema,
+  type codexPoolThreadSelectionSchema,
+} from "@bb/server-contract";
 import { registerPoolCli } from "./cli.js";
 import {
   accountPoolConfigSchema,
@@ -217,6 +225,108 @@ export function createAccountPoolPlugin(
       (accountId) => hub.refreshUsage(accountId, true),
       parentStatus,
     );
+    const getThreadAccount = async (threadId: string | null) =>
+      threadId === null
+        ? null
+        : codexPoolAccountIdSchema
+            .nullable()
+            .parse(
+              (await bb.sdk.threads.getPluginMetadata({ threadId }))
+                .codexAccountId ?? null,
+            );
+    const resolveCodexAccount = async (
+      threadId: string | null,
+      model: string | undefined,
+    ) =>
+      (await getThreadAccount(threadId)) ??
+      (model === undefined || threadId === null || proxyingParent() !== null
+        ? null
+        : await routing.codexModelAccount(model));
+    const validateCodexAccount = async (accountId: string | null) => {
+      if (accountId === null) return;
+      if (
+        proxyingParent() !== null ||
+        !(await routing.isProviderEnabled("codex"))
+      ) {
+        throw new Error("Enable local Codex routing in Account Pooler first.");
+      }
+      const account = await accounts.get(accountId);
+      if (account?.provider !== "codex" || !account.enabled) {
+        throw new Error("Choose an enabled Codex account from this bb server.");
+      }
+    };
+    const codexRouting = {
+      get: async (threadId: string | null) => ({
+        enabled:
+          proxyingParent() === null &&
+          (await routing.isProviderEnabled("codex")) &&
+          (threadId === null || !(await routing.isBypassed(threadId))),
+        accounts: (await accounts.list())
+          .filter((account) => account.provider === "codex")
+          .map((account) => {
+            const { id, label, enabled } = account;
+            const quota = quotas.get(id);
+            const timestamp = now();
+            return {
+              id,
+              label,
+              enabled,
+              status: accountStatus(account, quota, timestamp),
+              windows: quota.limitWindows
+                .filter(
+                  (window) =>
+                    window.resetAt === null || window.resetAt > timestamp,
+                )
+                .map((window) => ({
+                  minutes: window.windowMinutes,
+                  remainingPercent:
+                    window.utilization === null
+                      ? null
+                      : Math.min(
+                          100,
+                          Math.max(
+                            0,
+                            Math.round((1 - window.utilization) * 100),
+                          ),
+                        ),
+                  resetAt: window.resetAt,
+                })),
+            };
+          }),
+        rules: await routing.listCodexModelRules(),
+        accountId: await getThreadAccount(threadId),
+      }),
+      validate: validateCodexAccount,
+      setThread: async ({
+        threadId,
+        accountId,
+      }: z.infer<typeof codexPoolThreadSelectionSchema>) => {
+        await validateCodexAccount(accountId);
+        const thread = await bb.sdk.threads.get({ threadId });
+        if (thread.providerId !== "codex")
+          throw new Error("Choose a Codex chat.");
+        if (accountId !== null && (await routing.isBypassed(threadId))) {
+          throw new Error(
+            "Turn off Account Pooler bypass for this chat first.",
+          );
+        }
+        await bb.sdk.threads.updatePluginMetadata({
+          threadId,
+          ...(accountId === null
+            ? { remove: ["codexAccountId"] }
+            : { set: { codexAccountId: accountId } }),
+        });
+        bb.realtime.publish(ACCOUNT_POOL_ACCOUNTS_CHANGED, {});
+      },
+      setModel: async ({
+        model,
+        accountId,
+      }: z.infer<typeof codexPoolModelSelectionSchema>) => {
+        await validateCodexAccount(accountId);
+        await routing.setCodexModelAccount(model, accountId);
+        bb.realtime.publish(ACCOUNT_POOL_ACCOUNTS_CHANGED, {});
+      },
+    };
     const login = new ClaudeOAuthLogin({
       fetch: upstreamFetch,
       now,
@@ -267,6 +377,12 @@ export function createAccountPoolPlugin(
       return hub.retryAvailability(
         provider.data,
         modelFamily(request.data.execution.model),
+        provider.data === "codex"
+          ? await resolveCodexAccount(
+              input.threadId,
+              request.data.execution.model,
+            )
+          : null,
       );
     };
     bb.rpc.register(
@@ -281,9 +397,9 @@ export function createAccountPoolPlugin(
     registerUsageSource(bb, hub);
     bb.rpc.register(
       accountPoolRpcContract,
-      createRpcHandlers(operations, login, codexLogin, config),
+      createRpcHandlers(operations, login, codexLogin, config, codexRouting),
     );
-    registerPoolCli(bb, operations, login, codexLogin, config);
+    registerPoolCli(bb, operations, login, codexLogin, config, codexRouting);
     const canServe = async (provider: PoolProvider): Promise<boolean> => {
       if (!(await operations.isRoutingEnabled(provider))) return false;
       if (proxyingParent() !== null && availability !== null) {
@@ -315,11 +431,17 @@ export function createAccountPoolPlugin(
         provider: PoolProvider,
         serving: (token: string) => Promise<PoolEnvEntry[]>,
       ) =>
-      async (context: { threadId: string | null; hostId: string }) => {
+      async (context: ExperimentalPluginProviderEnvContext) => {
         const { threadId } = context;
         const bypassed =
           threadId !== null && (await routing.isBypassed(threadId));
-        if (!bypassed && (await canServe(provider))) {
+        const accountId =
+          provider === "codex" &&
+          !bypassed &&
+          (await routing.isProviderEnabled("codex"))
+            ? await resolveCodexAccount(threadId, context.experimental_model)
+            : null;
+        if (!bypassed && (accountId !== null || (await canServe(provider)))) {
           const token = await hubTokens.forHost(context.hostId);
           if (threadId !== null) {
             await bb.storage.kv.set(`retry-route:${threadId}`, provider);
@@ -327,7 +449,14 @@ export function createAccountPoolPlugin(
               await routing.recordRouted(threadId, context.hostId);
             }
           }
-          return [...(await serving(token)), ...markerEntries(token)];
+          return [
+            ...(await serving(
+              accountId === null
+                ? token
+                : hubTokens.scopeToCodexAccount(token, accountId),
+            )),
+            ...markerEntries(token),
+          ];
         }
         if (threadId !== null) {
           await bb.storage.kv.delete(`retry-route:${threadId}`);

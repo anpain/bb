@@ -860,6 +860,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
           "experimental_useProviders",
           "PluginProvidersState",
           "ExperimentalPluginProviderEnvContext",
+          "ExperimentalPluginProviderEnvContext.experimental_model",
           "ExperimentalPluginProviderEnvEntry",
           "ExperimentalPluginProviderEnvHealthContext",
           "ExperimentalPluginProviderEnvHealth",

@@ -6,6 +6,7 @@ import { ApiError } from "../../errors.js";
 import { resolveSystemProviderModels } from "../system/execution-options.js";
 import { createThreadFromRequest } from "./thread-create.js";
 import { resolveExistingThreadPermissionMode } from "./thread-execution-plan.js";
+import { validateCodexPoolAccount } from "../plugins/plugin-agent-contributions.js";
 
 export async function dispatchAgentProfiles(
   deps: LoggedPendingInteractionWorkSessionDeps,
@@ -143,6 +144,8 @@ export async function dispatchAgentProfiles(
         "invalid_request",
         `${profile.name}: service tier is not supported by this model.`,
       );
+    if (profile.codexAccountId != null)
+      await validateCodexPoolAccount(profile.codexAccountId);
     targets.push({ profile, model: profile.model });
   }
   const permissionMode = resolveExistingThreadPermissionMode(deps, thread.id);
@@ -154,6 +157,9 @@ export async function dispatchAgentProfiles(
       parentNotifications: "auto",
       environment: { type: "reuse", environmentId: environment.id },
       providerId: profile.providerId,
+      ...(profile.codexAccountId == null
+        ? {}
+        : { codexAccountId: profile.codexAccountId }),
       model,
       permissionMode,
       ...(profile.reasoningLevel === null

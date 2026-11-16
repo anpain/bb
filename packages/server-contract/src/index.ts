@@ -1,4 +1,5 @@
 export * from "./api-client.js";
+export * from "./chat-import-context.js";
 export * from "./api-types.js";
 export * from "./api/thread-tabs.js";
 export * from "./common.js";

@@ -107,6 +107,8 @@ import {
 import type { TurnRequestRetryMarker } from "./thread-events.js";
 import { restoreInterruptedThreadStartupRequest } from "./thread-provisioning.js";
 import { markTurnTraceSpan } from "../system/turn-trace.js";
+import { isImportedChat } from "./imported-chat-context.js";
+import { resolveThreadEnvironmentPlacement } from "./thread-environment-placement.js";
 
 export const pendingThreadStartContextSchema = z.object({
   environmentIntent: threadProvisionEnvironmentIntentSchema,
@@ -426,18 +428,39 @@ async function runDispatchAttempt(
     thread.environmentId === null
       ? await restoreInterruptedThreadStartupRequest(deps, thread.id)
       : null;
-  const firstDispatch =
+  const importedPlacement =
     systemNotice === null &&
-    (thread.status === "pending" || interruptedStartupRequest !== null);
+    (thread.status === "idle" || thread.status === "error") &&
+    thread.environmentId === null &&
+    interruptedStartupRequest === null &&
+    isImportedChat(deps.db, thread.id)
+      ? await resolveThreadEnvironmentPlacement(deps, {
+          projectId: thread.projectId,
+          requestedEnvironment: {
+            type: "host",
+            workspace: { type: "personal" },
+          },
+        })
+      : null;
   const retryStartContext: PendingThreadStartContext | null =
     interruptedStartupRequest === null
-      ? null
+      ? importedPlacement === null
+        ? null
+        : {
+            environmentIntent: importedPlacement.environmentIntent,
+            fork: null,
+            startedOnBehalfOf: args.startedOnBehalfOf,
+            titleProvided: true,
+          }
       : {
           environmentIntent: interruptedStartupRequest.environmentIntent,
           fork: interruptedStartupRequest.fork,
           startedOnBehalfOf: args.startedOnBehalfOf,
           titleProvided: interruptedStartupRequest.titleProvided,
         };
+  const firstDispatch =
+    systemNotice === null &&
+    (thread.status === "pending" || retryStartContext !== null);
   const author = resolveDispatchAuthor({
     retrying: args.retryOf !== undefined,
     systemNotice: systemNotice !== null,

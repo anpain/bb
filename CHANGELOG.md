@@ -1,6 +1,11 @@
 # Changelog
 
-Fork history for 0.49.0–0.49.9 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
+Fork history for 0.49.0–0.49.10 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
+
+## 0.49.10
+
+- Choose whether imported Codex and Kimi history is sent on first continuation. Context is off by default; choose all history, hour/day/week presets or manual boundaries, with token-cost warnings and rough estimates. Import itself uses no model tokens.
+- Prepare Personal workspaces on the first message after import. Preserve continuation context across startup failures and respect context clearing.
 
 ## 0.49.9
 

@@ -1,4 +1,9 @@
 export type {
+  ChatImportContext,
+  ChatImportRequest,
+  ChatImportResponse,
+} from "@bb/server-contract";
+export type {
   CallerExecutionInputSource,
   ContextSnapshot,
   ContextCategory,

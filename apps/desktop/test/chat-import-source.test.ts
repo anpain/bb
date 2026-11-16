@@ -161,6 +161,7 @@ it("combines resumed files and event formats without duplicating messages", asyn
   const meta = { type: "session_meta", payload: { id: "resumed", cwd: home } };
   const question = {
     type: "event_msg",
+    timestamp: "2026-11-16T01:00:00Z",
     payload: { type: "user_message", message: "First question" },
   };
   const image = join(home, "screen.png");
@@ -175,7 +176,9 @@ it("combines resumed files and event formats without duplicating messages", asyn
           payload: { type: "agent_message", message: "First answer" },
         },
       ]
-        .map((row) => JSON.stringify(row))
+        .map((row) =>
+          JSON.stringify({ ...row, timestamp: "2026-11-16T01:00:00Z" }),
+        )
         .join("\n"),
     );
     await writeFile(
@@ -210,7 +213,9 @@ it("combines resumed files and event formats without duplicating messages", asyn
           },
         },
       ]
-        .map((row) => JSON.stringify(row))
+        .map((row) =>
+          JSON.stringify({ ...row, timestamp: "2026-11-16T01:00:00Z" }),
+        )
         .join("\n"),
     );
     const chats = await listSavedChats({}, home);
@@ -225,6 +230,9 @@ it("combines resumed files and event formats without duplicating messages", asyn
       "Latest answer",
     ]);
     expect(chat.messages[2]?.images).toEqual([image]);
+    expect(
+      chat.messages.find((item) => item.text === "First question")?.timestamp,
+    ).toBe(Date.parse("2026-11-16T01:00:00Z"));
   } finally {
     await rm(home, { recursive: true, force: true });
   }

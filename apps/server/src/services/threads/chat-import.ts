@@ -24,6 +24,7 @@ import { z } from "zod";
 import type {
   ChatImportRequest,
   ChatImportResponse,
+  ChatImportContext,
 } from "@bb/server-contract";
 import { ApiError } from "../../errors.js";
 import type { AppDeps } from "../../types.js";
@@ -39,6 +40,7 @@ export async function importChat(
   deps: Pick<AppDeps, "db" | "hub" | "config">,
   request: ChatImportRequest,
 ): Promise<ChatImportResponse> {
+  const context: ChatImportContext = request.context ?? { mode: "none" };
   const project =
     request.projectId === undefined
       ? getPersonalProject(deps.db)
@@ -59,7 +61,7 @@ export async function importChat(
       );
   }
   const contentHash = createHash("sha256")
-    .update(JSON.stringify(request.messages))
+    .update(JSON.stringify([request.messages, context]))
     .digest("hex");
   const source = createHash("sha256")
     .update(JSON.stringify([request.providerId, request.sourceId]))
@@ -169,7 +171,7 @@ export async function importChat(
         patchThreadPluginMetadata(deps.db, {
           threadId,
           pluginId: metadataNamespace,
-          set: { contentHash },
+          set: { contentHash, context },
           remove: [],
         });
       }
@@ -184,7 +186,11 @@ export async function importChat(
           status: "idle",
           pluginMetadata: {
             pluginId: metadataNamespace,
-            metadata: { fingerprint, contentHash },
+            metadata: {
+              fingerprint,
+              contentHash,
+              context,
+            },
           },
         });
       const events: AppendStoredThreadEventArgs[] = [];

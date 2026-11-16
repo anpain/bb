@@ -1,6 +1,7 @@
 import { ipcMain, type BrowserWindow } from "electron";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { PERSONAL_PROJECT_ID } from "@bb/domain";
 import { escapeHtmlText } from "@bb/text-utils";
@@ -9,6 +10,8 @@ import {
   projectResponseSchema,
   uploadedPromptAttachmentSchema,
   type ChatImportRequest,
+  chatImportRequestSchema,
+  summarizeChatImportMessages,
 } from "@bb/server-contract";
 import {
   createDesktopDialogWindow,
@@ -19,6 +22,7 @@ import {
   chatImportCloseChannel,
   chatImportSubmissionSchema,
   chatImportSubmitChannel,
+  chatImportPreviewChannel,
 } from "./chat-import-ipc.js";
 import { readSavedChat, type SavedChat } from "./chat-import-source.js";
 
@@ -65,7 +69,22 @@ function renderDialog(
     <title>Import chats</title><style>${DESKTOP_DIALOG_BASE_CSS}
     body { height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; }
     form { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .workspace { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(230px, 1fr) minmax(0, 1.25fr); gap: 14px; }
+    .chat-list { min-height: 0; display: flex; flex-direction: column; }
     .list { flex: 1; min-height: 0; overflow: auto; border: 1px solid color-mix(in srgb, CanvasText 22%, transparent); border-radius: 8px; }
+    .context-panel { min-height: 0; overflow: auto; border: 1px solid color-mix(in srgb, CanvasText 22%, transparent); border-radius: 8px; padding: 12px; }
+    .context-panel p { margin: 8px 0; }
+    .context-panel select, .context-panel input[type=datetime-local] { box-sizing: border-box; width: 100%; margin: 4px 0 10px; color: FieldText; background: Field; }
+    .context-panel input[type=range] { width: 100%; }
+    .boundary { overflow-wrap: anywhere; white-space: pre-line; padding: 8px; background: color-mix(in srgb, CanvasText 5%, Canvas); border-radius: 6px; }
+    .switch-label { display: flex; align-items: center; gap: 8px; }
+    .switch { appearance: none; flex-shrink: 0; width: 2.5em; height: 1.4em; border-radius: 1em; background: color-mix(in srgb, CanvasText 25%, Canvas); position: relative; }
+    .switch::before { content: ''; display: block; width: 1em; height: 1em; margin: .2em; border-radius: 50%; background: Canvas; transition: transform .12s; }
+    .switch:checked { background: AccentColor; }
+    .switch:checked::before { transform: translateX(1.1em); }
+    [data-estimate] { font-weight: 600; }
+    [data-large-context] { border-left: 3px solid AccentColor; padding-left: 8px; }
+    @media (max-width: 650px) { .workspace { grid-template-columns: 1fr; overflow: auto; } .chat-list { min-height: 180px; } .context-panel { min-height: 230px; overflow: visible; } }
     [hidden] { display: none !important; }
     [data-search] { color: FieldText; background: Field; border: 1px solid color-mix(in srgb, CanvasText 22%, transparent); border-radius: 6px; padding: 8px; margin-bottom: 10px; }
     .chat { display: flex; gap: 8px; align-items: start; padding: 8px; font-size: 13px; }
@@ -79,13 +98,41 @@ function renderDialog(
     [data-status] { margin: 8px 0 0; white-space: pre-line; }
     </style></head><body>
     <h1>Import chats</h1><p>Select Codex and Kimi Code chats from this computer. Existing project folders and available images are included. Chats without a local folder go into Personal.</p>
-    <p>Only chats with local transcript files are listed. Background agent sessions are hidden.</p>
-    <form>${
+    <p>Importing only saves history and does not call a model. Background agent sessions are hidden.</p>
+    <form><div class="workspace"><div class="chat-list">${
       items
         ? `<input type="search" data-search aria-label="Search chats" placeholder="Search by title, project, provider or ID">
     <div class="list">${items}<p data-no-matches hidden>No matching chats.</p></div>`
         : "<p>No supported local chats were found.</p>"
     }
+    </div><section class="context-panel" aria-label="Continuation context">
+    <label class="switch-label"><input class="switch" type="checkbox" role="switch" data-send-context> Send existing context to the model</label>
+    <p data-context-off>Off: history is saved for viewing. No imported messages or images are sent to the model, so they use no tokens. New messages and model replies still use tokens normally.</p>
+    <div data-context-controls hidden>
+      <p><strong>Sending history uses input tokens and your provider limits when you first continue a chat.</strong> Importing itself uses no model tokens.</p>
+      <label>Configure selected chat<select data-context-chat aria-label="Configure selected chat"></select></label>
+      <label>Context period<select data-context-period aria-label="Context period">
+        <option value="all">Entire conversation</option><option value="hour">Last hour of this chat</option><option value="day">Last 24 hours of this chat</option><option value="week">Last 7 days of this chat</option><option value="manual">Choose messages manually</option><option value="none">No context for this chat</option>
+      </select></label>
+      <small>Periods end at this chat's last dated message. Settings are saved separately for each selected chat.</small>
+      <p data-date-warning></p>
+      <p data-chat-estimate aria-live="polite"></p>
+      <div data-manual hidden>
+        <label>From date and time<input type="datetime-local" data-date-start></label>
+        <label>Through date and time<input type="datetime-local" data-date-end></label>
+        <label>From message <input type="number" min="1" data-number-start aria-label="First context message"></label>
+        <input type="range" min="1" step="1" data-range-start aria-label="First context message slider">
+        <p class="boundary" data-start-preview></p>
+        <label>Through message <input type="number" min="1" data-number-end aria-label="Last context message"></label>
+        <input type="range" min="1" step="1" data-range-end aria-label="Last context message slider">
+        <p class="boundary" data-end-preview></p>
+      </div>
+      <p data-large-context hidden>Large context may exceed the selected model's context window. Choose a smaller range if needed. Your selected text is sent without automatic truncation.</p>
+    </div>
+    <small>Approximate text estimate, not provider billing. Image tokens, new prompts, system instructions and replies are excluded. The exact count depends on the model and caching. Up to eight recent unique images from the chosen range are included.</small>
+    <button type="button" data-refresh-preview hidden>Refresh previews and clear choices</button>
+    </section></div>
+    <p data-estimate aria-live="polite">Imported context: 0 tokens</p>
     ${items ? destination : ""}<p data-status role="status" aria-live="polite"></p>
     <div class="actions"><button type="button" data-close>Close</button>
     <button type="submit" disabled>Import selected</button></div></form></body></html>`;
@@ -257,6 +304,7 @@ export async function openChatImportDialog(
     activeWindow = null;
     ipcMain.removeListener(chatImportCloseChannel, handleClose);
     ipcMain.removeHandler(chatImportSubmitChannel);
+    ipcMain.removeHandler(chatImportPreviewChannel);
   });
   ipcMain.on(chatImportCloseChannel, handleClose);
   const chats = await options.listChats().catch((error: unknown) => {
@@ -264,6 +312,34 @@ export async function openChatImportDialog(
     throw error;
   });
   if (window.isDestroyed()) return;
+  ipcMain.handle(chatImportPreviewChannel, async (event, index: unknown) => {
+    if (
+      event.sender.id !== contentsId ||
+      event.senderFrame !== event.sender.mainFrame ||
+      busy ||
+      typeof index !== "number" ||
+      !Number.isInteger(index) ||
+      index < 0 ||
+      !chats[index]
+    )
+      return { ok: false, message: "Select an available chat." };
+    try {
+      const chat = await readSavedChat(chats[index]);
+      return {
+        ok: true,
+        sourceHash: createHash("sha256")
+          .update(JSON.stringify(chat.messages))
+          .digest("hex"),
+        messages: summarizeChatImportMessages(chat.messages),
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        message:
+          error instanceof Error ? error.message : "Could not read chat.",
+      };
+    }
+  });
   ipcMain.handle(chatImportSubmitChannel, async (event, payload: unknown) => {
     const parsed = chatImportSubmissionSchema.safeParse(payload);
     if (
@@ -296,7 +372,25 @@ export async function openChatImportDialog(
       for (const saved of selected) {
         if (!saved) continue;
         try {
-          const chat = await readSavedChat(saved);
+          const choice = parsed.data.contexts.find(
+            (item) => chats[item.index] === saved,
+          );
+          if (!choice) throw new Error("Review context for this chat.");
+          const source = await readSavedChat(saved);
+          if (
+            choice.context.mode !== "none" &&
+            choice.sourceHash !==
+              createHash("sha256")
+                .update(JSON.stringify(source.messages))
+                .digest("hex")
+          )
+            throw new Error(
+              "This chat changed after preview. Refresh its preview and review the context again.",
+            );
+          const chat = chatImportRequestSchema.parse({
+            ...source,
+            context: choice.context,
+          });
           try {
             const projectId = await importProject(localUrl, saved.cwd);
             const local = await uploadImages(fetch, localUrl, {

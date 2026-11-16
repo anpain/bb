@@ -31,7 +31,7 @@ or hand off to another agent.
 This is [anpain/bb](https://github.com/anpain/bb), based on the `privacy-kimi`
 fork. It supports local execution and execution on your Linux server, removes
 bb product telemetry, and adds provider installation and account controls.
-Read the [complete fork changelog for 0.49.0–0.49.9](./CHANGELOG.md#0499).
+Read the [complete fork changelog for 0.49.0–0.49.10](./CHANGELOG.md#04910).
 
 ## Quick start
 
@@ -43,6 +43,16 @@ The desktop does not provision a fresh VPS when you enter an address. Run the
 server installer once, connect over SSH, then use **Providers → Provider
 installation** to install or remove supported CLIs and **Provider accounts** to
 sign in. Account authorization always requires your own confirmation.
+
+### Continue imported conversations
+
+Open **File → Import chats…**, select local Codex or Kimi chats, then send a
+message in the imported conversation to continue. Context is off by default.
+Enable **Send existing context to the model** to choose all history, a time
+period or a manual message range, and review the rough token estimate. Importing
+only saves history; sending chosen context uses provider tokens/limits on first
+continuation. Project files must be present on the execution machine; importing
+history does not transfer a repository or restore running commands.
 
 ### How requests travel
 

@@ -428,7 +428,10 @@ export async function readSavedChat(
       const parsedTimestamp =
         typeof entry.data.timestamp === "string"
           ? Date.parse(entry.data.timestamp)
-          : NaN;
+          : typeof entry.data.timestamp === "number"
+            ? entry.data.timestamp *
+              (entry.data.timestamp < 100_000_000_000 ? 1000 : 1)
+            : NaN;
       const timestamp = Number.isFinite(parsedTimestamp) ? parsedTimestamp : 0;
       const streams =
         chat.providerId === "codex"
@@ -440,7 +443,10 @@ export async function readSavedChat(
       for (const [stream, messages] of Object.entries(streams)) {
         for (const message of messages)
           entries.push({
-            message,
+            message:
+              timestamp > 0
+                ? { ...message, timestamp: Math.trunc(timestamp) }
+                : message,
             timestamp,
             stream: `${fileIndex}:${stream}`,
             order: order++,
@@ -469,6 +475,8 @@ export async function readSavedChat(
         ...new Set([...(previous.images ?? []), ...(message.images ?? [])]),
       ];
       if (images.length) previous.images = images;
+      if (previous.timestamp === undefined && message.timestamp !== undefined)
+        previous.timestamp = message.timestamp;
       continue;
     }
     bytes += Buffer.byteLength(message.text);

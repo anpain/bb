@@ -122,3 +122,4 @@ export type {
 } from "./transport.js";
 export type { BbHttpErrorArgs } from "./response.js";
 export type * from "./public-types.js";
+export { previewChatImportContext } from "@bb/server-contract";

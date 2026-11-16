@@ -1197,6 +1197,21 @@ are copied from available local references. The result reports missing files.
 Re-import refreshes the same chat until you continue it in bb. Remote copies go
 into Personal on the selected server and include their own uploaded images.
 For CLI and SDK input and attachment uploads, see `bb guide threads`.
+**Send existing context to the model** is off by default. Off imports only save
+the transcript; no imported text or images are sent to a model. New prompts and
+replies still use tokens normally. Turning it on shows a token-cost warning,
+per-chat choices for all history, the last hour/day/week of that chat, or manual
+date/message boundaries. The full history is saved regardless of the selection.
+The preview shows a rough text-token range for each chat and the total, excluding
+image tokens, new prompts, system instructions and replies. Exact usage depends
+on the model and caching. Selected text is sent without automatic truncation,
+plus up to eight recent unique images; large ranges may exceed the model window.
+Import itself never calls a model. Chosen context uses provider tokens/limits
+when the chat is first continued. Failed startup can retry with that context.
+Later turns do not prepend it again; clearing context disables the handoff.
+Old imports without an explicit choice do not send context. A Personal workspace
+is prepared on first send if no project folder was attached. Remote project
+files, running commands and native provider sessions are not copied by import.
 Removal retains account credentials and chat history. User-local native Cursor
 and Claude installations and writable npm installations offer automatic removal.
 For a Linux service that installs npm CLIs, set `NPM_CONFIG_PREFIX` to a writable

@@ -49,6 +49,8 @@ import type { ProviderRegistryService } from "../providers/provider-registry.js"
 import { resolveProviderPlanCommand } from "../providers/provider-plan-command.js";
 import { workspaceContextFromPath } from "../environments/workspace-command-target.js";
 import { projectCheckoutPathOnHost } from "../projects/project-workspace.js";
+import { resolvePromptAttachmentReferences } from "../projects/attachments.js";
+import { prependImportedChatContext } from "./imported-chat-context.js";
 import {
   requireBridgeLaunchForProviderId,
   resolveBridgeLaunchForProviderId,
@@ -230,18 +232,19 @@ function toRuntimeExecutionOptions(
     args.projectId,
     args.hostId,
   );
-  const model = args.deps.lifecycleDedupers.providerModelCatalogs.getCachedModel(
-    args.deps,
-    {
-      hostId: args.hostId,
-      providerId: args.providerId,
-      workspacePaths:
-        checkoutPath === undefined
-          ? [args.workspacePath]
-          : [args.workspacePath, checkoutPath],
-      model: args.execution.model,
-    },
-  );
+  const model =
+    args.deps.lifecycleDedupers.providerModelCatalogs.getCachedModel(
+      args.deps,
+      {
+        hostId: args.hostId,
+        providerId: args.providerId,
+        workspacePaths:
+          checkoutPath === undefined
+            ? [args.workspacePath]
+            : [args.workspacePath, checkoutPath],
+        model: args.execution.model,
+      },
+    );
   const reasoningLevel =
     model === null ||
     model.supportedReasoningEfforts.some(
@@ -301,10 +304,42 @@ export async function buildExecutionOptions(
   return plan.resolvedExecution;
 }
 
+async function resolveImportedChatCommandInput<
+  T extends Pick<
+    ThreadStartCommandArgs,
+    "thread" | "environment" | "input" | "inputGroups"
+  >,
+>(deps: LoggedWorkSessionDeps, args: T): Promise<T> {
+  const prompt = prependImportedChatContext(deps.db, args.thread.id, args);
+  if (prompt === args) return args;
+  const input = await resolvePromptAttachmentReferences({
+    db: deps.db,
+    dataDir: deps.config.dataDir,
+    projectId: args.thread.projectId,
+    hostId: args.environment.hostId,
+    input: prompt.input,
+  });
+  const resolved = new Map(
+    prompt.input.map((item, index) => [item, input[index]!]),
+  );
+  return {
+    ...args,
+    input,
+    ...(prompt.inputGroups === undefined
+      ? {}
+      : {
+          inputGroups: prompt.inputGroups.map((group) =>
+            group.map((item) => resolved.get(item) ?? item),
+          ),
+        }),
+  };
+}
+
 export async function buildThreadStartCommand(
   deps: LoggedWorkSessionDeps,
   args: ThreadStartCommandArgs,
 ): Promise<Extract<HostDaemonCommand, { type: "thread.start" }>> {
+  args = await resolveImportedChatCommandInput(deps, args);
   await deps.providerRegistry.whenRegistrationsSettled();
   const runtimeContext = await resolveThreadRuntimeCommandConfig(deps, {
     thread: args.thread,
@@ -399,6 +434,7 @@ export async function prepareTurnSubmitCommandPayload(
   deps: LoggedWorkSessionDeps,
   args: PrepareTurnSubmitCommandPayloadArgs,
 ): Promise<PreparedTurnSubmitCommandPayload> {
+  args = await resolveImportedChatCommandInput(deps, args);
   await deps.providerRegistry.whenRegistrationsSettled();
   const providerThreadId = requireProviderThreadId(
     args.providerThreadId ??
@@ -449,12 +485,7 @@ function threadHasLiveChildren(
   const row = deps.db
     .select({ id: threads.id })
     .from(threads)
-    .where(
-      and(
-        eq(threads.parentThreadId, threadId),
-        liveThread,
-      ),
-    )
+    .where(and(eq(threads.parentThreadId, threadId), liveThread))
     .limit(1)
     .get();
   return row !== undefined;

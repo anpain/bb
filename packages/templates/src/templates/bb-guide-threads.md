@@ -22,7 +22,7 @@ Thread commands are split across four chapters:
 
 Importing chat history:
 
-  bb thread import-chat <file> [--json]
+  bb thread import-chat <file> [--preview] [--json]
 
   The JSON file contains providerId ("codex" or "acp-kimi"), sourceId, title,
   and messages (an ordered array of {"role":"user"|"assistant","text":"..."}).
@@ -35,6 +35,31 @@ Importing chat history:
   source import return a conflict. Import creates a transcript without starting
   an agent or resuming the original provider session.
   SDK callers use threads.importChat with the same fields.
+  To continue, send a normal message in the imported chat, use
+  bb thread tell <id> "Continue", or call threads.send() in the SDK.
+  Context is off by default, including for old imports without a choice.
+  Importing only saves history and uses no model tokens. To pass history on
+  first continuation, set context to {"mode":"all"} or
+  {"mode":"range","startMessage":10,"endMessage":25}. Indexes start at zero;
+  endMessage is exclusive. {"mode":"none"} sends no imported text or images.
+  The full transcript remains saved regardless of this choice. Text in a
+  selected range is sent without automatic truncation, with up to eight recent
+  unique images. Large selections can exceed the model's context window.
+  Message timestamps, when known, use optional epoch-millisecond timestamp.
+  Desktop offers hour/day/week presets counted back from the last dated
+  message, plus date boundaries and message sliders. Undated messages can be
+  selected by index. Each selected chat keeps its own choice.
+  --preview estimates the selected text tokens without importing or calling
+  a model. SDK callers can use previewChatImportContext(messages, context).
+  This is a rough range; image tokens, new prompts, system instructions and
+  replies are excluded. Exact usage depends on the model and caching.
+  Sending chosen context consumes provider tokens/limits on first continuation.
+  Failed startup keeps it available for retry; later turns do not prepend it
+  again. Context clear disables the handoff. Re-import can change the choice
+  only while the chat has no bb activity.
+  Personal imports create a workspace on first send. Project imports use the
+  selected project folder. Remote imports need project files on that machine;
+  import does not copy a repository or restore terminals and running commands.
 
 Spawning:
 

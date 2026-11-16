@@ -156,7 +156,7 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 - `bb thread`
 - `bb thread wait`
 - `bb thread spawn`
-- `bb thread import-chat`
+- `bb thread import-chat` (use `--preview` to estimate context without importing)
 - `bb thread create`
 - `bb thread new`
 - `bb thread fork`

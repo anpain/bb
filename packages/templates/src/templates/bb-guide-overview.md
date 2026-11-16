@@ -34,6 +34,8 @@ Each server keeps its own files, history, provider installations and sign-ins.
 The equivalent CLI target is `BB_SERVER_URL=http://127.0.0.1:38886` for local bb
 or the remote URL (for example `http://127.0.0.1:48886` for an SSH forward).
 The Node SDK uses `createNodeBbSdk({ baseUrl: "http://127.0.0.1:48886" })`.
+Desktop can manage the forward while the SSH server is selected. For a CLI or
+SDK session independent of Desktop, open the forward with OpenSSH first.
 
 Run `bb status` to see your current context (resolved project and thread IDs).
 It also warns when an enabled plugin is not running (incompatible after a bb

@@ -31,9 +31,16 @@ window.addEventListener("DOMContentLoaded", () => {
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     void (async () => {
+      const fields = new FormData(form);
       const payload: unknown = await ipcRenderer.invoke(
         BB_DESKTOP_SERVER_URL_DIALOG_SUBMIT_CHANNEL,
-        { name: nameInput.value, url: input.value },
+        {
+          name: nameInput.value,
+          url: input.value,
+          sshTarget: fields.get("sshTarget") ?? "",
+          sshIdentityFile: fields.get("sshIdentityFile") ?? "",
+          sshRemotePort: fields.get("sshRemotePort") ?? "",
+        },
       );
       const parsed = serverUrlDialogSubmitResponseSchema.safeParse(payload);
       if (parsed.success && !parsed.data.ok) {

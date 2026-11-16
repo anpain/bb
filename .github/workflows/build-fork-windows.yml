@@ -53,4 +53,5 @@ jobs:
           if ! gh release view desktop-latest >/dev/null 2>&1; then
             gh release create desktop-latest --target "$GITHUB_SHA" --title "BB fork desktop builds" --prerelease --notes $'Unsigned fork builds. Windows artifacts pass packaged-app startup smoke checks before upload. SmartScreen may warn.\n\n> AGENT GENERATED'
           fi
-          gh release upload desktop-latest apps/desktop/release/*.exe apps/desktop/release/*.blockmap apps/desktop/release/latest.yml apps/desktop/release/desktop-version-windows.json --clobber
+          gh release upload desktop-latest apps/desktop/release/*.exe apps/desktop/release/*.blockmap --clobber
+          gh release upload desktop-latest apps/desktop/release/latest.yml apps/desktop/release/desktop-version-windows.json --clobber

@@ -9,6 +9,7 @@ export const startupActionIdSchema = z.enum([
   "open-moved-server",
   "reconnect-connect",
   "retry",
+  "work-locally",
 ]);
 
 export type StartupActionId = z.infer<typeof startupActionIdSchema>;

@@ -33,14 +33,14 @@ describe("desktop update support", () => {
     ).toEqual({ autoUpdate: false, versionCheck: true });
   });
 
-  it("checks for updates without replacing the Windows fork automatically", () => {
+  it("enables in-app installation for Windows releases", () => {
     expect(
       resolveDesktopUpdateSupport({
         canReplaceAppImage: alwaysReplaceable,
         env: { APPIMAGE: APP_IMAGE_PATH },
         platform: "windows",
       }),
-    ).toEqual({ autoUpdate: false, versionCheck: true });
+    ).toEqual({ autoUpdate: true, versionCheck: true });
   });
 
   it("keeps Linux updates manual inside and outside an AppImage", () => {

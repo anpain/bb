@@ -62,6 +62,7 @@ describe("loadRemoteServerPage", () => {
     );
     expect(view?.actions.map((action) => action.id)).toEqual([
       "retry",
+      "work-locally",
       "choose-server",
     ]);
     expect(view?.details).not.toContain("rejectAndCleanup");

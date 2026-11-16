@@ -6,7 +6,12 @@ The **Build fork Windows** GitHub Actions workflow builds the x64 NSIS installer
 
 These builds are unsigned. Windows SmartScreen may warn before installation. The packaged startup smoke is not a substitute for interactive Windows testing of providers, terminals, and filesystem permissions.
 
-Version checks use this fork's release feeds. Automatic installation remains disabled; download and install updates manually.
+On Windows, bb 0.49.8 and later check this fork's GitHub Releases at startup and
+periodically while open. bb downloads a newer installer in the background and
+offers **Restart and update** or **Later**. You can also install a downloaded
+update from **Settings → Updates**. Install 0.49.8 once from GitHub if your
+current Windows build only reports updates. macOS and Linux use version checks
+with manual installation.
 
 ## Connect to your Linux server
 

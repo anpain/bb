@@ -32,6 +32,27 @@ const connectServer = {
   url: "https://laptop.getbb.app",
 };
 
+it("keeps SSH settings on selection and restart, and removes them when the server is removed", async () => {
+  const storagePath = await createStoragePath();
+  const url = "http://127.0.0.1:48886";
+  const ssh = {
+    target: "user@example.net",
+    identityFile: "~/.ssh/bb",
+    remotePort: 38886,
+  };
+  const store = createServerTargetStore({ storagePath });
+  await store.setCustomServerUrl(url, { ssh });
+  await store.setTarget("builtin");
+  const reopened = createServerTargetStore({ storagePath });
+  await reopened.load();
+  expect(reopened.getCustomServerSsh(url)).toEqual(ssh);
+  await reopened.setCustomServerUrl(url);
+  expect(reopened.getCustomServerSsh(url)).toEqual(ssh);
+  await reopened.setCustomServerUrl(null);
+  await reopened.setCustomServerUrl(url);
+  expect(reopened.getCustomServerSsh(url)).toBeNull();
+});
+
 it.each([
   {
     name: "legacy settings without a saved list",

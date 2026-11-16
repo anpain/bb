@@ -88,7 +88,21 @@ procedure until that migration is reviewed.
 
 ## 3. Connect Windows
 
-In a checkout of this repository on Windows:
+For bb Desktop 0.49.8 or later, open **Settings → Execution mode → Add server**.
+For an existing `http://127.0.0.1:48886` connection, open **Server → Edit Server**.
+Keep that URL and fill in **SSH tunnel** with your `user@host` or OpenSSH profile.
+For a specific key, enter its absolute path or a path such as `~/.ssh/bb_ed25519`.
+The remote port defaults to `38886`. For additional servers, use a different
+local loopback port for each saved connection.
+
+Use your system OpenSSH client to verify the host key and confirm that the login
+works with a key or SSH agent once. bb uses the verified entry in `known_hosts`
+and runs SSH without interactive prompts. When the saved server is selected, bb
+opens the tunnel on launch. It closes the tunnel on exit or when switching to
+another server. The systemd service on the VPS keeps running.
+
+For a standalone connection shared by a browser, CLI or SDK, run this helper
+from a Windows checkout of this repository:
 
 ```powershell
 .\scripts\server\connect.ps1 -SshTarget user@your-server -IdentityFile "$env:USERPROFILE\.ssh\your_key"

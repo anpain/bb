@@ -1643,6 +1643,11 @@ servers' separate histories, settings and account credentials; it does not copy
 data or sign in to providers. Cloud models require internet in either mode.
 This controls bb requests, not the computer's system proxy or VPN.
 
+Use **SSH tunnel** in **Add Server** or **Edit Server** to save the SSH host or
+profile, optional key path and remote bb port. bb opens the tunnel when that
+server is selected and closes it on switch or quit. Use a verified OpenSSH host
+key and key-based authentication. See [Connect Windows](server-deployment.md#3-connect-windows).
+
 The primary machine's menu offers **Change execution mode**. Remove machine
 revokes additional worker machines; the running server remains its primary host.
 A web browser uses the server at its current URL; use bb Desktop for the local

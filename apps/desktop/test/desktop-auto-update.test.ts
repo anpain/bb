@@ -227,7 +227,7 @@ describe("desktop auto-update service", () => {
 
     expect(updater.feedConfigs).toEqual([DESKTOP_AUTO_UPDATE_FEED_CONFIG]);
     expect(updater.autoDownload).toBe(false);
-    expect(updater.autoInstallOnAppQuit).toBe(true);
+    expect(updater.autoInstallOnAppQuit).toBe(false);
     expect(updater.forceDevUpdateConfig).toBe(false);
     expect(updater.logger).not.toBeNull();
   });
@@ -275,7 +275,7 @@ describe("desktop auto-update service", () => {
       "Desktop auto-update available: 0.0.2; downloading in background.",
     );
     expect(messages.infos).toContain(
-      "Desktop auto-update downloaded: 0.0.2; it will install on restart or quit.",
+      "Desktop auto-update downloaded: 0.0.2; waiting for confirmation.",
     );
   });
 

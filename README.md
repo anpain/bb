@@ -31,13 +31,13 @@ or hand off to another agent.
 This is [anpain/bb](https://github.com/anpain/bb), based on the `privacy-kimi`
 fork. It supports local execution and execution on your Linux server, removes
 bb product telemetry, and adds provider installation and account controls.
-Read the [complete fork changelog for 0.49.0–0.49.7](./CHANGELOG.md#0497).
+Read the [complete fork changelog for 0.49.0–0.49.8](./CHANGELOG.md#0498).
 
 ## Quick start
 
 - **Windows, local execution:** use the [fork desktop downloads](https://github.com/anpain/bb/releases/tag/desktop-latest), launch bb, and select **Settings → Execution mode → Local on this computer**. Install and sign in to the providers you want under **Settings → Providers**. Native Windows requires [Git for Windows](https://git-scm.com/download/win). Support varies by provider; for Linux-only CLIs use a Linux server or WSL.
 - **Your Linux server:** follow the [server setup guide](./docs/server-deployment.md). The repository includes a systemd installer, service and environment templates, health verification, and a PowerShell SSH-tunnel helper in [`scripts/server`](./scripts/server/).
-- **Switch local/server:** open **Settings → Execution mode**, select a saved server or choose **Add server**. Projects, history, settings and provider accounts belong to the selected server. Switching does not copy files or account credentials.
+- **Switch local/server:** open **Settings → Execution mode**, select a saved server or choose **Add server**. The optional SSH settings let Desktop manage the tunnel for the selected server. Projects, history, settings and provider accounts belong to that server.
 
 The desktop does not provision a fresh VPS when you enter an address. Run the
 server installer once, connect over SSH, then use **Providers → Provider

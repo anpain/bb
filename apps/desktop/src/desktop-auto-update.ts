@@ -358,7 +358,7 @@ export function createDesktopAutoUpdateService(
     args.updater.setLogger(args.logger);
     args.updater.setFeedURL(DESKTOP_AUTO_UPDATE_FEED_CONFIG);
     args.updater.setAutoDownload(false);
-    args.updater.setAutoInstallOnAppQuit(true);
+    args.updater.setAutoInstallOnAppQuit(false);
     args.updater.setForceDevUpdateConfig(args.forceDevUpdateConfig);
     args.updater.onUpdateAvailable((info) => {
       applyUpdateAvailable({
@@ -375,7 +375,7 @@ export function createDesktopAutoUpdateService(
     });
     args.updater.onUpdateDownloaded((event) => {
       args.logger.info(
-        `Desktop auto-update downloaded: ${event.version}; it will install on restart or quit.`,
+        `Desktop auto-update downloaded: ${event.version}; waiting for confirmation.`,
       );
       applyUpdateDownloaded({
         checkedAt: formatCheckedAt(now),

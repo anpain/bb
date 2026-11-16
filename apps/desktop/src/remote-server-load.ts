@@ -49,6 +49,7 @@ export async function loadRemoteServerPage(
     await args.loadStartupError({
       actions: [
         { id: "retry", label: "Try again" },
+        { id: "work-locally", label: "Work locally" },
         { id: "choose-server", label: "Choose server…" },
       ],
       details:

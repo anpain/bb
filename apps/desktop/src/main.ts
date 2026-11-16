@@ -116,6 +116,7 @@ import {
   type ServerProbeResult,
 } from "./server-probe.js";
 import { loadRemoteServerPage } from "./remote-server-load.js";
+import { startSshTunnel, type SshTunnel } from "./ssh-tunnel.js";
 import {
   applyServerMove,
   createServerMovedWatcher,
@@ -446,6 +447,8 @@ let cachedConnectCredential: ConnectCredential | null = null;
 let enrollingDesktopMachine: Promise<void> | null = null;
 let connectSessionRenewal: ConnectSessionRenewal | null = null;
 let serverTargetGeneration = 0;
+let sshTunnel: SshTunnel | null = null;
+let stoppingSshTunnel = Promise.resolve();
 let connectAccountServers: ConnectAccountServer[] = [];
 let connectServerSyncSkipReason: ConnectServerSyncSkipReason | null = null;
 let builtinServerUrl: string = DEFAULT_BB_SERVER_URL;
@@ -1732,6 +1735,10 @@ async function runStartupAction(
     popupServerMenu(browserWindow);
     return;
   }
+  if (action === "work-locally") {
+    await selectBuiltinServer();
+    return;
+  }
   if (action === "reconnect-connect") {
     openConnectSignIn(browserWindow);
     return;
@@ -1886,13 +1893,14 @@ async function applyServerTarget(): Promise<void> {
   connectSessionRenewal?.stop();
   serverTargetGeneration += 1;
   const generation = serverTargetGeneration;
-  const isCurrent = (): boolean => serverTargetGeneration === generation;
+  const isCurrent = (): boolean =>
+    !quitting && serverTargetGeneration === generation;
   desktopBrowserBrokerClient?.suspend();
   for (const window of BrowserWindow.getAllWindows()) {
     if (applicationWindowWebContentsIds.has(window.webContents.id))
       desktopBrowserViewManager?.prepareWindowReload(window);
   }
-  await loadLoadingView();
+  await Promise.all([loadLoadingView(), stopSshTunnel()]);
   if (!isCurrent()) return;
   if (serverTargetStore.getTarget().kind === "builtin") {
     await activateLocalServerMoveIfLocked();
@@ -1985,12 +1993,61 @@ async function applyServerTarget(): Promise<void> {
     }
   } else {
     stopServerMovedWatcher();
-    await loadRemoteServerTarget(target.url, isCurrent);
+    const ssh = serverTargetStore.getCustomServerSsh(target.url);
+    if (ssh !== null) {
+      try {
+        sshTunnel = startSshTunnel(target.url, ssh);
+        await sshTunnel.ready;
+      } catch (error) {
+        if (isCurrent()) {
+          await stopSshTunnel();
+          if (isCurrent()) await showSshTunnelError(error);
+          refreshApplicationMenu();
+        }
+        return;
+      }
+    }
+    if (!isCurrent()) return;
+    const tunnel = sshTunnel;
+    const loaded = await loadRemoteServerTarget(target.url, isCurrent);
+    if (tunnel !== null && loaded && isCurrent()) {
+      void tunnel.closed
+        .then(async (error) => {
+          if (sshTunnel !== tunnel || !isCurrent()) return;
+          sshTunnel = null;
+          await showSshTunnelError(error);
+        })
+        .catch((error: unknown) => desktopLogger.warn(String(error)));
+    }
     if (!isCurrent()) {
       return;
     }
   }
   refreshApplicationMenu();
+}
+
+function stopSshTunnel(): Promise<void> {
+  if (sshTunnel !== null) {
+    stoppingSshTunnel = sshTunnel.stop();
+    sshTunnel = null;
+  }
+  return stoppingSshTunnel;
+}
+
+async function showSshTunnelError(error: unknown): Promise<void> {
+  const detail = error instanceof Error ? error.message : String(error);
+  desktopLogger.warn(`[desktop] SSH connection failed: ${detail}`);
+  stopSystemConfigSync();
+  await loadStartupError({
+    actions: [
+      { id: "retry", label: "Reconnect" },
+      { id: "work-locally", label: "Work locally" },
+      { id: "choose-server", label: "Choose server…" },
+    ],
+    details: "Check the saved SSH host and key in Edit Server, then reconnect.",
+    logs: detail,
+    title: "Could not connect over SSH",
+  });
 }
 
 async function loadRemoteServerTarget(
@@ -2083,6 +2140,10 @@ async function openSetServerUrlDialog(add = false): Promise<void> {
         .getCustomServers()
         .find((server) => server.url === previousUrl)?.name ?? null,
     initialUrl: previousUrl,
+    initialSsh:
+      previousUrl === null
+        ? null
+        : serverTargetStore.getCustomServerSsh(previousUrl),
     mode: add ? "add" : "edit",
     parentWindow: getFocusedApplicationWindow(),
     preloadPath: serverUrlDialogPreloadPath,
@@ -2096,7 +2157,12 @@ async function openSetServerUrlDialog(add = false): Promise<void> {
   ) {
     return;
   }
-  if (result.kind === "set" && result.url === previousUrl) {
+  if (
+    result.kind === "set" &&
+    result.url === previousUrl &&
+    JSON.stringify(result.ssh) ===
+      JSON.stringify(serverTargetStore.getCustomServerSsh(previousUrl))
+  ) {
     await serverTargetStore.setCustomServerName(previousUrl, result.name);
     refreshApplicationMenu();
     return;
@@ -2109,6 +2175,7 @@ async function openSetServerUrlDialog(add = false): Promise<void> {
       ...(result.kind === "set" && !(add && result.name === null)
         ? { name: result.name }
         : {}),
+      ...(result.kind === "set" ? { ssh: result.ssh } : {}),
     },
   );
   await serverTargetStore.adoptConnectServers(listMenuConnectServers());
@@ -2389,6 +2456,7 @@ function handleBeforeQuit(event: Event): void {
 }
 
 async function finishQuit(): Promise<void> {
+  const tunnelClosed = stopSshTunnel();
   stopServerMovedWatcher();
   desktopBrowserBrokerClient?.stop();
   desktopBrowserBroker?.dispose();
@@ -2408,7 +2476,7 @@ async function finishQuit(): Promise<void> {
   for (const browserWindow of BrowserWindow.getAllWindows()) {
     browserWindow.hide();
   }
-  await stopOwnedRuntime();
+  await Promise.all([stopOwnedRuntime(), tunnelClosed]);
 }
 
 async function checkDesktopUpdates(): Promise<void> {
@@ -2433,6 +2501,35 @@ async function installDesktopUpdate(): Promise<void> {
   }
   await desktopWindowFactory?.persistOpenWindows();
   await desktopAutoUpdateService.installUpdate();
+}
+
+let offeredDesktopVersion: string | null = null;
+
+async function offerDesktopUpdate(): Promise<void> {
+  const info = desktopAutoUpdateService?.getInfo();
+  const version = info?.pendingVersion;
+  if (
+    quitting ||
+    !info?.updateDownloaded ||
+    !version ||
+    offeredDesktopVersion === version
+  )
+    return;
+  offeredDesktopVersion = version;
+  const options = {
+    type: "info" as const,
+    message: `bb ${version} is ready to install.`,
+    detail: "Restart bb to install the update from GitHub Releases.",
+    buttons: ["Restart and update", "Later"],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true,
+  };
+  const window = getFocusedApplicationWindow();
+  const result = await (window === null
+    ? dialog.showMessageBox(options)
+    : dialog.showMessageBox(window, options));
+  if (result.response === 0 && !quitting) await installDesktopUpdate();
 }
 
 function registerDesktopUpdateIpc(): void {
@@ -3243,6 +3340,9 @@ async function runDesktopApp(): Promise<void> {
   });
   desktopAutoUpdateService.subscribe(() => {
     sendDesktopInfoChanged();
+    void offerDesktopUpdate().catch((error: unknown) =>
+      desktopLogger.error(`Could not offer desktop update: ${String(error)}`),
+    );
   });
   registerDesktopUpdateIpc();
   desktopFindViewManager = createDesktopFindViewManager({

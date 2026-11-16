@@ -1,6 +1,11 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { z } from "zod";
+import {
+  sshLocalPort,
+  sshTunnelSettingsSchema,
+  type SshTunnelSettings,
+} from "./ssh-tunnel.js";
 
 export const SERVER_TARGET_FILE_NAME = "server-target.json";
 export const MAX_SERVER_NAME_LENGTH = 64;
@@ -14,6 +19,7 @@ interface SetCustomServerUrlOptions {
   availableConnectServers?: readonly ConnectServerRef[];
   replacedUrl?: string;
   name?: string | null;
+  ssh?: SshTunnelSettings | null;
 }
 
 export function builtinServerName(platform: NodeJS.Platform): string {
@@ -54,6 +60,7 @@ export interface ServerTargetStore {
   getCustomServerUrl(): string | null;
   getCustomServerUrls(): string[];
   getCustomServers(): CustomServer[];
+  getCustomServerSsh(url: string): SshTunnelSettings | null;
   setCustomServerName(url: string, name: string | null): Promise<void>;
   getTarget(): DesktopServerTarget;
   getShowBuiltinServer(): boolean;
@@ -82,6 +89,7 @@ const persistedServerTargetSchema = z.looseObject({
   customServerUrls: z.array(z.string().min(1)).default([]),
   target: z.enum(["builtin", "connect", "custom"]),
   customServerNames: z.record(z.string(), z.unknown()).default({}).catch({}),
+  customServerSsh: z.record(z.string(), z.unknown()).default({}).catch({}),
   connectServerNames: z.record(z.string(), z.unknown()).default({}).catch({}),
 });
 
@@ -137,6 +145,7 @@ export function createServerTargetStore(
   let connectServer: ConnectServerRef | null = null;
   let customServerUrl: string | null = null;
   let customServers: CustomServer[] = [];
+  const customServerSsh = new Map<string, SshTunnelSettings>();
   let connectServerNames = new Map<string, string>();
   let target: "builtin" | "connect" | "custom" = "builtin";
   let showBuiltinServer = true;
@@ -159,6 +168,10 @@ export function createServerTargetStore(
         Object.keys(customServerNames).length === 0
           ? undefined
           : customServerNames,
+      customServerSsh:
+        customServerSsh.size === 0
+          ? undefined
+          : Object.fromEntries(customServerSsh),
       connectServerNames:
         connectServerNames.size === 0
           ? undefined
@@ -209,6 +222,7 @@ export function createServerTargetStore(
         }
       }
       customServers = remaining;
+      for (const url of serversByUrl.keys()) customServerSsh.delete(url);
       if (customServerUrl !== null && serversByUrl.has(customServerUrl)) {
         customServerUrl = remaining[0]?.url ?? null;
       }
@@ -234,6 +248,10 @@ export function createServerTargetStore(
     getCustomServers() {
       return customServers.map((server) => ({ ...server }));
     },
+    getCustomServerSsh(url) {
+      const ssh = customServerSsh.get(url);
+      return ssh === undefined ? null : { ...ssh };
+    },
     getTarget() {
       if (target === "custom" && customServerUrl !== null) {
         return { kind: "custom", url: customServerUrl };
@@ -253,6 +271,7 @@ export function createServerTargetStore(
         persisted = null;
       }
       persistedSettings = persisted;
+      customServerSsh.clear();
       showBuiltinServer = persisted?.showBuiltinServer ?? true;
       if (persisted === null) {
         connectServer = null;
@@ -291,6 +310,13 @@ export function createServerTargetStore(
         url,
         name: names[url] ?? null,
       }));
+      for (const url of customServerUrls) {
+        const ssh = sshTunnelSettingsSchema.safeParse(
+          persisted.customServerSsh[url],
+        );
+        if (ssh.success && sshLocalPort(url) !== null)
+          customServerSsh.set(url, ssh.data);
+      }
       connectServerNames = new Map(
         Object.entries(persisted.connectServerNames).flatMap(
           ([handle, rawName]) => {
@@ -347,12 +373,25 @@ export function createServerTargetStore(
       if (url !== null && normalized === null) {
         throw new Error("Enter a valid http(s) URL.");
       }
+      if (
+        options.ssh != null &&
+        (normalized === null || sshLocalPort(normalized) === null)
+      ) {
+        throw new Error(
+          "For SSH, enter http://127.0.0.1:48886 or use another free loopback port.",
+        );
+      }
       const removedUrl =
         options.replacedUrl ?? (url === null ? customServerUrl : null);
       const removedIndex = customServers.findIndex(
         (server) => server.url === removedUrl,
       );
       const carriedName = customServers[removedIndex]?.name ?? null;
+      const carriedSsh =
+        removedUrl === normalized && normalized !== null
+          ? customServerSsh.get(normalized)
+          : undefined;
+      if (removedUrl !== null) customServerSsh.delete(removedUrl);
       customServers = customServers.filter(
         (server) => server.url !== removedUrl,
       );
@@ -377,6 +416,9 @@ export function createServerTargetStore(
           }
         }
       } else {
+        const ssh = options.ssh === undefined ? carriedSsh : options.ssh;
+        if (ssh != null) customServerSsh.set(normalized, { ...ssh });
+        if (ssh === null) customServerSsh.delete(normalized);
         customServerUrl = normalized;
         const existing = customServers.find(
           (server) => server.url === normalized,

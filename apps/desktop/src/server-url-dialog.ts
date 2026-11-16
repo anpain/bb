@@ -16,17 +16,29 @@ import {
   normalizeCustomServerUrl,
   normalizeServerName,
 } from "./server-target.js";
+import {
+  resolveSshIdentityFile,
+  sshLocalPort,
+  sshTunnelSettingsSchema,
+  type SshTunnelSettings,
+} from "./ssh-tunnel.js";
 
 type ServerUrlDialogResult =
   | { kind: "cancelled" }
   | { kind: "clear" }
-  | { kind: "set"; name: string | null; url: string };
+  | {
+      kind: "set";
+      name: string | null;
+      url: string;
+      ssh: SshTunnelSettings | null;
+    };
 
 type ServerUrlDialogMode = "add" | "edit" | "rename";
 
 interface OpenServerUrlDialogArgs {
   initialName: string | null;
   initialUrl: string | null;
+  initialSsh?: SshTunnelSettings | null;
   mode: ServerUrlDialogMode;
   parentWindow: BrowserWindow | null;
   preloadPath: string;
@@ -49,6 +61,7 @@ function renderServerUrlDialogHtml(
   mode: ServerUrlDialogMode,
   initialUrl: string | null,
   initialName: string | null,
+  ssh: SshTunnelSettings | null,
 ): string {
   const title = SERVER_URL_DIALOG_TITLES[mode];
   return `<!doctype html>
@@ -73,6 +86,13 @@ ${DESKTOP_DIALOG_BASE_CSS}
 
     input + input {
       margin-top: 8px;
+    }
+
+    fieldset {
+      border: 1px solid color-mix(in srgb, CanvasText 24%, transparent);
+      border-radius: 6px;
+      color: CanvasText;
+      margin: 12px 0 0;
     }
 
     [data-error] {
@@ -103,6 +123,17 @@ ${DESKTOP_DIALOG_BASE_CSS}
   <form>
     <input name="url" type="text" placeholder="https://example.com:38886" value="${escapeHtmlText(initialUrl ?? "")}"${mode === "rename" ? " readonly" : ""} autocomplete="off" spellcheck="false">
     <input name="name" type="text" placeholder="Name (optional)" value="${escapeHtmlText(initialName ?? "")}" maxlength="${MAX_SERVER_NAME_LENGTH}" autocomplete="off" spellcheck="false">
+    ${
+      mode === "rename"
+        ? ""
+        : `<fieldset>
+      <legend>SSH tunnel (optional)</legend>
+      <p>bb connects on startup and closes the tunnel when you quit. Use a separate loopback URL, such as http://127.0.0.1:48886.</p>
+      <input name="sshTarget" type="text" aria-label="SSH host" placeholder="user@host or SSH profile" value="${escapeHtmlText(ssh?.target ?? "")}" maxlength="255" autocomplete="off" spellcheck="false">
+      <input name="sshIdentityFile" type="text" aria-label="SSH key file" placeholder="Key path (optional), e.g. ~/.ssh/id_ed25519" value="${escapeHtmlText(ssh?.identityFile ?? "")}" maxlength="4096" autocomplete="off" spellcheck="false">
+      <input name="sshRemotePort" type="text" inputmode="numeric" aria-label="Remote bb port" placeholder="Remote bb port (38886)" value="${escapeHtmlText(ssh?.remotePort.toString() ?? "")}" maxlength="5" autocomplete="off">
+    </fieldset>`
+    }
     <div data-error></div>
     <div class="actions">
       <button type="button" data-cancel>Cancel</button>
@@ -174,6 +205,7 @@ export function openServerUrlDialog(
             kind: "set",
             name: normalizeServerName(parsed.data.name),
             url: args.initialUrl,
+            ssh: null,
           });
           return { ok: true };
         }
@@ -181,14 +213,52 @@ export function openServerUrlDialog(
           finish({ kind: "clear" });
           return { ok: true };
         }
-        const normalized = normalizeCustomServerUrl(parsed.data.url);
+        const sshTarget = parsed.data.sshTarget.trim();
+        const normalized = normalizeCustomServerUrl(
+          parsed.data.url.trim() || (sshTarget ? "http://127.0.0.1:48886" : ""),
+        );
         if (normalized === null) {
           return { ok: false, message: "Enter a valid http(s) URL." };
+        }
+        let ssh: SshTunnelSettings | null = null;
+        if (sshTarget) {
+          if (sshLocalPort(normalized) === null) {
+            return {
+              ok: false,
+              message:
+                "For SSH, use http://127.0.0.1:48886 or another free loopback port.",
+            };
+          }
+          const identityFile = parsed.data.sshIdentityFile.trim() || null;
+          const port = parsed.data.sshRemotePort.trim();
+          const result = sshTunnelSettingsSchema.safeParse({
+            target: sshTarget,
+            identityFile,
+            remotePort:
+              port === "" ? 38886 : /^\d+$/u.test(port) ? Number(port) : NaN,
+          });
+          if (!result.success)
+            return {
+              ok: false,
+              message:
+                "Enter an SSH profile or user@host and a valid remote port.",
+            };
+          if (
+            identityFile !== null &&
+            resolveSshIdentityFile(identityFile) === null
+          ) {
+            return {
+              ok: false,
+              message: "Enter an absolute key path or a path starting with ~/.",
+            };
+          }
+          ssh = result.data;
         }
         finish({
           kind: "set",
           name: normalizeServerName(parsed.data.name),
           url: normalized,
+          ssh,
         });
         return { ok: true };
       },
@@ -203,7 +273,12 @@ export function openServerUrlDialog(
 
   showDesktopDialogHtml(
     dialogWindow,
-    renderServerUrlDialogHtml(args.mode, args.initialUrl, args.initialName),
+    renderServerUrlDialogHtml(
+      args.mode,
+      args.initialUrl,
+      args.initialName,
+      args.initialSsh ?? null,
+    ),
   );
 
   return result;

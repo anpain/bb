@@ -1,6 +1,12 @@
 # Changelog
 
-Fork history for 0.49.0–0.49.7 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
+Fork history for 0.49.0–0.49.8 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
+
+## 0.49.8
+
+- Save an SSH profile or host and key path in **Add Server** or **Edit Server**. Desktop opens the tunnel for the selected server and closes it on exit or when you switch servers.
+- Reconnect or choose **Work locally** from the connection error screen.
+- Windows checks GitHub Releases for new versions, downloads them in the background, and asks before restarting and installing.
 
 ## 0.49.7
 

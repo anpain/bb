@@ -9,6 +9,9 @@ export const serverUrlDialogSubmitRequestSchema = z
   .object({
     name: z.string().max(1024),
     url: z.string().max(4096),
+    sshTarget: z.string().max(255),
+    sshIdentityFile: z.string().max(4096),
+    sshRemotePort: z.string().max(5),
   })
   .strict();
 

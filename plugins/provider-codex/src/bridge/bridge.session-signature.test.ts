@@ -181,6 +181,59 @@ function recordedRequests() {
     .map((line) => schema.parse(JSON.parse(line)));
 }
 
+it("resumes the same native thread after changing the pooled account without replaying history", async () => {
+  const envVars = {
+    CODEX_OPENAI_BASE_URL:
+      "http://127.0.0.1:38886/api/v1/plugins/account-pool/http/v1",
+    CODEX_POOL_AUTH_TOKEN: "test-account-one",
+  };
+  harness.sendRequest(1, "thread/start", {
+    threadId: THREAD_ID,
+    cwd: workspaceDir,
+    instructionMode: "append",
+    options: { ...FULL_ACCESS_SESSION_OPTIONS, envVars },
+  });
+  const started = await harness.waitForResponse(1);
+  const { providerThreadId } = z
+    .object({ providerThreadId: z.string() })
+    .parse(started.result);
+  harness.sendRequest(2, "turn/start", {
+    threadId: THREAD_ID,
+    providerThreadId,
+    clientRequestId: "creq_accswapxxx",
+    input: [
+      { type: "text", text: "Continue with the second account", mentions: [] },
+    ],
+    options: {
+      ...FULL_ACCESS_SESSION_OPTIONS,
+      envVars: { ...envVars, CODEX_POOL_AUTH_TOKEN: "test-account-two" },
+    },
+  });
+  expect((await harness.waitForResponse(2)).error).toBeUndefined();
+  const requests = recordedRequests();
+  expect(
+    requests.filter((request) => request.method === "thread/start"),
+  ).toHaveLength(1);
+  const resumed = requests.filter(
+    (request) => request.method === "thread/resume",
+  );
+  expect(resumed).toHaveLength(1);
+  expect(resumed[0]?.params).toMatchObject({
+    threadId: providerThreadId,
+    excludeTurns: true,
+  });
+  expect(resumed[0]?.params).not.toHaveProperty("history");
+  expect(
+    requests.find((request) => request.method === "turn/start")?.params.input,
+  ).toEqual([
+    {
+      type: "text",
+      text: "Continue with the second account",
+      text_elements: [],
+    },
+  ]);
+}, 30_000);
+
 it("clears Fast for the next turn without replacing the session", async () => {
   harness.sendRequest(1, "thread/start", {
     threadId: THREAD_ID,

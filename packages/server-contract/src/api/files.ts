@@ -5,6 +5,20 @@ import {
   FILE_LIST_LIMIT_MAX,
 } from "@bb/domain";
 import type { HostDaemonOnlineRpcResultByType } from "@bb/host-daemon-contract";
+import {
+  workspaceSyncOperationSchema,
+  workspaceSyncResultSchema,
+} from "@bb/host-daemon-contract";
+
+export const workspaceSyncRequestSchema = z
+  .object({
+    hostId: z.string().min(1).optional(),
+    operation: workspaceSyncOperationSchema,
+  })
+  .strict();
+export type WorkspaceSyncRequest = z.infer<typeof workspaceSyncRequestSchema>;
+export { workspaceSyncResultSchema };
+export type WorkspaceSyncResponse = z.infer<typeof workspaceSyncResultSchema>;
 
 export const hostFileReadRequestSchema = z
   .object({
@@ -14,10 +28,13 @@ export const hostFileReadRequestSchema = z
     ref: z.string().min(1).optional(),
   })
   .strict()
-  .refine((request) => request.ref === undefined || request.rootPath !== undefined, {
-    message: "rootPath is required when ref is set",
-    path: ["rootPath"],
-  });
+  .refine(
+    (request) => request.ref === undefined || request.rootPath !== undefined,
+    {
+      message: "rootPath is required when ref is set",
+      path: ["rootPath"],
+    },
+  );
 export type HostFileReadRequest = z.infer<typeof hostFileReadRequestSchema>;
 
 export const hostFileWriteRequestSchema = z

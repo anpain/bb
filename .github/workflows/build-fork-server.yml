@@ -48,6 +48,12 @@ jobs:
           test/threads/thread-plugin-metadata-configure.test.ts
           test/public/public-provider-installations.test.ts
           test/public/public-chat-import.test.ts
+          test/public/public-thread-transfer.test.ts
+      - name: Test workspace and native session transfer
+        run: >-
+          pnpm exec turbo run test --filter=@bb/host-daemon --filter=bb-plugin-provider-codex --output-logs=new-only --
+          workspace-sync.test.ts native-session-transfer.test.ts
+          app-server-launch.test.ts bridge.session-signature.test.ts
       - name: Test Account Pooler routing
         run: >-
           pnpm exec turbo run test --filter=bb-plugin-account-pool --output-logs=new-only --

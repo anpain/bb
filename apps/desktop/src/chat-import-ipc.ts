@@ -2,11 +2,28 @@ import { z } from "zod";
 import {
   chatImportContextSchema,
   chatImportMessageSummarySchema,
+  chatImportContinuationSchema,
+  systemExecutionOptionsResponseSchema,
 } from "@bb/server-contract";
 
 export const chatImportSubmitChannel = "bb-desktop:chat-import:submit";
 export const chatImportCloseChannel = "bb-desktop:chat-import:close";
 export const chatImportPreviewChannel = "bb-desktop:chat-import:preview";
+export const chatImportModelsChannel = "bb-desktop:chat-import:models";
+export const chatImportModelsRequestSchema = z
+  .object({
+    providerId: z.string().min(1).max(200).nullable(),
+    remote: z.boolean(),
+  })
+  .strict();
+export const chatImportModelsResponseSchema = z.discriminatedUnion("ok", [
+  z.object({
+    ok: z.literal(true),
+    sourceLabel: z.string().min(1),
+    catalog: systemExecutionOptionsResponseSchema,
+  }),
+  z.object({ ok: z.literal(false), message: z.string() }),
+]);
 export const chatImportPreviewSchema = z.discriminatedUnion("ok", [
   z.object({
     ok: z.literal(true),
@@ -19,6 +36,7 @@ export const chatImportSubmissionSchema = z
   .object({
     selected: z.array(z.number().int().nonnegative()).min(1).max(100),
     copyToServer: z.boolean(),
+    continuation: chatImportContinuationSchema.optional(),
     contexts: z
       .array(
         z

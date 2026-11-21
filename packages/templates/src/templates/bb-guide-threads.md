@@ -22,7 +22,24 @@ Thread commands are split across four chapters:
 
 Importing chat history:
 
+  bb thread move <id> --to-server <url> [--target-path <absolute-path>]
+    [--state-dir <local-folder>] [--json]
+
+    Move an idle top-level native Codex chat, its full project folder and chat
+    files to another bb server. Stop active work first. Both servers and their
+    Codex providers must support native transfer; sign in to the target's
+    Account Pooler before continuing a portable session. The same bb thread ID
+    and Codex session ID are restored, with no model request or transcript
+    replay. The source stays archived after a successful move. Moving back
+    updates that unchanged archived copy; divergent history is never replaced.
+    An ambiguous activation failure leaves the source archived to avoid two
+    live writers. Inspect the target before manually reopening the source.
+    --state-dir defaults to ~/.bb/workspace-sync on the CLI machine. Keep it
+    when moving back. SDK: experimental_moveThread from @bb/sdk/node, or the
+    typed threads.experimental_transfer operations used by core Desktop.
+
   bb thread import-chat <file> [--preview] [--json]
+    [--provider <id>] [--model <id>] [--reasoning <level>]
 
   The JSON file contains providerId ("codex" or "acp-kimi"), sourceId, title,
   and messages (an ordered array of {"role":"user"|"assistant","text":"..."}).
@@ -35,6 +52,13 @@ Importing chat history:
   source import return a conflict. Import creates a transcript without starting
   an agent or resuming the original provider session.
   SDK callers use threads.importChat with the same fields.
+    With context enabled, optional continuation selects { providerId, model,
+    reasoningLevel }; model and reasoningLevel may be null to use defaults.
+    --provider, --model and --reasoning select the same values from the CLI.
+    This can continue Kimi history with Codex/ChatGPT. The selected model sees
+    the chosen context with the first new message, without a separate summary
+    request at import. continuation is rejected when context is off. Model and
+    reasoning can still be changed in the normal composer before continuing.
   To continue, send a normal message in the imported chat, use
   bb thread tell <id> "Continue", or call threads.send() in the SDK.
   Context is off by default, including for old imports without a choice.

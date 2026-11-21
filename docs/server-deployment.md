@@ -208,11 +208,73 @@ with its own daemon; it does not switch the desktop to another bb server.
 Projects assigned to such a host execute there. **Execution mode** chooses
 which bb server the desktop uses.
 
-Switching servers does not synchronize files, accounts or chat history. Use Git
-branches to bring code from the VPS to a local checkout. The Provider accounts
-description shows the selected primary machine's name, which can be renamed
-under **Settings → Machines → Rename**. This setup routes bb traffic, not all
-traffic from your computer.
+Changing servers outside a thread opens that server's own projects and history.
+Changing servers while an idle native Codex thread is open moves that thread
+and mirrors its project folder. Provider credentials are not migrated. The
+Provider accounts description shows the selected primary machine's name, which
+can be renamed under **Settings → Machines → Rename**. This setup routes bb
+traffic, not all traffic from your computer.
+
+The **Local / VPS** control above both the new-thread and follow-up composers
+uses this same server selection. **VPS** opens Add server when none is saved,
+or a picker when several are saved. **Local** returns to the embedded server.
+The provider usage rail loads a fresh inventory and quota snapshot on opening
+the selected server; late responses from a previous connection are discarded.
+Its cards identify the usage source and host. This control selects a complete
+bb server, rather than forwarding only model requests.
+
+When moving an open Codex thread, stop active work first. Desktop archives the
+source, verifies the full project copy (including Git and uncommitted files),
+transfers native history and available attachments, and opens the same thread
+on the target. A missing native session is reported instead of silently
+starting an empty conversation. Both servers must run this feature and their
+matching Codex provider; the target needs its own signed-in Account Pooler.
+Other providers can use transcript import with a chosen continuation model.
+
+While the remote server is selected, Desktop mirrors the linked project folders
+with a 10-second pause between completed passes. Local bb stays running for
+filesystem access; model execution and provider authentication belong to the
+selected execution host. On exit, Desktop attempts one final file sync before
+closing its runtime and SSH tunnel. It does not cancel an agent still working
+on an independently running VPS. Such work can continue on the VPS and is
+downloaded on the next connection.
+
+If a file changed on both machines, synchronization stops without choosing a
+winner. Save the intended contents on both sides and retry using the same
+state. A deleted project root is never treated as deletion of every file.
+Desktop keeps the mapping, hash baseline and recovery journal under its user
+data directory's `workspace-sync`; the CLI defaults to `~/.bb/workspace-sync`.
+Preserve this state when moving back. Replaced/deleted file versions are kept
+under each daemon's `workspace-sync/backups`, up to ten per file. Staging uses
+a private sibling `.bb-sync-<hash>` folder. Symlinks, special files, incompatible
+filenames and case collisions fail explicitly. A Windows virtual environment
+or CorelDRAW installation does not become executable on Linux merely by copying
+its files; run platform-specific checks on the appropriate machine.
+
+The CLI equivalents are `bb project sync <path> --to-server <url> --target-path
+<path> --watch` for files and `bb thread move <id> --to-server <url>` for a native
+Codex handoff. Node SDK callers use `experimental_syncWorkspacePair` and
+`experimental_moveThread` from `@bb/sdk/node`; Desktop uses these same helpers.
+
+### Codex accounts and conversation continuity
+
+Changing a pooled Codex account on the same execution host preserves the native
+Codex thread ID. The bridge resumes that stored thread with `thread/resume`
+when the pool credentials change, then sends only the new user message. There
+is no need to import or append the conversation again just to change accounts.
+The next model request still uses conversation context and is subject to the
+selected account's usage and cache rules.
+
+Moving to another execution host also requires the native Codex session files
+and a matching bb thread/environment association. A matching email, copied
+project folder, or imported display history alone does not restore that state.
+The chat importer saves display history and can optionally attach selected
+text as continuation context; it does not migrate a native provider session.
+Native handoff through Local / VPS and `bb thread move` is a separate path that
+preserves the real provider session instead of creating imported context.
+Keep that option off when resuming an existing native session. Import itself
+does not call a model; selected continuation context is sent with the first
+subsequent message. See the [Codex app-server documentation](https://learn.chatgpt.com/docs/app-server).
 
 CLI clients choose the endpoint with `BB_SERVER_URL`, for example
 `http://127.0.0.1:48886` for the Windows tunnel or `http://127.0.0.1:38886` on

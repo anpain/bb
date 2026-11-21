@@ -5,6 +5,7 @@ import {
   getEnvironment,
   listStoredEventRows,
   getLatestThreadSequence,
+  getThreadExecutionOverride,
   threads,
 } from "@bb/db";
 import {
@@ -21,6 +22,81 @@ import {
 import { expect, it, vi } from "vitest";
 import { prependImportedChatContext } from "../../src/services/threads/imported-chat-context.js";
 import { textInput } from "../helpers/prompt-input.js";
+
+it("continues Kimi history using the selected Codex model and reasoning without a model call at import", async () => {
+  await withTestHarness(async (harness) => {
+    ensurePersonalProject(harness.db);
+    const payload = {
+      providerId: "acp-kimi",
+      sourceId: "cross-provider-chat",
+      title: "Kimi to Codex",
+      context: { mode: "all" },
+      continuation: {
+        providerId: "codex",
+        model: "gpt-5",
+        reasoningLevel: "high",
+      },
+      messages: [
+        { role: "user", text: "Continue this Kimi project" },
+        { role: "assistant", text: "The Kimi parser is ready" },
+      ],
+    };
+    const post = (body: object) =>
+      harness.app.request("/api/v1/threads/import-chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    const response = await post(payload);
+    expect(response.status).toBe(201);
+    const { threadId } = chatImportResponseSchema.parse(await response.json());
+    expect(getThread(harness.db, threadId)).toMatchObject({
+      providerId: "codex",
+      status: "idle",
+    });
+    expect(getThreadExecutionOverride(harness.db, threadId)).toEqual({
+      modelOverride: "gpt-5",
+      reasoningLevelOverride: "high",
+    });
+    expect(getStoredProviderSession(harness.db, threadId).kind).not.toBe(
+      "owned",
+    );
+    expect(
+      JSON.stringify(
+        prependImportedChatContext(harness.db, threadId, {
+          input: textInput("Next step"),
+        }).input,
+      ),
+    ).toContain("The Kimi parser is ready");
+    expect((await post({ ...payload, context: { mode: "none" } })).status).toBe(
+      400,
+    );
+    expect(
+      (
+        await post({
+          ...payload,
+          sourceId: "invalid-provider",
+          continuation: {
+            ...payload.continuation,
+            providerId: "missing-provider",
+          },
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await post({
+          ...payload,
+          sourceId: "invalid-reasoning",
+          continuation: {
+            ...payload.continuation,
+            reasoningLevel: "invented-level",
+          },
+        })
+      ).status,
+    ).toBe(400);
+  });
+});
 import {
   registerHostRpcResponder,
   EMPTY_WORKSPACE_AGENT_CONTEXT,

@@ -246,6 +246,7 @@ type ExpectedEnvironmentsKey =
   | "update";
 
 type ExpectedFilesKey =
+  | "experimental_sync"
   | "createPreview"
   | "list"
   | "listPaths"
@@ -392,6 +393,7 @@ type ExpectedThemeKey = "catalog" | "get" | "resolve" | "set";
 type ExpectedThreadSectionsKey = "create" | "delete" | "list" | "update";
 
 type ExpectedThreadsKey =
+  | "experimental_transfer"
   | "importChat"
   | "experimental_listAncestors"
   | "experimental_listDescendants"

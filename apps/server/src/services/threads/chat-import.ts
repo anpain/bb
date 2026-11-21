@@ -12,6 +12,7 @@ import {
   deleteThreadEventSuffixInTransaction,
   patchThreadPluginMetadata,
   threads,
+  setThreadExecutionOverride,
   type AppendStoredThreadEventArgs,
 } from "@bb/db";
 import {
@@ -37,10 +38,34 @@ import { requirePublicProject } from "../lib/entity-lookup.js";
 const metadataNamespace = "bb.core.chat-import";
 
 export async function importChat(
-  deps: Pick<AppDeps, "db" | "hub" | "config">,
+  deps: Pick<AppDeps, "db" | "hub" | "config" | "providerRegistry">,
   request: ChatImportRequest,
 ): Promise<ChatImportResponse> {
   const context: ChatImportContext = request.context ?? { mode: "none" };
+  const targetProviderId =
+    request.continuation?.providerId ?? request.providerId;
+  const targetProvider = request.continuation
+    ? deps.providerRegistry.get(targetProviderId)
+    : null;
+  if (request.continuation && !targetProvider)
+    throw new ApiError(
+      400,
+      "invalid_request",
+      "The continuation provider is not enabled on this server",
+    );
+  if (
+    targetProvider &&
+    request.continuation?.reasoningLevel &&
+    targetProvider.info.reasoningLevels?.length &&
+    !targetProvider.info.reasoningLevels.some(
+      (level) => level.id === request.continuation?.reasoningLevel,
+    )
+  )
+    throw new ApiError(
+      400,
+      "invalid_request",
+      "This provider does not support the selected reasoning level",
+    );
   const project =
     request.projectId === undefined
       ? getPersonalProject(deps.db)
@@ -61,7 +86,13 @@ export async function importChat(
       );
   }
   const contentHash = createHash("sha256")
-    .update(JSON.stringify([request.messages, context]))
+    .update(
+      JSON.stringify(
+        request.continuation
+          ? [request.messages, context, request.continuation]
+          : [request.messages, context],
+      ),
+    )
     .digest("hex");
   const source = createHash("sha256")
     .update(JSON.stringify([request.providerId, request.sourceId]))
@@ -164,6 +195,7 @@ export async function importChat(
             projectId: project.id,
             environmentId: environment?.id ?? null,
             title: request.title,
+            providerId: targetProviderId,
             updatedAt: Date.now(),
           })
           .where(eq(threads.id, threadId))
@@ -181,7 +213,7 @@ export async function importChat(
           id: threadId,
           projectId: project.id,
           environmentId: environment?.id ?? null,
-          providerId: request.providerId,
+          providerId: targetProviderId,
           title: request.title,
           status: "idle",
           pluginMetadata: {
@@ -193,6 +225,11 @@ export async function importChat(
             },
           },
         });
+      setThreadExecutionOverride(tx, {
+        threadId,
+        modelOverride: request.continuation?.model ?? null,
+        reasoningLevelOverride: request.continuation?.reasoningLevel ?? null,
+      });
       const events: AppendStoredThreadEventArgs[] = [];
       const providerThreadId = `imported:${threadId}`;
       let scope = turnScope(randomUUID());

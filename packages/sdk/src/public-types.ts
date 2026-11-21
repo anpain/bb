@@ -1,8 +1,17 @@
 export type {
   ChatImportContext,
+  ChatImportContinuation,
   ChatImportRequest,
   ChatImportResponse,
+  ThreadTransferRequest,
+  ThreadTransferResponse,
+  ThreadTransferPacket,
 } from "@bb/server-contract";
+export type {
+  WorkspaceSyncOperation,
+  WorkspaceSyncEntry,
+  WorkspaceSyncResult,
+} from "@bb/host-daemon-contract";
 export type {
   CallerExecutionInputSource,
   ContextSnapshot,

@@ -59,6 +59,7 @@ import {
   readHostFileChunk,
 } from "./command-handlers/host-files.js";
 import { writeHostFile } from "./command-handlers/file-write.js";
+import { runWorkspaceSync } from "./command-handlers/workspace-sync.js";
 import { discoverRepos } from "./command-handlers/discover-repos.js";
 import {
   mkdirHostPath,
@@ -653,6 +654,8 @@ const onlineRpcHandlers: OnlineRpcHandlerMap = {
   "host.read_file": readHostFile,
   "host.read_file_chunk": readHostFileChunk,
   "host.write_file": writeHostFile,
+  "host.workspace_sync": (command, options, signal) =>
+    runWorkspaceSync(command.operation, options.dataDir, signal),
   "provider.list_models": (command, options) =>
     withResolvedBridgeLaunch(command, options, (args) =>
       options.listModels({

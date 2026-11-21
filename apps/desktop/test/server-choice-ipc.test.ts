@@ -178,6 +178,20 @@ describe("server choice IPC", () => {
     expect(select).not.toHaveBeenCalled();
     request(event, "remote");
     expect(select).toHaveBeenCalledWith("remote");
+    const invoke = ipc.handle.mock.calls.find(
+      ([channel]) => channel === BB_DESKTOP_SELECT_SERVER_CHANNEL,
+    )?.[1];
+    if (!invoke) throw new Error("Missing execution switch handler");
+    expect(await invoke({ ...event, senderFrame: {} }, "remote")).toMatchObject(
+      { ok: false },
+    );
+    expect(await invoke(event, "unknown")).toMatchObject({ ok: false });
+    expect(await invoke(event, "remote")).toEqual({ ok: true });
+    select.mockRejectedValueOnce(new Error("Conflicting edits"));
+    expect(await invoke(event, "remote")).toEqual({
+      ok: false,
+      message: "Conflicting edits",
+    });
     select.mockRejectedValueOnce(new Error("disk full"));
     request(event, "remote");
     await Promise.resolve();

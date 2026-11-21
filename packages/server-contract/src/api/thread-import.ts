@@ -18,6 +18,16 @@ export const chatImportContextSchema = z.discriminatedUnion("mode", [
     ),
 ]);
 export type ChatImportContext = z.infer<typeof chatImportContextSchema>;
+export const chatImportContinuationSchema = z
+  .object({
+    providerId: z.string().trim().min(1).max(200),
+    model: z.string().trim().min(1).max(512).nullable(),
+    reasoningLevel: z.string().trim().min(1).max(100).nullable(),
+  })
+  .strict();
+export type ChatImportContinuation = z.infer<
+  typeof chatImportContinuationSchema
+>;
 export const chatImportRequestSchema = z
   .object({
     providerId: chatImportProviderSchema,
@@ -25,6 +35,7 @@ export const chatImportRequestSchema = z
     title: z.string().trim().min(1).max(200),
     projectId: z.string().min(1).optional(),
     context: chatImportContextSchema.optional(),
+    continuation: chatImportContinuationSchema.optional(),
     messages: z
       .array(
         z
@@ -52,6 +63,12 @@ export const chatImportRequestSchema = z
       .max(10_000),
   })
   .strict()
+  .refine(
+    (chat) =>
+      chat.continuation === undefined ||
+      (chat.context !== undefined && chat.context.mode !== "none"),
+    "Choose continuation settings only when importing model context",
+  )
   .refine(
     (chat) =>
       chat.context?.mode !== "range" ||

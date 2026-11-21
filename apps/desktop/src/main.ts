@@ -6,6 +6,13 @@ import { createDesktopLogger } from "./desktop-logger.js";
 import { attachServerUpdateControl } from "./server-update-control.js";
 import { registerServerChoiceIpc } from "./server-choice-ipc.js";
 import { openChatImportDialog } from "./chat-import-dialog.js";
+import {
+  createNodeBbSdk,
+  experimental_moveThread,
+  type BbSdk,
+} from "@bb/sdk/node";
+import { createWorkspaceMirrors } from "./workspace-mirrors.js";
+import { BB_DESKTOP_EXECUTION_PROGRESS_CHANNEL } from "./desktop-window-command-ipc.js";
 import { listSavedChats } from "./chat-import-source.js";
 import { randomUUID } from "node:crypto";
 import { accessSync, constants as fsConstants } from "node:fs";
@@ -428,6 +435,70 @@ let systemConfigSync: SystemConfigSync | null = null;
 let systemConfigRefreshToken = 0;
 let refreshRemoteSystemConfig: (() => void) | null = null;
 const applicationWindowWebContentsIds = new Set<number>();
+let workspaceMirrors: ReturnType<typeof createWorkspaceMirrors> | null = null;
+let executionSwitchInProgress = false;
+let executionSwitchAbort: AbortController | null = null;
+let executionSwitchCompletion: Promise<void> | null = null;
+
+function serverUrlForChoice(serverId: string): string | null {
+  if (serverId === "builtin")
+    return currentRuntime?.serverUrl ?? builtinServerUrl;
+  if (serverId.startsWith("custom:"))
+    return (
+      serverTargetStore
+        ?.getCustomServerUrls()
+        .find((url) => customServerId(url) === serverId) ?? null
+    );
+  return (
+    listMenuConnectServers().find(
+      (server) => `connect:${server.handle}` === serverId,
+    )?.url ?? null
+  );
+}
+
+async function workspaceClient(serverId: string): Promise<BbSdk> {
+  if (serverId === "builtin" && !(await ensureBuiltinRuntimeAttached(true)))
+    throw new Error("Could not start local bb for file synchronization");
+  const url = serverUrlForChoice(serverId);
+  if (url === null)
+    throw new Error("The saved server was removed. Synchronization stopped.");
+  const session = getFocusedApplicationWindow()?.webContents.session;
+  return createNodeBbSdk({
+    baseUrl: url,
+    timeoutMs: 180_000,
+    fetch: (input, init) => {
+      const signal = AbortSignal.any([
+        AbortSignal.timeout(180_000),
+        ...(init?.signal ? [init.signal] : []),
+      ]);
+      return session
+        ? session.fetch(input instanceof URL ? input.toString() : input, {
+            ...init,
+            signal,
+          })
+        : fetch(input, { ...init, signal });
+    },
+  });
+}
+
+function mirrors() {
+  workspaceMirrors ??= createWorkspaceMirrors({
+    dataDir: app.getPath("userData"),
+    client: workspaceClient,
+    onError: (message) => {
+      desktopLogger.warn(`Workspace synchronization: ${message}`);
+      if (quitting) return;
+      void dialog.showMessageBox({
+        type: "warning",
+        title: "Project synchronization stopped",
+        message,
+        detail:
+          "Both copies were preserved. Resolve the conflict or restore the connection before continuing.",
+      });
+    },
+  });
+  return workspaceMirrors;
+}
 const splitNavigationEnabledWebContentsIds = new Set<number>();
 const splitNavigationCommandsByWebContentsId = new Map<
   number,
@@ -1886,6 +1957,7 @@ async function loadServerMovedView(move: DesktopServerMove): Promise<void> {
 }
 
 async function applyServerTarget(): Promise<void> {
+  await workspaceMirrors?.stop();
   startupErrorPage = null;
   if (serverTargetStore === null) {
     return;
@@ -2024,6 +2096,8 @@ async function applyServerTarget(): Promise<void> {
     }
   }
   refreshApplicationMenu();
+  const activeChoice = listServerChoices().find((choice) => choice.active);
+  if (activeChoice && bbAppLoaded) mirrors().start(activeChoice.id);
 }
 
 function stopSshTunnel(): Promise<void> {
@@ -2072,6 +2146,111 @@ async function loadRemoteServerTarget(
 }
 
 async function setActiveServerTarget(serverId: string): Promise<void> {
+  if (executionSwitchInProgress)
+    throw new Error("An execution switch is already in progress");
+  executionSwitchInProgress = true;
+  const controller = new AbortController();
+  executionSwitchAbort = controller;
+  let completed: () => void = () => {};
+  executionSwitchCompletion = new Promise<void>((resolve) => {
+    completed = resolve;
+  });
+  let previewTunnel: SshTunnel | null = null;
+  try {
+    const previous = listServerChoices().find((choice) => choice.active);
+    if (previous && previous.id !== serverId) {
+      await workspaceMirrors?.stop();
+      const targetUrl = serverUrlForChoice(serverId);
+      if (targetUrl === null) throw new Error("Select a saved server");
+      const ssh = serverId.startsWith("custom:")
+        ? serverTargetStore?.getCustomServerSsh(targetUrl)
+        : null;
+      if (ssh) {
+        previewTunnel = startSshTunnel(targetUrl, ssh);
+        await previewTunnel.ready;
+      }
+      const window = getFocusedApplicationWindow();
+      const pathname = window
+        ? new URL(window.webContents.getURL()).pathname
+        : "";
+      const match =
+        /(?:\/projects\/[^/]+)?\/threads\/(thr_[a-zA-Z0-9_-]+)(?:\/|$)/u.exec(
+          pathname,
+        );
+      if (match?.[1]) {
+        const [source, target] = await Promise.all([
+          workspaceClient(previous.id),
+          workspaceClient(serverId),
+        ]);
+        let lastProgress = 0;
+        let phase = "";
+        const moved = await experimental_moveThread({
+          source: { id: previous.id, sdk: source },
+          target: { id: serverId, sdk: target },
+          threadId: match[1],
+          stateDir: mirrors().stateDir,
+          signal: controller.signal,
+          onProgress: (progress) => {
+            if (window === null || window.isDestroyed()) return;
+            const now = Date.now();
+            if (phase === progress.phase && now - lastProgress < 100) return;
+            phase = progress.phase;
+            lastProgress = now;
+            window.webContents.send(
+              BB_DESKTOP_EXECUTION_PROGRESS_CHANNEL,
+              progress,
+            );
+          },
+        });
+        const sourceSide = {
+          serverId: previous.id,
+          hostId: moved.mirror.sourceHostId,
+          path: moved.mirror.sourcePath,
+        };
+        const targetSide = {
+          serverId,
+          hostId: moved.mirror.targetHostId,
+          path: moved.mirror.targetPath,
+        };
+        const reverse =
+          `${sourceSide.hostId}:${sourceSide.path}` >
+          `${targetSide.hostId}:${targetSide.path}`;
+        await mirrors().remember({
+          identity: moved.mirror.identity,
+          left: reverse ? targetSide : sourceSide,
+          right: reverse ? sourceSide : targetSide,
+        });
+        await previewTunnel?.stop();
+        previewTunnel = null;
+        await setActiveServerTargetWithoutTransfer(serverId);
+        const url = new URL(
+          `/projects/${encodeURIComponent(moved.projectId)}/threads/${encodeURIComponent(moved.threadId)}`,
+          targetUrl,
+        );
+        await loadBbApp(url.toString());
+        return;
+      }
+    }
+    await previewTunnel?.stop();
+    previewTunnel = null;
+    await setActiveServerTargetWithoutTransfer(serverId);
+  } finally {
+    try {
+      await previewTunnel?.stop();
+    } finally {
+      executionSwitchInProgress = false;
+      executionSwitchAbort = null;
+      completed();
+      executionSwitchCompletion = null;
+      const active = listServerChoices().find((choice) => choice.active);
+      if (active && bbAppLoaded && !quitting) mirrors().start(active.id);
+    }
+  }
+}
+
+async function setActiveServerTargetWithoutTransfer(
+  serverId: string,
+): Promise<void> {
   if (
     serverTargetStore === null ||
     !listServerChoices().some(
@@ -2179,6 +2358,14 @@ async function openSetServerUrlDialog(add = false): Promise<void> {
     },
   );
   await serverTargetStore.adoptConnectServers(listMenuConnectServers());
+  if (add && result.kind === "set") {
+    if (target.kind === "builtin") await serverTargetStore.setTarget("builtin");
+    else if (target.kind === "custom")
+      await serverTargetStore.setCustomServerUrl(target.url);
+    else await serverTargetStore.setConnectServer(target.server);
+    await setActiveServerTarget(customServerId(result.url));
+    return;
+  }
   await applyServerTarget();
 }
 
@@ -2456,6 +2643,9 @@ function handleBeforeQuit(event: Event): void {
 }
 
 async function finishQuit(): Promise<void> {
+  executionSwitchAbort?.abort();
+  await executionSwitchCompletion;
+  await workspaceMirrors?.stop(true);
   const tunnelClosed = stopSshTunnel();
   stopServerMovedWatcher();
   desktopBrowserBrokerClient?.stop();

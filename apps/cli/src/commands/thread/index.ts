@@ -12,6 +12,7 @@ import { registerShowCommand } from "./show.js";
 import { registerSpawnCommand } from "./spawn.js";
 import { registerForkCommand } from "./fork.js";
 import { registerImportChatCommand } from "./import-chat.js";
+import { registerMoveThreadCommand } from "./move.js";
 import { registerWaitCommand } from "./wait.js";
 
 export function registerThreadCommands(
@@ -23,6 +24,7 @@ export function registerThreadCommands(
   registerSpawnCommand(thread, getUrl);
   registerForkCommand(thread, getUrl);
   registerImportChatCommand(thread, getUrl);
+  registerMoveThreadCommand(thread, getUrl);
   registerListCommand(thread, getUrl);
   registerCountCommand(thread, getUrl);
   registerContextCommand(thread, getUrl);

@@ -100,6 +100,7 @@ import {
   BB_DESKTOP_GET_SERVER_CHOICES_CHANNEL,
   BB_DESKTOP_SERVER_CHOICES_CHANGED_CHANNEL,
   BB_DESKTOP_SELECT_SERVER_CHANNEL,
+  BB_DESKTOP_EXECUTION_PROGRESS_CHANNEL,
   BB_DESKTOP_ADD_SERVER_CHANNEL,
   BB_DESKTOP_APP_COMMAND_CHANNEL,
   BB_DESKTOP_OPEN_WINDOW_FIND_CHANNEL,
@@ -447,6 +448,21 @@ const bbDesktopApi: BbDesktopApi = {
   },
   selectServer(id) {
     ipcRenderer.send(BB_DESKTOP_SELECT_SERVER_CHANNEL, id);
+  },
+  switchExecution(id) {
+    return ipcRenderer.invoke(BB_DESKTOP_SELECT_SERVER_CHANNEL, id);
+  },
+  onExecutionProgress(listener) {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      progress: Parameters<typeof listener>[0],
+    ) => listener(progress);
+    ipcRenderer.on(BB_DESKTOP_EXECUTION_PROGRESS_CHANNEL, handler);
+    return () =>
+      ipcRenderer.removeListener(
+        BB_DESKTOP_EXECUTION_PROGRESS_CHANNEL,
+        handler,
+      );
   },
   addServer() {
     ipcRenderer.send(BB_DESKTOP_ADD_SERVER_CHANNEL);

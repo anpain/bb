@@ -37,6 +37,10 @@ import {
 } from "@bb/domain";
 import { z } from "zod";
 import {
+  workspaceSyncOperationSchema,
+  workspaceSyncResultSchema,
+} from "./workspace-sync.js";
+import {
   pathsExistRequestSchema,
   pathsExistResponseSchema,
   pickFolderResponseSchema,
@@ -1561,6 +1565,20 @@ export const hostDaemonCommandRegistry = {
     resultSchema: fileListResultSchema,
     transport: "onlineRpc",
     retryable: true,
+    flushEventsBeforeResult: false,
+    envLane: null,
+  }),
+  "host.workspace_sync": defineHostDaemonCommandDescriptor({
+    type: "host.workspace_sync",
+    schema: z
+      .object({
+        type: z.literal("host.workspace_sync"),
+        operation: workspaceSyncOperationSchema,
+      })
+      .strict(),
+    resultSchema: workspaceSyncResultSchema,
+    transport: "onlineRpc",
+    retryable: false,
     flushEventsBeforeResult: false,
     envLane: null,
   }),

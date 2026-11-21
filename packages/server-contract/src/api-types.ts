@@ -4,6 +4,7 @@ export * from "./api/prompt-history.js";
 export * from "./api/skills.js";
 export * from "./api/environments.js";
 export * from "./api/files.js";
+export * from "./api/thread-transfer.js";
 export * from "./api/hosts.js";
 export * from "./api/plugins.js";
 export * from "./api/system.js";

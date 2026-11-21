@@ -165,6 +165,7 @@ export function registerFileRoutes(app: Hono, deps: AppDeps): void {
   };
 
   for (const route of [
+    fileRoutes.sync,
     fileRoutes.write,
     fileRoutes.mkdir,
     fileRoutes.move,
@@ -197,6 +198,18 @@ export function registerFileRoutes(app: Hono, deps: AppDeps): void {
       return remapDaemonFileRouteError(error);
     }
   };
+
+  post(fileRoutes.sync, (context, payload) =>
+    withHostFileRoute(payload.hostId, async (hostId) => {
+      const result = await callHostOnlineRpcForWork(deps, {
+        hostId,
+        timeoutMs: 180_000,
+        signal: context.req.raw.signal,
+        command: { type: "host.workspace_sync", operation: payload.operation },
+      });
+      return context.json(result);
+    }),
+  );
 
   post(fileRoutes.read, (context, payload) =>
     withHostFileRoute(payload.hostId, async (hostId) => {

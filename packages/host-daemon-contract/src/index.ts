@@ -1,4 +1,5 @@
 export * from "./commands.js";
+export * from "./workspace-sync.js";
 export * from "./local-state.js";
 export * from "./local.js";
 export * from "./server-move.js";

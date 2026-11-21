@@ -1,6 +1,6 @@
 {
   "name": "@bb/desktop",
-  "version": "0.49.10",
+  "version": "0.49.11",
   "private": true,
   "description": "macOS, Linux, and Windows Electron shell for bb",
   "main": "dist/main.js",
@@ -33,6 +33,8 @@
     "smoke:browser-address": "node scripts/smoke-browser-address.mjs"
   },
   "dependencies": {
+    "fs-native-extensions": "1.5.0",
+    "@bb/sdk": "workspace:*",
     "@bb/connect-client": "workspace:*",
     "@bb/host-daemon-contract": "workspace:*",
     "@bb/process-utils": "workspace:*",
@@ -43,6 +45,8 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "jsdom": "^29.1.1",
     "@bb/config": "workspace:*",
     "@bb/desktop-contract": "workspace:*",
     "@bb/domain": "workspace:*",

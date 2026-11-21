@@ -3,6 +3,7 @@ import {
   estimateChatImportContext,
   type ChatImportContext,
   type ChatImportMessageSummary,
+  type SystemExecutionOptionsResponse,
 } from "@bb/server-contract";
 import {
   chatImportCloseChannel,
@@ -10,9 +11,11 @@ import {
   chatImportSubmitChannel,
   chatImportPreviewChannel,
   chatImportPreviewSchema,
+  chatImportModelsChannel,
+  chatImportModelsResponseSchema,
 } from "./chat-import-ipc.js";
 
-window.addEventListener("DOMContentLoaded", () => {
+export function initializeChatImport(): void {
   const form = document.querySelector("form");
   const submit = document.querySelector<HTMLButtonElement>(
     "button[type=submit]",
@@ -31,6 +34,15 @@ window.addEventListener("DOMContentLoaded", () => {
   const refreshPreview = document.querySelector<HTMLButtonElement>(
     "[data-refresh-preview]",
   );
+  const provider = document.querySelector<HTMLSelectElement>(
+    "[data-continuation-provider]",
+  );
+  const model = document.querySelector<HTMLSelectElement>(
+    "[data-continuation-model]",
+  );
+  const reasoning = document.querySelector<HTMLSelectElement>(
+    "[data-continuation-reasoning]",
+  );
   if (
     !form ||
     !submit ||
@@ -39,7 +51,10 @@ window.addEventListener("DOMContentLoaded", () => {
     !enabled ||
     !chatPicker ||
     !period ||
-    !refreshPreview
+    !refreshPreview ||
+    !provider ||
+    !model ||
+    !reasoning
   )
     return;
   const choices = Array.from(
@@ -71,6 +86,9 @@ window.addEventListener("DOMContentLoaded", () => {
   const errors = new Set<number>();
   let busy = false;
   let loading = false;
+  let loadingModels = false;
+  let modelCatalog: SystemExecutionOptionsResponse | null = null;
+  let modelRequest = 0;
   const selected = () =>
     choices
       .filter((input) => input.checked)
@@ -133,13 +151,25 @@ window.addEventListener("DOMContentLoaded", () => {
       indexes.length === 0 ||
       indexes.length > 100 ||
       pending ||
-      loading;
+      loading ||
+      (enabled.checked && provider.value !== "" && loadingModels);
     submit.textContent =
       indexes.length === 0
         ? "Import selected"
         : `Import selected (${indexes.length})`;
     close.disabled = busy;
     enabled.disabled = busy;
+    provider.disabled = busy || loadingModels;
+    model.disabled =
+      busy ||
+      loadingModels ||
+      provider.value === "" ||
+      !modelCatalog?.models.length;
+    reasoning.disabled =
+      busy ||
+      loadingModels ||
+      provider.value === "" ||
+      reasoning.options.length <= 1;
     for (const choice of choices) choice.disabled = busy;
     if (remote) remote.disabled = busy;
     hide("[data-context-controls]", !enabled.checked);
@@ -214,6 +244,84 @@ window.addEventListener("DOMContentLoaded", () => {
       "[data-estimate]",
       `Imported context across selected chats: ${tokenText(min, max)} text tokens${images ? ` + ${images} images` : ""}${pending ? " (preview incomplete)" : ""}. Used only when each chat is first continued.`,
     );
+  };
+  const option = (value: string, label: string) => {
+    const result = document.createElement("option");
+    result.value = value;
+    result.textContent = label;
+    return result;
+  };
+  const updateReasoning = () => {
+    const previous = reasoning.value;
+    const selectedModel =
+      modelCatalog?.models.find((item) => item.model === model.value) ??
+      modelCatalog?.models.find((item) => item.isDefault);
+    reasoning.replaceChildren(
+      option("", "Use default"),
+      ...(selectedModel?.supportedReasoningEfforts ?? []).map((effort) =>
+        option(effort.reasoningEffort, effort.label ?? effort.reasoningEffort),
+      ),
+    );
+    if (Array.from(reasoning.options).some((item) => item.value === previous))
+      reasoning.value = previous;
+    refresh();
+  };
+  const loadModels = async () => {
+    const request = ++modelRequest;
+    const providerId = provider.value || null;
+    loadingModels = true;
+    model.replaceChildren(option("", "Provider default"));
+    reasoning.replaceChildren(option("", "Use default"));
+    showText("[data-continuation-status]", "Loading available models…");
+    refresh();
+    try {
+      const result = chatImportModelsResponseSchema.safeParse(
+        await ipcRenderer.invoke(chatImportModelsChannel, {
+          providerId,
+          remote: remote?.checked ?? false,
+        }),
+      );
+      if (request !== modelRequest) return;
+      if (!result.success || !result.data.ok)
+        throw new Error(
+          result.success && !result.data.ok
+            ? result.data.message
+            : "Could not load continuation models.",
+        );
+      modelCatalog = result.data.catalog;
+      provider.replaceChildren(
+        option("", "Keep the source provider"),
+        ...modelCatalog.providers
+          .filter((item) => item.available)
+          .map((item) => option(item.id, item.displayName)),
+      );
+      if (providerId !== null) provider.value = providerId;
+      if (providerId !== null && provider.value !== providerId)
+        throw new Error("This provider is unavailable on the selected server.");
+      model.replaceChildren(
+        option("", "Provider default"),
+        ...(providerId === null ? [] : modelCatalog.models).map((item) =>
+          option(item.model, item.displayName),
+        ),
+      );
+      showText(
+        "[data-continuation-status]",
+        providerId !== null && modelCatalog.modelLoadError
+          ? "Model catalog unavailable. You can keep the provider default or choose another provider."
+          : `Models from ${result.data.sourceLabel}.`,
+      );
+      updateReasoning();
+    } catch (error) {
+      showText(
+        "[data-continuation-status]",
+        error instanceof Error ? error.message : "Could not load models.",
+      );
+    } finally {
+      if (request === modelRequest) {
+        loadingModels = false;
+        refresh();
+      }
+    }
   };
   const loadPreviews = async () => {
     if (loading || !enabled.checked) return;
@@ -350,6 +458,18 @@ window.addEventListener("DOMContentLoaded", () => {
   enabled.addEventListener("change", () => {
     refresh();
     void loadPreviews();
+    if (enabled.checked && modelCatalog === null && !loadingModels)
+      void loadModels();
+  });
+  provider.addEventListener("change", () => {
+    void loadModels();
+  });
+  remote?.addEventListener("change", () => {
+    if (enabled.checked) void loadModels();
+  });
+  model.addEventListener("change", () => {
+    reasoning.value = "";
+    updateReasoning();
   });
   refreshPreview.addEventListener("click", () => {
     cache.clear();
@@ -382,6 +502,15 @@ window.addEventListener("DOMContentLoaded", () => {
     const payload = {
       selected: indexes,
       copyToServer: remote?.checked ?? false,
+      ...(enabled.checked && provider.value !== ""
+        ? {
+            continuation: {
+              providerId: provider.value,
+              model: model.value || null,
+              reasoningLevel: reasoning.value || null,
+            },
+          }
+        : {}),
       contexts: indexes.map((index) => ({
         index,
         context: enabled.checked ? setting(index).context : { mode: "none" },
@@ -414,4 +543,6 @@ window.addEventListener("DOMContentLoaded", () => {
       });
   });
   refresh();
-});
+}
+
+window.addEventListener("DOMContentLoaded", initializeChatImport);

@@ -18,6 +18,15 @@ export function registerImportChatCommand(
     .description("Import or refresh a Codex or Kimi transcript JSON")
     .option("--json", "Print the result as JSON")
     .option(
+      "--provider <id>",
+      "Provider for the first continuation with imported context",
+    )
+    .option("--model <id>", "Continuation model (requires --provider)")
+    .option(
+      "--reasoning <level>",
+      "Continuation reasoning level (requires --provider)",
+    )
+    .option(
       "--preview",
       "Estimate selected context tokens without importing or calling a model",
     )
@@ -25,14 +34,34 @@ export function registerImportChatCommand(
       action(
         async (
           file: string,
-          options: { json?: boolean; preview?: boolean },
+          options: {
+            json?: boolean;
+            preview?: boolean;
+            provider?: string;
+            model?: string;
+            reasoning?: string;
+          },
         ) => {
           const source = await stat(file);
           if (!source.isFile() || source.size > chatImportMaxBytes) {
             throw new Error("Choose a chat JSON file of at most 8 MiB.");
           }
           const payload: unknown = JSON.parse(await readFile(file, "utf8"));
-          const chat = chatImportRequestSchema.parse(payload);
+          const original = chatImportRequestSchema.parse(payload);
+          if (!options.provider && (options.model || options.reasoning))
+            throw new Error("Specify --provider with --model or --reasoning.");
+          const chat = chatImportRequestSchema.parse({
+            ...original,
+            ...(options.provider
+              ? {
+                  continuation: {
+                    providerId: options.provider,
+                    model: options.model ?? null,
+                    reasoningLevel: options.reasoning ?? null,
+                  },
+                }
+              : {}),
+          });
           const preview = previewChatImportContext(chat.messages, chat.context);
           if (options.preview) {
             if (!outputJson(options, preview))

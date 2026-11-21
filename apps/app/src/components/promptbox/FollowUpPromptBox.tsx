@@ -61,6 +61,7 @@ import { useIsCompactViewport } from "@bb/shared-ui/hooks/use-compact-viewport";
 import { usePointerCoarse } from "@bb/shared-ui/hooks/use-pointer-coarse";
 import { ThreadTimelineScrollToBottomButton } from "@/views/thread-detail/ThreadTimelineScrollToBottomButton";
 import { ThreadContextWindowIndicator } from "@/components/thread/timeline";
+import { ExecutionLocationControl } from "./ExecutionLocationControl";
 import { formatCompactTokenCount } from "@/components/thread/timeline/thread-context-window-usage";
 import {
   CompactBeforeSendChip,
@@ -728,6 +729,7 @@ function FollowUpPromptBoxWithComposer({
               <ThreadContextWindowIndicator usage={contextWindowUsage} />
             </div>
           ) : null}
+          <ExecutionLocationControl />
         </div>
       ) : null}
       <PromptBoxWithScrollAnchor

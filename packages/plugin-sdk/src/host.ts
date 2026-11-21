@@ -15,6 +15,11 @@ export {
   type ExperimentalHostWorkerLease,
 } from "./host-contract.js";
 export {
+  internal_DO_NOT_USE_nativeSessionTransferHostContract,
+  internal_DO_NOT_USE_nativeSessionTransferInputSchema,
+  internal_DO_NOT_USE_nativeSessionTransferOutputSchema,
+} from "./native-session-transfer.js";
+export {
   experimental_filterResolvedNativeRoots,
   experimental_nativeRootsHostContract,
   experimental_nativeRootsResolveInputSchema,

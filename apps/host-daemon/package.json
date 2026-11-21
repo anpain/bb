@@ -57,6 +57,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@bb/sdk": "workspace:*",
     "@bb/plugin-build": "workspace:*",
     "@bb/scripts": "workspace:*",
     "@bb/test-helpers": "workspace:*",

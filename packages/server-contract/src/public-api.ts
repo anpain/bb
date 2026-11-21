@@ -1,4 +1,9 @@
 import {
+  threadTransferRequestSchema,
+  type ThreadTransferRequest,
+  type ThreadTransferResponse,
+} from "./api/thread-transfer.js";
+import {
   chatImportRequestSchema,
   type ChatImportRequest,
   type ChatImportResponse,
@@ -330,6 +335,9 @@ import {
   environmentCleanupQuerySchema,
   hostCloneDefaultPathQuerySchema,
   hostFileListRequestSchema,
+  workspaceSyncRequestSchema,
+  type WorkspaceSyncRequest,
+  type WorkspaceSyncResponse,
   hostFileReadRequestSchema,
   hostFileWriteRequestSchema,
   hostMkdirRequestSchema,
@@ -684,6 +692,14 @@ export const publicApiRoutes = {
   },
 
   files: {
+    sync: defineRoute({
+      path: "/files/sync",
+      method: "post",
+      request: jsonRequest<EmptyInput, WorkspaceSyncRequest>(
+        workspaceSyncRequestSchema,
+      ),
+      response: jsonResponse<WorkspaceSyncResponse>(),
+    }),
     read: defineRoute({
       path: "/files/read",
       method: "post",
@@ -1301,6 +1317,14 @@ export const publicApiRoutes = {
   },
 
   threads: {
+    transfer: defineRoute({
+      path: "/threads/transfer",
+      method: "post",
+      request: jsonRequest<EmptyInput, ThreadTransferRequest>(
+        threadTransferRequestSchema,
+      ),
+      response: jsonResponse<ThreadTransferResponse>(),
+    }),
     importChat: defineRoute({
       path: "/threads/import-chat",
       method: "post",

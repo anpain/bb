@@ -1,6 +1,12 @@
 # Changelog
 
-Fork history for 0.49.0–0.49.10 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
+Fork history for 0.49.0–0.49.11 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
+
+## 0.49.11
+
+- Switch between Local and VPS above the composer. An idle native Codex chat can move with its project and native session, retaining its identity. Refresh provider accounts and limits for the selected machine.
+- Mirror linked project folders while using a VPS, with persistent recovery state, conflict detection and backups of replaced files. Expose the same operations through `bb project sync`, `bb thread move` and the Node SDK. Both servers and the Codex provider must be updated; the target needs its own signed-in Account Pooler.
+- Choose the destination provider, model and reasoning level when importing continuation context, including Kimi to Codex. Send selected history with the first new message, without a separate summarization request; context stays off by default.
 
 ## 0.49.10
 

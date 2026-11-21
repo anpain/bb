@@ -7,6 +7,8 @@ import type {
   HostMovePathResponse,
   HostPathListResponse,
   HostRemovePathResponse,
+  WorkspaceSyncRequest,
+  WorkspaceSyncResponse,
 } from "@bb/server-contract";
 import { signalRequestArgs, type CreateSdkAreaArgs } from "./common.js";
 
@@ -87,6 +89,10 @@ export type FileRemoveResult = HostRemovePathResponse;
 export type FilePreviewResult = CreateFilePreviewResponse;
 
 export interface FilesArea {
+  experimental_sync(
+    args: WorkspaceSyncRequest,
+    signal?: AbortSignal,
+  ): Promise<WorkspaceSyncResponse>;
   read(args: FileReadArgs): Promise<FileReadResult>;
   write(args: FileWriteArgs): Promise<FileWriteResult>;
   list(args: FileListArgs): Promise<FileListResult>;
@@ -100,6 +106,14 @@ export interface FilesArea {
 export function createFilesArea(args: CreateSdkAreaArgs): FilesArea {
   const { transport } = args;
   return {
+    async experimental_sync(input, signal) {
+      return transport.readJson(
+        transport.api.v1.files.sync.$post(
+          { json: input },
+          ...signalRequestArgs(signal),
+        ),
+      );
+    },
     async read(input) {
       return transport.readJson(
         transport.api.v1.files.read.$post(

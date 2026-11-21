@@ -75,6 +75,106 @@ function threadOnMachine(
   };
 }
 
+it("loads fresh accounts for a new connection and ignores a late previous connection response", async () => {
+  const result = (name: string) =>
+    Response.json({
+      ok: true,
+      result: {
+        machines: [
+          {
+            id: `host-${name}`,
+            displayName: name,
+            status: "connected",
+            error: null,
+            providers: [
+              {
+                id: name,
+                providerId: "codex",
+                accountLabel: `${name}@example.com`,
+                displayName: "Codex",
+                logoUrl: null,
+                icon: null,
+                strings: { iconTint: null },
+                signInHint: "Sign in",
+                expiredHint: "Sign in again",
+                usage: {
+                  status: "ok",
+                  accountEmail: `${name}@example.com`,
+                  planLabel: "Plus",
+                  windows: [
+                    {
+                      label: "Weekly limit",
+                      usedPercent: name === "VPS" ? 40 : 90,
+                      resetsAt: null,
+                      cost: null,
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+  let finishOld: (value: Response) => void = () => {
+    throw new Error("Old request has not started");
+  };
+  const oldRequest = new Promise<Response>((resolve) => {
+    finishOld = resolve;
+  });
+  const fetchMock = vi
+    .fn<typeof fetch>()
+    .mockImplementationOnce(() => oldRequest)
+    .mockImplementation(async () => result("VPS"));
+  vi.stubGlobal("fetch", fetchMock);
+  const app = await loadPluginApp(() => import("./app"));
+  const old = await mountPluginContentScripts(app, {
+    pluginId: "bb--provider-usage",
+  });
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+  await old.lifecycle.dispose();
+  expect(fetchMock.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+  const current = await mountPluginContentScripts(app, {
+    pluginId: "bb--provider-usage",
+  });
+  const item = app.experimentalSidebarFooterItems[0];
+  if (item?.kind !== "disclosure" || !item.experimental_railContent)
+    throw new Error("missing rail");
+  const Rail = item.experimental_railContent;
+  const rail = renderSlot(
+    {
+      component: () =>
+        createElement(
+          TooltipProvider,
+          null,
+          createElement(Rail, { providerIds: [] }),
+        ),
+    },
+    {},
+    { pluginId: "bb--provider-usage" },
+  );
+  try {
+    finishOld(result("Local"));
+    const button = await waitFor(() =>
+      rail.getByRole("button", {
+        name: /Codex usage:.*Weekly limit, 60% remaining/u,
+      }),
+    );
+    expect(rail.queryByRole("button", { name: /10% remaining/u })).toBeNull();
+    fireEvent.click(button);
+    await waitFor(() =>
+      expect(rail.getByText("Usage source: VPS")).toBeTruthy(),
+    );
+    expect(rail.queryByText("Local@example.com")).toBeNull();
+    const initial = fetchMock.mock.calls.slice(1, 3);
+    expect(initial).toHaveLength(2);
+    for (const [, init] of initial)
+      expect(JSON.parse(String(init?.body))).toMatchObject({ maxAgeMs: 0 });
+  } finally {
+    await current.lifecycle.dispose();
+  }
+});
+
 describe("provider usage footer disclosure", () => {
   it("shows host provider limits alongside accounts from a shared pool", async () => {
     const provider = (id: string, name: string): UsageProvider => ({
@@ -169,6 +269,7 @@ describe("provider usage footer disclosure", () => {
         "work@example.com",
       );
       fireEvent.click(cursor);
+      expect(rail.getByText("Usage source: Local")).toBeTruthy();
       await waitFor(() =>
         expect(fetchMock).toHaveBeenCalledWith(
           "/api/v1/plugins/bb--provider-usage/rpc/getUsage",
@@ -416,7 +517,7 @@ describe("provider usage footer disclosure", () => {
           body: JSON.stringify({
             force: false,
             machineIds: null,
-            maxAgeMs: 60_000,
+            maxAgeMs: 0,
             providerIds: [],
           }),
         }),
@@ -900,7 +1001,7 @@ it("keeps a measured refresh when an older snapshot response arrives late", asyn
             },
           ],
         });
-      if (fetchMock.mock.calls.length === 1) return snapshot(null);
+      if (fetchMock.mock.calls.length <= 2) return snapshot(null);
       await new Promise<void>((resolve) => {
         releaseInventory = resolve;
       });
@@ -912,7 +1013,7 @@ it("keeps a measured refresh when an older snapshot response arrives late", asyn
   const mounted = await mountPluginContentScripts(app, {
     pluginId: "bb--provider-usage",
   });
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   const now = vi.spyOn(Date, "now").mockReturnValue(1_000);
   window.dispatchEvent(new Event("blur"));
   now.mockReturnValue(5 * 60_000 + 1_001);

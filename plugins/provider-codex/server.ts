@@ -1,4 +1,5 @@
 import { registerCodexAiService } from "./src/ai-service.js";
+import { z } from "zod";
 import { registerAsyncQuestions } from "./src/async-questions.js";
 import { registerUsageSource } from "./src/usage-source.js";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
@@ -6,6 +7,29 @@ import { codexExtensionKinds } from "./src/extension-kinds.js";
 import { CODEX_NATIVE_ROOTS_DECLARATION } from "./src/native-roots.js";
 
 export default function plugin(bb: BbPluginApi) {
+  bb.providers.experimental_contributeEnv("codex", async ({ threadId }) => {
+    if (threadId === null) return [];
+    const metadata = await bb.sdk.threads.getPluginMetadata({ threadId });
+    const parsed = z
+      .object({ portableCodexHome: z.string().min(1).optional() })
+      .safeParse(metadata.metadata);
+    const home = parsed.success ? parsed.data.portableCodexHome : undefined;
+    return typeof home === "string"
+      ? [
+          {
+            name: "CODEX_HOME",
+            value: home,
+            reason: "Portable native Codex session for this thread",
+          },
+          {
+            name: "BB_CODEX_PORTABLE_SESSION",
+            value: "1",
+            reason:
+              "Use the server account pool with an isolated conversation home",
+          },
+        ]
+      : [];
+  });
   registerUsageSource(bb);
   registerCodexAiService(bb);
   registerAsyncQuestions(bb);

@@ -28,9 +28,16 @@ Context variables set automatically inside a thread environment:
 Outside a thread the CLI targets http://127.0.0.1:38886; set BB_SERVER_URL (and
 BB_HOST_DAEMON_PORT) only for a deliberate non-default target.
 
-In bb Desktop, Settings → Execution mode switches between the embedded local
-server and saved remote servers; Add server opens the native address dialog.
+In bb Desktop, the Local / VPS control above the composer switches between the
+embedded local server and saved remote servers. Settings → Execution mode uses
+the same selection; Add server opens the native address dialog. With several
+remote servers, VPS opens a server picker. With none, it opens Add server.
 Each server keeps its own files, history, provider installations and sign-ins.
+While an idle native Codex thread is open, switching hands off that thread and
+its project folder; Desktop then mirrors the project back to this computer.
+Active work, missing native history and conflicting edits block the transfer
+instead of silently opening an empty thread. The target uses its own accounts.
+The provider usage rail reloads accounts and limits from the selected server.
 The equivalent CLI target is `BB_SERVER_URL=http://127.0.0.1:38886` for local bb
 or the remote URL (for example `http://127.0.0.1:48886` for an SSH forward).
 The Node SDK uses `createNodeBbSdk({ baseUrl: "http://127.0.0.1:48886" })`.

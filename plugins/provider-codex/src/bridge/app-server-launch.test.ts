@@ -4,6 +4,18 @@ import { resolveAppServerLaunch } from "./bridge.js";
 afterEach(() => vi.unstubAllEnvs());
 
 describe("Codex Account Pool launch", () => {
+  it("uses only the target pool token for a portable session without requiring a copied auth file", () => {
+    const launch = resolveAppServerLaunch({
+      CODEX_OPENAI_BASE_URL: "http://127.0.0.1:38886/pool/v1",
+      CODEX_POOL_AUTH_TOKEN: "target-only-token",
+      CODEX_HOME: "/private/portable/home",
+      BB_CODEX_PORTABLE_SESSION: "1",
+    });
+    expect(launch.args).toContain(
+      "model_providers.bb-account-pool.requires_openai_auth=false",
+    );
+    expect(JSON.stringify(launch.args)).not.toContain("target-only-token");
+  });
   it("adds an in-memory base URL and environment-backed hub header", () => {
     vi.stubEnv("CODEX_OPENAI_BASE_URL", "https://bb.example/pool/v1");
     vi.stubEnv("CODEX_POOL_AUTH_TOKEN", "secret-machine-token");

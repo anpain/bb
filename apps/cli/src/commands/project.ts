@@ -8,6 +8,7 @@ import type {
   UpdateProjectSourceRequest,
 } from "@bb/server-contract";
 import { action } from "../action.js";
+import { registerProjectSyncCommand } from "./project-sync.js";
 import { createCliBbSdk } from "../client.js";
 import { resolveLocalHostId } from "../daemon.js";
 import { columnWidths, printBorderlessTable } from "../table.js";
@@ -248,6 +249,7 @@ export function registerProjectCommands(
   const project = program
     .command("project")
     .description("Inspect and manage projects");
+  registerProjectSyncCommand(project, getUrl);
   const source = project
     .command("source")
     .description("Manage project sources");

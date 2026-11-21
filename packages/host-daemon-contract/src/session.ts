@@ -519,6 +519,7 @@ const hostDaemonOnlineRpcResponseSuccessSchema = z.discriminatedUnion(
     onlineRpcResponseSuccessSchemaFor("desktop.browser.import_cookies"),
     onlineRpcResponseSuccessSchemaFor("host.list_files"),
     onlineRpcResponseSuccessSchemaFor("host.list_paths"),
+    onlineRpcResponseSuccessSchemaFor("host.workspace_sync"),
     onlineRpcResponseSuccessSchemaFor("host.mkdir"),
     onlineRpcResponseSuccessSchemaFor("host.move_path"),
     onlineRpcResponseSuccessSchemaFor("host.remove_path"),

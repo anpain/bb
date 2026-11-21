@@ -36,6 +36,7 @@ const hostCommandWakePolicy = {
   "desktop.browser.list_import_sources": "work",
   "desktop.browser.import_cookies": "work",
   "host.list_files": "work",
+  "host.workspace_sync": "work",
   "host.list_paths": "work",
   "host.mkdir": "work",
   "host.move_path": "work",

@@ -29,6 +29,12 @@ jobs:
         run: npm install --global pnpm@9.15.0 --ignore-scripts
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Test execution switching and import controls
+        run: >-
+          pnpm exec turbo run test --filter=@bb/app --filter=@bb/desktop
+          --filter=bb-plugin-bb--provider-usage --output-logs=new-only --
+          ExecutionLocationControl.test.tsx server-choice-ipc.test.ts
+          chat-import-models.test.ts chat-import-context.test.ts app.test.tsx
       - name: Build Windows installer
         run: pnpm exec turbo run desktop:build:win --filter=@bb/desktop --output-logs=new-only
       - name: Launch packaged app and verify renderer and preload

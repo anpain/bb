@@ -95,6 +95,9 @@ await Promise.all([
   build({
     ...commonOptions,
     entryPoints: [resolve(packageRoot, "src", "main.ts")],
+    alias: {
+      "@bb/sdk/node": resolve(packageRoot, "../../packages/sdk/src/node.ts"),
+    },
     external: ["electron"],
     format: "cjs",
     outfile: resolve(distDir, "main.js"),

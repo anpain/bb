@@ -69,6 +69,7 @@ import {
 import { useSystemConfig } from "@/hooks/queries/system-queries";
 import { useSystemMachineProviders } from "@/hooks/queries/machine-provider-queries";
 import { useHostDaemon } from "@/hooks/useHostDaemon";
+import { ExecutionLocationControl } from "./ExecutionLocationControl";
 
 const NEW_THREAD_PROMPT_BOX_MIN_HEIGHT = 80;
 
@@ -312,28 +313,31 @@ const DefaultNewThreadComposer = memo(function DefaultNewThreadComposer({
         data-new-thread-environment=""
         className="relative z-0 mx-6 -mb-3 flex min-h-14 min-w-0 select-none items-center gap-3 rounded-t-2xl border border-b-0 border-border bg-surface-raised px-4 pb-3 text-sm"
       >
-        <EnvironmentSlot
-          projectless={project?.value === null}
-          environment={modeConfig.environment}
-          worktree={modeConfig.worktree}
-          environmentProviderInputsSlot={
-            modeConfig.environmentProviderInputsSlot
-          }
-          machineProviderInputsSlot={modeConfig.machineProviderInputsSlot}
-        />
-        {project ? (
-          <ProjectSelector
-            projects={project.projects}
-            value={project.value}
-            onChange={project.onChange}
-            allowNoProject={project.allowNoProject ?? false}
-            createProject={project.createProject}
-            disabled={project.disabled}
-            isLoading={project.isLoading}
-            showChevronWhenDisabled={project.showChevronWhenDisabled}
-            className="shrink-0"
+        <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
+          <EnvironmentSlot
+            projectless={project?.value === null}
+            environment={modeConfig.environment}
+            worktree={modeConfig.worktree}
+            environmentProviderInputsSlot={
+              modeConfig.environmentProviderInputsSlot
+            }
+            machineProviderInputsSlot={modeConfig.machineProviderInputsSlot}
           />
-        ) : null}
+          {project ? (
+            <ProjectSelector
+              projects={project.projects}
+              value={project.value}
+              onChange={project.onChange}
+              allowNoProject={project.allowNoProject ?? false}
+              createProject={project.createProject}
+              disabled={project.disabled}
+              isLoading={project.isLoading}
+              showChevronWhenDisabled={project.showChevronWhenDisabled}
+              className="min-w-0"
+            />
+          ) : null}
+        </div>
+        <ExecutionLocationControl />
       </div>
       <ComposerBox
         id={id}

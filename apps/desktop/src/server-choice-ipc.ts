@@ -54,4 +54,34 @@ export function registerServerChoiceIpc({
       return;
     void select(parsed.data).catch(onError);
   });
+  ipcMain.handle(
+    BB_DESKTOP_SELECT_SERVER_CHANNEL,
+    async (event, payload: unknown) => {
+      const parsed = bbDesktopServerChoiceSchema.shape.id.safeParse(payload);
+      if (
+        !applicationWindowWebContentsIds.has(event.sender.id) ||
+        event.senderFrame !== event.sender.mainFrame ||
+        !parsed.success
+      )
+        return {
+          ok: false,
+          message: "Execution switching is limited to bb application windows",
+        };
+      if (!list().some((choice) => choice.id === parsed.data))
+        return { ok: false, message: "Select a saved server" };
+      try {
+        await select(parsed.data);
+        return { ok: true };
+      } catch (error) {
+        onError(error);
+        return {
+          ok: false,
+          message:
+            error instanceof Error
+              ? error.message
+              : "Could not move this workspace",
+        };
+      }
+    },
+  );
 }

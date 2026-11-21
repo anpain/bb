@@ -75,6 +75,17 @@ export interface BbDesktopApi extends BbDesktopInfo {
     listener: (choices: BbDesktopServerChoice[]) => void,
   ): () => void;
   selectServer?(id: string): void;
+  switchExecution?(
+    id: string,
+  ): Promise<{ ok: true } | { ok: false; message: string }>;
+  onExecutionProgress?(
+    listener: (progress: {
+      phase: string;
+      path: string | null;
+      bytes: number;
+      totalBytes: number;
+    }) => void,
+  ): () => void;
   addServer?(): void;
   checkForUpdates(): Promise<BbDesktopInfo>;
   getInfo(): Promise<BbDesktopInfo>;

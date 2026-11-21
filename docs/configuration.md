@@ -1,5 +1,15 @@
 # Configuration
 
+Desktop's Local / VPS control moves an idle native Codex thread with its project
+when used inside that thread. After a remote switch, linked project folders are
+mirrored with a 10-second pause between completed checks. Desktop stores pair
+identities, hash baselines and recovery journals in its user-data directory's
+`workspace-sync`. Keep these files when moving back. The CLI equivalents use
+`--state` / `--state-dir` and default to `~/.bb/workspace-sync`; state must stay
+outside the synchronized project. Conflicting edits stop synchronization.
+See [server deployment](server-deployment.md) for routing, native session
+requirements, backups and cross-platform limits.
+
 The packaged `npx bb-app` flow stores persistent package settings under
 `~/.bb/config.json`, provider environment values under `~/.bb/env.json`, and
 client SSH target mappings under `~/.bb/client.json`.
@@ -238,25 +248,25 @@ change the host-daemon protocol.
 
 ## Common Keys
 
-| Key                            | Set with                                           | When to set             | Used for                                                                                                                                                                                                                                                                   |
-| ------------------------------ | -------------------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BB_APP_URL`                   | `bb-app config`                                    | Optional for remote use | Human-facing app URL used for generated links, allowed browser origins, and the allowed DNS hostname for requests. Leave empty for local-only use. Live when set with `bb-app config`.                                                                                     |
-| `BB_EXTERNAL_URL`              | `bb-app env`, or environment                       | Startup-only            | Internet-facing HTTPS base URL for generated public links; the fallback for `machineServerUrl`.                                                                                                                                                                            |
-| `BB_MARKETPLACE_URL`           | `bb-app env`, or environment                       | Startup-only testing    | Manifest URL of the reserved `bb-community` marketplace. Default `https://getbb.app/marketplace/v2/marketplace.json` (falls back to v1 on 404); a custom URL is requested without fallback. Changes only `bb-community`.                                                   |
-| `BB_CONNECT_GATE_KEYS_URL`     | `bb-app env`, or environment                       | Startup-only testing    | Public key set the bb connect next tunnel ingress verifies gate assertions with. Default `https://getbb.app/.well-known/bb-connect-gate-keys.json`. See [connect-next.md](connect-next.md).                                                                                |
-| `BB_SERVER_URL`                | `bb-app config`                                    | Remote CLI/host use     | Server targeted by the standalone `bb` CLI and `host-daemon` commands on this machine. Defaults to `http://127.0.0.1:38886`. It does not change where `npx bb-app` binds.                                                                                                  |
-| `BB_SERVER_BIND_HOST`          | `bb-app env`, environment, or `--server-bind-host` | Startup-only            | Server listener host: `127.0.0.1` (default) or `0.0.0.0`. Not a `bb-app config` key. See [Startup Flags](#startup-flags).                                                                                                                                                  |
-| `BB_SERVER_PORT`               | `bb-app env`, environment, or `--server-port`      | Startup-only            | HTTP listener port. Defaults to `38886`.                                                                                                                                                                                                                                   |
-| `BB_HOST_DAEMON_PORT`          | `bb-app env`, environment, or `--host-daemon-port` | Startup-only            | Local host-daemon API port. Defaults to `38887`.                                                                                                                                                                                                                           |
-| `BB_LOG_LEVEL`                 | `bb-app config`                                    | Startup-only debugging  | `trace`, `debug`, `info`, `warn`, `error`, or `fatal`.                                                                                                                                                                                                                     |
-| `BB_SKIP_ONBOARDING`           | Environment                                        | Startup-only            | Default false. `1` marks first-run setup completed at startup when it is not yet, so the setup screen is skipped. Settings → General can still replay it. `pnpm dev`, `pnpm start:worktree`, and `pnpm desktop:worktree` default it to `1`; an explicit `0` retains setup. |
-| `BB_SETUP_GUIDE_VARIANT`       | Environment                                        | Startup-only QA         | `control` or `new` forces the first-run setup guide variant, ignoring a legacy saved assignment. Unset by default. See [General settings](#general-settings).                                                                                    |
-| `BB_PERF_DIAGNOSTICS`          | `bb-app env`, environment, or `--perf-diagnostics` | Startup-only            | Default false. Permits the `performanceDiagnostics` experiment; see [Experiments](#experiments).                                                                                                                                                                           |
+| Key                            | Set with                                           | When to set             | Used for                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------ | -------------------------------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BB_APP_URL`                   | `bb-app config`                                    | Optional for remote use | Human-facing app URL used for generated links, allowed browser origins, and the allowed DNS hostname for requests. Leave empty for local-only use. Live when set with `bb-app config`.                                                                                                                                              |
+| `BB_EXTERNAL_URL`              | `bb-app env`, or environment                       | Startup-only            | Internet-facing HTTPS base URL for generated public links; the fallback for `machineServerUrl`.                                                                                                                                                                                                                                     |
+| `BB_MARKETPLACE_URL`           | `bb-app env`, or environment                       | Startup-only testing    | Manifest URL of the reserved `bb-community` marketplace. Default `https://getbb.app/marketplace/v2/marketplace.json` (falls back to v1 on 404); a custom URL is requested without fallback. Changes only `bb-community`.                                                                                                            |
+| `BB_CONNECT_GATE_KEYS_URL`     | `bb-app env`, or environment                       | Startup-only testing    | Public key set the bb connect next tunnel ingress verifies gate assertions with. Default `https://getbb.app/.well-known/bb-connect-gate-keys.json`. See [connect-next.md](connect-next.md).                                                                                                                                         |
+| `BB_SERVER_URL`                | `bb-app config`                                    | Remote CLI/host use     | Server targeted by the standalone `bb` CLI and `host-daemon` commands on this machine. Defaults to `http://127.0.0.1:38886`. It does not change where `npx bb-app` binds.                                                                                                                                                           |
+| `BB_SERVER_BIND_HOST`          | `bb-app env`, environment, or `--server-bind-host` | Startup-only            | Server listener host: `127.0.0.1` (default) or `0.0.0.0`. Not a `bb-app config` key. See [Startup Flags](#startup-flags).                                                                                                                                                                                                           |
+| `BB_SERVER_PORT`               | `bb-app env`, environment, or `--server-port`      | Startup-only            | HTTP listener port. Defaults to `38886`.                                                                                                                                                                                                                                                                                            |
+| `BB_HOST_DAEMON_PORT`          | `bb-app env`, environment, or `--host-daemon-port` | Startup-only            | Local host-daemon API port. Defaults to `38887`.                                                                                                                                                                                                                                                                                    |
+| `BB_LOG_LEVEL`                 | `bb-app config`                                    | Startup-only debugging  | `trace`, `debug`, `info`, `warn`, `error`, or `fatal`.                                                                                                                                                                                                                                                                              |
+| `BB_SKIP_ONBOARDING`           | Environment                                        | Startup-only            | Default false. `1` marks first-run setup completed at startup when it is not yet, so the setup screen is skipped. Settings → General can still replay it. `pnpm dev`, `pnpm start:worktree`, and `pnpm desktop:worktree` default it to `1`; an explicit `0` retains setup.                                                          |
+| `BB_SETUP_GUIDE_VARIANT`       | Environment                                        | Startup-only QA         | `control` or `new` forces the first-run setup guide variant, ignoring a legacy saved assignment. Unset by default. See [General settings](#general-settings).                                                                                                                                                                       |
+| `BB_PERF_DIAGNOSTICS`          | `bb-app env`, environment, or `--perf-diagnostics` | Startup-only            | Default false. Permits the `performanceDiagnostics` experiment; see [Experiments](#experiments).                                                                                                                                                                                                                                    |
 | `BB_QUERY_PLAN_AUDIT`          | Environment                                        | Startup-only debugging  | Default false. `1` logs `Slow SQLite query plan` for each query whose plan walks a large table or picks a weaker index; see [diagnostics](debugging-and-qa.md#slow-sqlite-query-plans). `pnpm dev`, `pnpm start:worktree`, and `pnpm desktop:worktree` default it to `1`. The `performanceDiagnostics` experiment also turns it on. |
-| `BB_PROVIDER_PREWARM`          | Server environment                                 | Startup-only            | Default false. `1` preloads provider model catalogs and CLI update status when a machine connects. By default bb discovers models and checks CLI status on demand. |
-| `BB_CLI_ERROR_LOG`             | Environment of the `bb` process                    | Optional                | `0` stops the CLI recording failed invocations (command path, error code, no argument values) to `<dataDir>/logs/cli-errors.jsonl`. See `bb guide overview`.                                                                                                               |
-| `BB_ACCOUNT_POOL_PARENT_URL`   | Set automatically by a parent bb server            | Nested bb servers       | Account Pooler hub of the bb server whose thread launched this one. When present the Account Pooler plugin is enabled on first run and proxies to that parent; `bb pool parent isolate` opts out. Not a `bb-app config` key.                                               |
-| `BB_ACCOUNT_POOL_PARENT_TOKEN` | Set automatically by a parent bb server            | Nested bb servers       | Machine token this nested server presents to the parent hub. Both parent variables must be well formed or proxying stays off.                                                                                                                                              |
+| `BB_PROVIDER_PREWARM`          | Server environment                                 | Startup-only            | Default false. `1` preloads provider model catalogs and CLI update status when a machine connects. By default bb discovers models and checks CLI status on demand.                                                                                                                                                                  |
+| `BB_CLI_ERROR_LOG`             | Environment of the `bb` process                    | Optional                | `0` stops the CLI recording failed invocations (command path, error code, no argument values) to `<dataDir>/logs/cli-errors.jsonl`. See `bb guide overview`.                                                                                                                                                                        |
+| `BB_ACCOUNT_POOL_PARENT_URL`   | Set automatically by a parent bb server            | Nested bb servers       | Account Pooler hub of the bb server whose thread launched this one. When present the Account Pooler plugin is enabled on first run and proxies to that parent; `bb pool parent isolate` opts out. Not a `bb-app config` key.                                                                                                        |
+| `BB_ACCOUNT_POOL_PARENT_TOKEN` | Set automatically by a parent bb server            | Nested bb servers       | Machine token this nested server presents to the parent hub. Both parent variables must be well formed or proxying stays off.                                                                                                                                                                                                       |
 
 BB accepts request hosts that are `localhost`, IP addresses (including LAN and
 Tailscale IPs), or the hostname in `BB_APP_URL`. For a custom DNS name or
@@ -960,6 +970,7 @@ either way.
   plugin releases can go out ahead of a retry scheduled for later (for example
   a provider-retry row waiting hours for a subscription window) and overtake
   it; with it, those rows wait for the retry.
+
 - `threadContextCard` moves a running thread's
   details into the thread context card at the upper-right of its pane: bb's parent
   thread and child threads, the Git plugin's changes, which open the Diff tab,
@@ -1607,6 +1618,7 @@ update message. Web browsers control their own handoff and may show a second
 prompt; BB cannot reliably detect missing apps in a browser. Executable web
 schemes, local-file launch schemes, and reserved editor-action schemes remain
 blocked.
+
 # Agent/model profiles
 
 Each profile exposes a named default-model picker with model-name/ID search,
@@ -1662,7 +1674,6 @@ service is stopped after collection and has Kimi telemetry disabled. CLI version
 without this API report unavailable data. Windows and booster credits are shown
 only when supplied by that API.
 
-
 ### Local and remote execution
 
 In bb Desktop, Settings → Execution mode selects **Local on this computer** or a
@@ -1692,7 +1703,6 @@ individual clients; the desktop saves its selection separately.
 Built-in agent profile aliases default to English names. Stored profiles with
 an unchanged legacy default alias list are upgraded when settings are read.
 Edited alias lists and custom profiles remain user configurable.
-
 
 ### Reproducible Linux service deployment
 

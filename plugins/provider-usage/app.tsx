@@ -82,6 +82,8 @@ let storeSnapshot: UsageStoreSnapshot = {
 };
 let activeRefreshCount = 0;
 let queuedRefresh: Promise<void> = Promise.resolve();
+let usageGeneration = 0;
+let usageAbortController = new AbortController();
 let lastMachineId: string | null = null;
 let lastProviderIdByMachine = new Map<string, string>();
 
@@ -146,10 +148,13 @@ function refreshUsage({
   providerIds: string[];
   signal?: AbortSignal;
 }): Promise<void> {
+  const generation = usageGeneration;
+  const generationSignal = usageAbortController.signal;
   activeRefreshCount += 1;
   updateStore({ ...storeSnapshot, error: null, isRefreshing: true });
   queuedRefresh = queuedRefresh.then(async () => {
     try {
+      if (generationSignal.aborted || signal?.aborted) return;
       const response = await fetch(
         `/api/v1/plugins/${encodeURIComponent(pluginId)}/rpc/getUsage`,
         {
@@ -158,8 +163,12 @@ function refreshUsage({
           body: JSON.stringify({ force, machineIds, maxAgeMs, providerIds }),
           signal:
             signal === undefined
-              ? AbortSignal.timeout(60_000)
-              : AbortSignal.any([signal, AbortSignal.timeout(60_000)]),
+              ? AbortSignal.any([generationSignal, AbortSignal.timeout(60_000)])
+              : AbortSignal.any([
+                  generationSignal,
+                  signal,
+                  AbortSignal.timeout(60_000),
+                ]),
         },
       );
       if (!response.ok)
@@ -171,13 +180,23 @@ function refreshUsage({
           rpcErrorMessage(body) ?? "Provider usage could not be loaded.",
         );
       }
+      if (
+        generationSignal.aborted ||
+        generation !== usageGeneration ||
+        signal?.aborted
+      )
+        return;
       updateStore({
         data: parsed.data.result,
         error: null,
         isRefreshing: activeRefreshCount > 1,
       });
     } catch (cause) {
-      if (signal?.aborted === true) {
+      if (
+        generationSignal.aborted ||
+        generation !== usageGeneration ||
+        signal?.aborted === true
+      ) {
         return;
       }
       console.warn("Provider usage refresh failed", cause);
@@ -1095,6 +1114,15 @@ function ProviderUsageRail({
         )
         .map(({ id, provider, marker }) => {
           const accounts = [provider];
+          const usageMachine = machine?.providers.some(
+            (account) => account.id === provider.id,
+          )
+            ? machine
+            : hostMachine;
+          const sourceLabel =
+            usageMachine?.id.startsWith("source:") && hostMachine
+              ? `${usageMachine.displayName} · ${hostMachine.displayName}`
+              : (usageMachine?.displayName ?? "Current server");
           const windows = railUsageWindows(provider);
           const accountName =
             provider.accountLabel ??
@@ -1112,13 +1140,7 @@ function ProviderUsageRail({
                   force: accounts.every(
                     (account) => account.usage?.status !== "ok",
                   ),
-                  machineIds: machine?.providers.some(
-                    (account) => account.id === provider.id,
-                  )
-                    ? [machine.id]
-                    : hostMachine === null
-                      ? null
-                      : [hostMachine.id],
+                  machineIds: usageMachine === null ? null : [usageMachine.id],
                   maxAgeMs: CARD_MAX_AGE_MS,
                   providerIds: [id],
                 });
@@ -1193,6 +1215,9 @@ function ProviderUsageRail({
                   </PopoverTrigger>
                 </TooltipTrigger>
                 <TooltipContent side="right">
+                  <div className="text-2xs text-subtle-foreground">
+                    {sourceLabel}
+                  </div>
                   {accountName === null ? null : (
                     <div className="font-medium">{accountName}</div>
                   )}
@@ -1208,6 +1233,9 @@ function ProviderUsageRail({
                 className="max-h-[min(32rem,80svh)] w-80 overflow-y-auto p-3"
               >
                 <div className="grid gap-2">
+                  <p className="text-2xs text-subtle-foreground">
+                    Usage source: {sourceLabel}
+                  </p>
                   <ProviderAccounts
                     accounts={accounts}
                     loading={snapshot.isRefreshing}
@@ -1289,6 +1317,12 @@ export default definePluginApp((app) => {
   app.contentScripts.register({
     id: "refresh-usage",
     mount({ pluginId, signal }) {
+      const generation = ++usageGeneration;
+      usageAbortController.abort();
+      usageAbortController = new AbortController();
+      lastMachineId = null;
+      lastProviderIdByMachine.clear();
+      updateStore({ data: null, error: null, isRefreshing: false });
       let timer: number | null = null;
       let hiddenAt = document.visibilityState === "hidden" ? Date.now() : null;
       let blurredAt: number | null = null;
@@ -1346,11 +1380,11 @@ export default definePluginApp((app) => {
       document.addEventListener("visibilitychange", onVisibilityChange);
       window.addEventListener("blur", onBlur);
       window.addEventListener("focus", onActive);
-      if (storeSnapshot.data === null)
-        reconcile(SAFETY_REFRESH_INTERVAL_MS, []);
-      reconcile(SAFETY_REFRESH_INTERVAL_MS, null);
+      reconcile(0, []);
+      reconcile(0, null);
       scheduleSafetyRefresh();
       return () => {
+        if (generation === usageGeneration) usageAbortController.abort();
         if (timer !== null) window.clearTimeout(timer);
         document.removeEventListener("visibilitychange", onVisibilityChange);
         window.removeEventListener("blur", onBlur);

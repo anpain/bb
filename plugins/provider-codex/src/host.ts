@@ -3,6 +3,7 @@ import { defineRpcContract } from "@get-bb/plugin-sdk";
 import {
   experimental_defineHostEntry,
   experimental_nativeRootsHostContract,
+  internal_DO_NOT_USE_nativeSessionTransferHostContract,
   type ExperimentalNativeRootsResolveAnswer,
 } from "@get-bb/plugin-sdk/host";
 import {
@@ -17,12 +18,14 @@ import {
   type CodexAiTextResult,
 } from "./ai/host-contract.js";
 import { resolveCodexNativeRoots } from "./native-roots.js";
+import { transferCodexNativeSession } from "./native-session-transfer.js";
 
 export { experimental_providerBridge } from "./bridge/bridge.js";
 
 const codexHostContract = defineRpcContract({
   ...codexAiHostContract,
   ...experimental_nativeRootsHostContract,
+  ...internal_DO_NOT_USE_nativeSessionTransferHostContract,
 });
 
 async function textResult(work: Promise<string>): Promise<CodexAiTextResult> {
@@ -36,6 +39,12 @@ async function textResult(work: Promise<string>): Promise<CodexAiTextResult> {
 export default experimental_defineHostEntry({
   contract: codexHostContract,
   handlers: {
+    transferNativeSession: (input, context) =>
+      transferCodexNativeSession(
+        input,
+        context.experimental_paths.dataDir,
+        context.signal,
+      ),
     resolveNativeRoots: (): Promise<ExperimentalNativeRootsResolveAnswer> =>
       resolveCodexNativeRoots({ homeDir: os.homedir(), env: process.env }),
     "codex.ai.complete": (input, context) =>

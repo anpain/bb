@@ -7,6 +7,33 @@ editingNotes: Keep flags accurate against the CLI implementation.
 ---
 Project commands
 
+  bb project sync <absolute-source-path> --to-server <url> --target-path <absolute-path>
+    [--source-host <id>] [--target-host <id>] [--state <local-state-file>]
+    [--watch] [--json]
+
+    Mirror the entire folder, including hidden files, uncommitted edits and Git
+    metadata, between the current BB_SERVER_URL and another bb server. Both
+    servers must support host protocol 267. Open an SSH forward first when
+    needed. --watch repeats after each completed sync with a 10-second pause.
+    This copies files only; it does not move chats or start model inference.
+    State defaults to ~/.bb/workspace-sync/<pair-hash>.json on the CLI machine.
+    Keep it outside both project folders. Preserve this file and its journal
+    between runs: they distinguish changes and deletions from conflicts.
+    A file modified on both sides stops the plan before writes. Resolve it by
+    saving the desired contents on both sides, then rerun with the same state.
+    Missing root folders never count as mass deletion. Symlinks, special files,
+    case collisions, nonportable filenames, and more than 100000 entries fail
+    explicitly. Replaced/deleted versions are kept under the daemon data dir's
+    workspace-sync/backups (up to ten versions per path). Transfers stage next
+    to the project and verify SHA-256 before publishing. Do not run Git or an
+    agent against both copies during a handoff. Platform-specific dependencies
+    remain platform-specific even though their files are copied.
+
+    Node SDK: experimental_syncWorkspacePair({ identity, statePath, left, right })
+    from @bb/sdk/node. Each endpoint supplies rootPath and call(operation, signal)
+    through sdk.files.experimental_sync({ hostId, operation }, signal). The same
+    lower-level path is available to plugin callers as bb.sdk.files.experimental_sync.
+
 A project maps to a code repository. All threads belong to a project.
 
   bb project list                         List ordinary projects

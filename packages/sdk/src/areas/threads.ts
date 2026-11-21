@@ -21,6 +21,8 @@ import type {
   CreateThreadRequest,
   ChatImportRequest,
   ChatImportResponse,
+  ThreadTransferRequest,
+  ThreadTransferResponse,
   QueuedMessageListQuery,
   EditMessageRequest,
   EditMessageResponse,
@@ -616,6 +618,10 @@ export interface ThreadQueueArea {
 }
 
 export interface ThreadsArea {
+  experimental_transfer(
+    args: ThreadTransferRequest,
+    signal?: AbortSignal,
+  ): Promise<ThreadTransferResponse>;
   importChat(
     args: ChatImportRequest & { signal?: AbortSignal },
   ): Promise<ChatImportResponse>;
@@ -1307,6 +1313,14 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
   return {
     archive: archiveAll,
     archiveAll,
+    async experimental_transfer(input, signal) {
+      return transport.readJson(
+        transport.api.v1.threads.transfer.$post(
+          { json: input },
+          ...signalRequestArgs(signal),
+        ),
+      );
+    },
     async importChat({ signal, ...chat }) {
       return transport.readJson(
         transport.api.v1.threads["import-chat"].$post(

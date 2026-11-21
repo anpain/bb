@@ -291,6 +291,7 @@ const CODEX_POOL_BASE_URL_ENV = "CODEX_OPENAI_BASE_URL";
 const CODEX_POOL_AUTH_TOKEN_ENV = "CODEX_POOL_AUTH_TOKEN";
 const CODEX_HOME_ENV = "CODEX_HOME";
 const APP_SERVER_LAUNCH_ENV_NAMES = [
+  "BB_CODEX_PORTABLE_SESSION",
   CODEX_POOL_BASE_URL_ENV,
   CODEX_POOL_AUTH_TOKEN_ENV,
   CODEX_HOME_ENV,
@@ -388,7 +389,7 @@ export function resolveAppServerLaunch(env: NodeJS.ProcessEnv = process.env): {
       "-c",
       'model_providers.bb-account-pool.wire_api="responses"',
       "-c",
-      "model_providers.bb-account-pool.requires_openai_auth=true",
+      `model_providers.bb-account-pool.requires_openai_auth=${env.BB_CODEX_PORTABLE_SESSION === "1" ? "false" : "true"}`,
       "-c",
       "model_providers.bb-account-pool.supports_websockets=false",
       "-c",
@@ -1235,6 +1236,14 @@ async function constructThreadSession(
     })),
   );
   const launchEnv = appServerLaunchEnv(decoded.sessionOptions.envVars);
+  if (
+    launchEnv.BB_CODEX_PORTABLE_SESSION === "1" &&
+    (!launchEnv[CODEX_POOL_BASE_URL_ENV] ||
+      !launchEnv[CODEX_POOL_AUTH_TOKEN_ENV])
+  )
+    throw new Error(
+      "Enable Codex routing in Account Pooler and sign in on this machine to continue the portable session. Provider credentials are not copied during transfer.",
+    );
   const envHash = environmentHash(decoded.sessionOptions.envVars);
   const session: CodexBridgeSession = {
     bbThreadId: args.threadId,

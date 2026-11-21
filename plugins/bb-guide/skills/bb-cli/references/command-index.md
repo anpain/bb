@@ -44,6 +44,8 @@ for local and remote targeting and the Desktop execution-mode picker.
 
 ## project
 
+- `bb project sync`
+
 - `bb project`
 - `bb project source`
 - `bb project source add`
@@ -152,6 +154,8 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 - `bb terminal stop`
 
 ## thread
+
+- `bb thread move`
 
 - `bb thread`
 - `bb thread wait`
@@ -345,6 +349,7 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 - `bb browser watch`
 - `bb browser import-sources`
 - `bb browser import-cookies`
+
 ## Agent profiles
 
 - `bb settings agent-profiles show --json`

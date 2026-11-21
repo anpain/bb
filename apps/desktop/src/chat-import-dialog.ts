@@ -12,6 +12,7 @@ import {
   type ChatImportRequest,
   chatImportRequestSchema,
   summarizeChatImportMessages,
+  systemExecutionOptionsResponseSchema,
 } from "@bb/server-contract";
 import {
   createDesktopDialogWindow,
@@ -23,6 +24,8 @@ import {
   chatImportSubmissionSchema,
   chatImportSubmitChannel,
   chatImportPreviewChannel,
+  chatImportModelsChannel,
+  chatImportModelsRequestSchema,
 } from "./chat-import-ipc.js";
 import { readSavedChat, type SavedChat } from "./chat-import-source.js";
 
@@ -42,7 +45,7 @@ interface ChatImportDialogOptions {
 
 let activeWindow: BrowserWindow | null = null;
 
-function renderDialog(
+export function renderChatImportDialog(
   chats: readonly SavedChat[],
   remote: RemoteDestination | null,
 ): string {
@@ -110,6 +113,11 @@ function renderDialog(
     <p data-context-off>Off: history is saved for viewing. No imported messages or images are sent to the model, so they use no tokens. New messages and model replies still use tokens normally.</p>
     <div data-context-controls hidden>
       <p><strong>Sending history uses input tokens and your provider limits when you first continue a chat.</strong> Importing itself uses no model tokens.</p>
+      <label>Continue with provider<select data-continuation-provider aria-label="Continuation provider"><option value="">Keep the source provider</option></select></label>
+      <label>Model for continuation<select data-continuation-model aria-label="Continuation model" disabled><option value="">Provider default</option></select></label>
+      <label>Reasoning level<select data-continuation-reasoning aria-label="Continuation reasoning" disabled><option value="">Model default</option></select></label>
+      <small>The selected model receives the chosen history with your first new message. No separate summary request is made. The same selection applies to all selected chats with context enabled.</small>
+      <p data-continuation-status></p>
       <label>Configure selected chat<select data-context-chat aria-label="Configure selected chat"></select></label>
       <label>Context period<select data-context-period aria-label="Context period">
         <option value="all">Entire conversation</option><option value="hour">Last hour of this chat</option><option value="day">Last 24 hours of this chat</option><option value="week">Last 7 days of this chat</option><option value="manual">Choose messages manually</option><option value="none">No context for this chat</option>
@@ -305,6 +313,7 @@ export async function openChatImportDialog(
     ipcMain.removeListener(chatImportCloseChannel, handleClose);
     ipcMain.removeHandler(chatImportSubmitChannel);
     ipcMain.removeHandler(chatImportPreviewChannel);
+    ipcMain.removeHandler(chatImportModelsChannel);
   });
   ipcMain.on(chatImportCloseChannel, handleClose);
   const chats = await options.listChats().catch((error: unknown) => {
@@ -312,6 +321,48 @@ export async function openChatImportDialog(
     throw error;
   });
   if (window.isDestroyed()) return;
+  ipcMain.handle(chatImportModelsChannel, async (event, input: unknown) => {
+    if (
+      event.sender.id !== contentsId ||
+      event.senderFrame !== event.sender.mainFrame ||
+      busy
+    )
+      return { ok: false, message: "Model selection is unavailable." };
+    const selectedProvider = chatImportModelsRequestSchema.safeParse(input);
+    if (!selectedProvider.success)
+      return { ok: false, message: "Select an available provider." };
+    try {
+      const destination = selectedProvider.data.remote ? options.remote : null;
+      if (selectedProvider.data.remote && destination === null)
+        throw new Error("The remote server is not connected.");
+      const base = destination?.url ?? (await options.localServerUrl());
+      const url = new URL("/api/v1/system/execution-options", base);
+      url.searchParams.set(
+        "preferCached",
+        selectedProvider.data.providerId === null ? "true" : "false",
+      );
+      if (selectedProvider.data.providerId !== null)
+        url.searchParams.set("providerId", selectedProvider.data.providerId);
+      const response = await (destination?.fetch ?? fetch)(url, {
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!response.ok)
+        throw new Error(`Could not load models (HTTP ${response.status}).`);
+      return {
+        ok: true,
+        sourceLabel: destination?.label ?? "this computer",
+        catalog: systemExecutionOptionsResponseSchema.parse(
+          await response.json(),
+        ),
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        message:
+          error instanceof Error ? error.message : "Could not load models.",
+      };
+    }
+  });
   ipcMain.handle(chatImportPreviewChannel, async (event, index: unknown) => {
     if (
       event.sender.id !== contentsId ||
@@ -390,6 +441,9 @@ export async function openChatImportDialog(
           const chat = chatImportRequestSchema.parse({
             ...source,
             context: choice.context,
+            ...(choice.context.mode !== "none" && parsed.data.continuation
+              ? { continuation: parsed.data.continuation }
+              : {}),
           });
           try {
             const projectId = await importProject(localUrl, saved.cwd);
@@ -449,5 +503,5 @@ export async function openChatImportDialog(
       busy = false;
     }
   });
-  showDesktopDialogHtml(window, renderDialog(chats, options.remote));
+  showDesktopDialogHtml(window, renderChatImportDialog(chats, options.remote));
 }

@@ -1660,12 +1660,18 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
           "Retry failed environment cleanup with recover: true after inspecting processes using the workspace",
         ],
         reference: [
+          "Mirror project files with bb.sdk.files.experimental_sync({ hostId, operation }): snapshot, read, begin/chunk/commit/abort, mkdir, remove and empty-directory rmdir. Chunks are at most 1 MiB; writes verify SHA-256 and expected destination hashes. Conflicts preserve both copies. Symlinks and nonportable paths are rejected; host protocol 267 is required. Core Desktop and bb project sync use this same path.",
+          "Hand off a top-level idle native Codex thread with bb.sdk.threads.experimental_transfer: export archives the source and returns typed history plus host staging locations; prepare selects a destination; apply restores the same native identity; cancel reopens an unchanged source. The Node SDK experimental_moveThread helper and bb thread move orchestrate this path. This differs from transcript import and never starts model inference.",
+          "The first-party host export internal_DO_NOT_USE_nativeSessionTransferHostContract is reserved for core thread transfer and the Codex provider implementation; third-party plugins must not implement or call it.",
           "Normalize and resolve host paths with experimental_normalizeHostPath(path) and experimental_resolveHostPath({ rootPath, path }) from @get-bb/plugin-sdk; invalid paths return null",
           "Recognize drive roots (including C:) and UNC paths with either Windows separator, regardless of the server OS; reject rootless backslashes and drive-relative paths such as C:foo during resolution",
           "Join relative paths, obtain dirname/basename, derive a slash-separated relative path within a root, and create case-insensitive Windows comparison keys with the experimental host-path helpers; invalid absolute inputs return null",
           "Check lexical containment separately with experimental_isHostPathWithin({ rootPath, candidatePath }): resolution allows .. escapes, and neither helper resolves symlinks",
         ],
         apiSymbols: [
+          "PluginBbSdk.files.experimental_sync",
+          "PluginBbSdk.threads.experimental_transfer",
+          "internal_DO_NOT_USE_nativeSessionTransferHostContract",
           "BbPluginApi",
           "PluginServerApi",
           "experimental_normalizeHostPath",

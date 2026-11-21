@@ -1,5 +1,36 @@
 # APIs To Audit
 
+## Workspace and native thread transfer
+
+`bb.sdk.files.experimental_sync({ hostId, operation })` exposes snapshot,
+verified chunk upload, guarded deletion and directory operations through the
+same daemon path used by Desktop mirrors, `bb project sync`, and the Node SDK
+`experimental_synchronizeWorkspaces` / `experimental_syncWorkspacePair` helpers.
+It supports full folders including hidden files and Git metadata, with an
+explicit 100000-entry limit and no symlink following. Host protocol 267 is
+required. Before stabilization, audit cross-platform path and cancellation
+behavior, sustained large-project performance and concurrent filesystem edits.
+
+`bb.sdk.threads.experimental_transfer` prepares, exports, applies or cancels a
+native Codex thread handoff. The Node SDK `experimental_moveThread` orchestrates
+the same calls and verified file operations used by Desktop and `bb thread move`.
+The source is archived before transfer and remains archived after activation;
+the target keeps the bb and provider thread IDs and starts no model inference.
+Before stabilization, audit provider version compatibility, attachment remapping,
+recovery after an ambiguous activation response and transfers with child threads.
+Only top-level idle Codex threads with a native session are accepted initially.
+
+`internal_DO_NOT_USE_nativeSessionTransferHostContract` and its input/output
+schemas are first-party host plumbing. The only core caller is
+`services/threads/thread-transfer.ts`; the only provider implementation is
+`plugins/provider-codex/src/host.ts`. Codex stages plain native rollout files
+and lineage without exporting auth files, and activates them in a private
+per-thread home. It rebuilds SQLite projections from native history. This is
+not a public provider portability API. Keep it internal until another provider
+has demonstrated equivalent session durability and restoration semantics.
+
+Docs: Plugin Guide, The bb SDK (`plugins/plugin-api-docs/src/surfaces.ts`).
+
 Every public plugin API member ships with an `experimental_` prefix and an
 entry here (see [AGENTS.md](../AGENTS.md), "CLI And Plugin API"). Each entry
 summarizes the API, names where its behavior is documented, and lists what
@@ -70,8 +101,9 @@ host and port only; desktop custom URLs can embed login details and paths),
 `loading` with no servers until the main process answers; the mobile app
 injects its list with the bridge handshake, so it starts `ready`. Both then
 push changes, and a change that arrives during a read wins over the read. `switchTo(id)` reloads the client on that server, unloading every
-plugin; it ignores the active server and unknown ids. Core's command palette
-server switcher uses the same `useServerChoices` implementation, so the mobile
+plugin; it ignores the active server and unknown ids. Core's command palette,
+Execution mode settings, and composer Local / VPS control use the same
+`useServerChoices` implementation, so the mobile
 app now offers the switcher too. Desktop pages served by an older desktop
 release get null until it updates. Plugins can't add, edit, rename or remove
 servers, and can't call another server. The list lives in the client, so the
@@ -4823,6 +4855,7 @@ experimental component rendered by the host's shared tooltip inside the plugin
 slot boundary. Core footer rendering and Provider Usage use the same registration
 path. Stabilization requires reviewing accessibility, compact-layout behavior and
 reactive subscription lifecycle across footer visibility changes.
+
 # Timeline context segment placement
 
 `ExperimentalThreadContextSegmentRegistration.experimental_placement` selects

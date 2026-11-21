@@ -123,3 +123,15 @@ export type {
 export type { BbHttpErrorArgs } from "./response.js";
 export type * from "./public-types.js";
 export { previewChatImportContext } from "@bb/server-contract";
+export {
+  experimental_synchronizeWorkspaces,
+  WorkspaceSyncConflictError,
+} from "./workspace-sync.js";
+export type {
+  WorkspaceSyncEndpoint,
+  WorkspaceSyncBaseline,
+  WorkspaceSyncCheckpoint,
+} from "./workspace-sync.js";
+export { experimental_syncWorkspacePair } from "./workspace-sync-state.js";
+export { experimental_moveThread } from "./thread-transfer.js";
+export type { ThreadTransferClient } from "./thread-transfer.js";

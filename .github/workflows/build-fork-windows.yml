@@ -30,6 +30,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Test execution switching and import controls
+        shell: bash
         run: >-
           pnpm exec turbo run test --filter=@bb/app --filter=@bb/desktop
           --filter=bb-plugin-bb--provider-usage --output-logs=new-only --

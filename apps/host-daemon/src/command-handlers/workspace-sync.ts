@@ -372,9 +372,9 @@ export function createWorkspaceSyncService(dataDir: string) {
                     outcome: "conflict",
                     currentSha256: current,
                   };
-                await fs.chmod(upload.file, upload.operation.mode);
                 const handle = await fs.open(upload.file, "r+");
                 try {
+                  await handle.chmod(upload.operation.mode);
                   await handle.sync();
                 } finally {
                   await handle.close();

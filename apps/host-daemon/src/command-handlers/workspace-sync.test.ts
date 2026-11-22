@@ -118,6 +118,37 @@ it("preserves a concurrent edit instead of publishing a stale upload", async () 
   expect(await fs.readFile(join(root, "code.py"), "utf8")).toBe("manual edit");
 });
 
+it("publishes read-only Git objects after flushing their open staging handle", async () => {
+  const { root, run } = await fixture();
+  const content = Buffer.from("read-only Git object");
+  const begin = await run({
+    action: "begin",
+    rootPath: root,
+    path: ".git/objects/pack/pack-test.pack",
+    expectedSha256: null,
+    sha256: sha(content),
+    sizeBytes: content.length,
+    mode: 0o444,
+  });
+  if (begin.action !== "begin") throw new Error("Unexpected result");
+  await run({
+    action: "chunk",
+    uploadId: begin.uploadId,
+    offset: 0,
+    data: content.toString("base64"),
+  });
+  expect(
+    await run({ action: "commit", uploadId: begin.uploadId }),
+  ).toMatchObject({
+    outcome: "written",
+    currentSha256: sha(content),
+  });
+  const file = join(root, ".git/objects/pack/pack-test.pack");
+  expect(await fs.readFile(file)).toEqual(content);
+  expect((await fs.stat(file)).mode & 0o222).toBe(0);
+  await fs.chmod(file, 0o600);
+});
+
 it("verifies uploaded bytes, ordering, and cancellation before publishing", async () => {
   const { root, run } = await fixture();
   const begin = await run({

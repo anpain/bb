@@ -2,6 +2,10 @@
 
 Fork history for 0.49.0–0.49.11 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
 
+## Unreleased
+
+- Fix project synchronization failing with `EACCES` for read-only files such as Git packfiles. Open the staging file before applying its final permissions, then flush and publish it.
+
 ## 0.49.11
 
 - Switch between Local and VPS above the composer. An idle native Codex chat can move with its project and native session, retaining its identity. Refresh provider accounts and limits for the selected machine.

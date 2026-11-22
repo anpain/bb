@@ -63,11 +63,20 @@ export async function transferCodexNativeSession(
       !names.some((name) => name.includes(input.providerThreadId))
     )
       throw new Error("The transferred native session is incomplete");
-    const destination = path.join(expectedHome, "sessions");
-    await fs.mkdir(destination, { recursive: true, mode: 0o700 });
     for (const name of names) {
       if (!/^rollout-[a-zA-Z0-9_-]+\.jsonl$/u.test(name))
         throw new Error("Unexpected native session file");
+      const date = /^rollout-(\d{4})-(\d{2})-(\d{2})(?:T|-)/u.exec(name);
+      if (!date)
+        throw new Error("Native session filename must contain its date");
+      const destination = path.join(
+        expectedHome,
+        "sessions",
+        date[1]!,
+        date[2]!,
+        date[3]!,
+      );
+      await fs.mkdir(destination, { recursive: true, mode: 0o700 });
       const file = path.join(sessionDir, name);
       const stat = await fs.lstat(file);
       if (!stat.isFile() || stat.isSymbolicLink())

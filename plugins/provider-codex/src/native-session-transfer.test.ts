@@ -72,6 +72,22 @@ it("exports native history and lineage, including zstd bytes in a .jsonl file, w
   expect(
     await fs.readFile(join(activated.nativeHome, "config.toml"), "utf8"),
   ).toContain("enabled = false");
+  expect(await fs.readdir(join(activated.nativeHome, "sessions"))).toEqual([
+    "2026",
+  ]);
+  expect(
+    await fs.readFile(
+      join(
+        activated.nativeHome,
+        "sessions",
+        "2026",
+        "11",
+        "21",
+        `rollout-2026-11-21-${id}.jsonl`,
+      ),
+      "utf8",
+    ),
+  ).toContain(id);
 });
 
 it("rejects unrelated homes and history that belongs to a different native thread", async () => {

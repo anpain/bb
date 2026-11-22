@@ -2,6 +2,10 @@
 
 Fork history for 0.49.0–0.49.13 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
 
+## Unreleased
+
+- Fix portable Codex sessions reading the wrong shape of plugin metadata. Use their isolated home when resuming, replace host-specific runtime workspace roots, and activate rollouts in dated session directories.
+
 ## 0.49.13
 
 - Preserve a native chat's visible fallback title when moving it between servers, including chats whose generated title is empty.

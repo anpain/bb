@@ -108,7 +108,10 @@ import {
   getCodexProviderUsage,
 } from "./provider-maintenance.js";
 
-type BbThreadResumeParams = ThreadResumeParams & { excludeTurns: boolean };
+type BbThreadResumeParams = ThreadResumeParams & {
+  excludeTurns: boolean;
+  runtimeWorkspaceRoots?: string[];
+};
 
 const codexBridgeCommandSchema = z.discriminatedUnion("method", [
   z.object({
@@ -1384,6 +1387,9 @@ async function constructThreadSession(
         const resumeParams: BbThreadResumeParams = {
           threadId: args.request.providerThreadId,
           excludeTurns: true,
+          ...(launchEnv.BB_CODEX_PORTABLE_SESSION === "1"
+            ? { runtimeWorkspaceRoots: [] }
+            : {}),
           ...sharedConstructionParams,
         };
         params = resumeParams;

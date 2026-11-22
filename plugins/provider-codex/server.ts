@@ -12,7 +12,7 @@ export default function plugin(bb: BbPluginApi) {
     const metadata = await bb.sdk.threads.getPluginMetadata({ threadId });
     const parsed = z
       .object({ portableCodexHome: z.string().min(1).optional() })
-      .safeParse(metadata.metadata);
+      .safeParse(metadata);
     const home = parsed.success ? parsed.data.portableCodexHome : undefined;
     return typeof home === "string"
       ? [

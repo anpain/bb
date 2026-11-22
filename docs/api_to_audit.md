@@ -6,6 +6,13 @@
 verified chunk upload, guarded deletion and directory operations through the
 same daemon path used by Desktop mirrors, `bb project sync`, and the Node SDK
 `experimental_synchronizeWorkspaces` / `experimental_syncWorkspacePair` helpers.
+Their `onProgress` callback reports `WorkspaceSyncProgress`: stage, current path,
+aggregate bytes/totalBytes and committed completedFiles/totalFiles for the current
+pass. Checking precedes the plan, so its totals are unknown (zero); completion is
+emitted only after all file commits, checkpoints and directory operations finish.
+Already synchronized files are excluded from the planned totals. A resumed pass
+reports only its remaining work. `experimental_moveThread` adds the enclosing
+phase and resets totals for each project/session/storage stage.
 It supports full folders including hidden files and Git metadata, with an
 explicit 100000-entry limit and no symlink following. Host protocol 267 is
 required. Before stabilization, audit cross-platform path and cancellation

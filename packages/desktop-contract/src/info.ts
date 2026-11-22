@@ -67,6 +67,16 @@ export interface BbDesktopAttentionThreads {
   unreadThreadIds: string[];
 }
 
+export interface BbDesktopExecutionProgress {
+  phase: string;
+  path: string | null;
+  bytes: number;
+  totalBytes: number;
+  stage?: "checking" | "directories" | "copying" | "finalizing" | "complete";
+  completedFiles?: number;
+  totalFiles?: number;
+}
+
 export interface BbDesktopApi extends BbDesktopInfo {
   browser: BbDesktopBrowserApi;
   getServerChoices?(): Promise<BbDesktopServerChoice[]>;
@@ -79,12 +89,7 @@ export interface BbDesktopApi extends BbDesktopInfo {
     id: string,
   ): Promise<{ ok: true } | { ok: false; message: string }>;
   onExecutionProgress?(
-    listener: (progress: {
-      phase: string;
-      path: string | null;
-      bytes: number;
-      totalBytes: number;
-    }) => void,
+    listener: (progress: BbDesktopExecutionProgress) => void,
   ): () => void;
   addServer?(): void;
   checkForUpdates(): Promise<BbDesktopInfo>;

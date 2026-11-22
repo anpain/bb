@@ -1,9 +1,10 @@
 # Changelog
 
-Fork history for 0.49.0–0.49.11 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
+Fork history for 0.49.0–0.49.12 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
 
-## Unreleased
+## 0.49.12
 
+- Show transfer progress per stage, with verified file counts, aggregate bytes and the current path. Keep checking and activation indeterminate; report file completion only after commit. The CLI and Node SDK expose the same progress.
 - Fix project synchronization failing with `EACCES` for read-only files such as Git packfiles. Open the staging file before applying its final permissions, then flush and publish it.
 
 ## 0.49.11

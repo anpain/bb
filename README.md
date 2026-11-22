@@ -31,7 +31,7 @@ or hand off to another agent.
 This is [anpain/bb](https://github.com/anpain/bb), based on the `privacy-kimi`
 fork. It supports local execution and execution on your Linux server, removes
 bb product telemetry, and adds provider installation and account controls.
-Read the [complete fork changelog for 0.49.0–0.49.11](./CHANGELOG.md#04911).
+Read the [complete fork changelog for 0.49.0–0.49.12](./CHANGELOG.md#04912).
 
 ## Quick start
 

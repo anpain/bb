@@ -87,12 +87,26 @@ export function registerProjectSyncCommand(
           process.once("SIGINT", stop);
           process.once("SIGTERM", stop);
           let first = true;
+          let lastProgress = 0;
           try {
             do {
               const result = await experimental_syncWorkspacePair({
                 identity,
                 statePath,
                 signal: controller.signal,
+                onProgress: options.json
+                  ? undefined
+                  : (value) => {
+                      if (
+                        Date.now() - lastProgress < 1000 &&
+                        value.stage !== "complete"
+                      )
+                        return;
+                      lastProgress = Date.now();
+                      console.error(
+                        `${value.stage}: ${value.completedFiles}/${value.totalFiles} files, ${value.bytes}/${value.totalBytes} bytes${value.path ? ` · ${value.path}` : ""}`,
+                      );
+                    },
                 left: {
                   rootPath: sourcePath,
                   call: (operation, signal) =>

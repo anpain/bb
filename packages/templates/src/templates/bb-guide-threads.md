@@ -37,6 +37,9 @@ Importing chat history:
     --state-dir defaults to ~/.bb/workspace-sync on the CLI machine. Keep it
     when moving back. SDK: experimental_moveThread from @bb/sdk/node, or the
     typed threads.experimental_transfer operations used by core Desktop.
+    Progress goes to stderr with separate preparation, project files, native
+    session and activation phases. File stages include completed/planned counts
+    and aggregate bytes; --json prints only the final structured result.
 
   bb thread import-chat <file> [--preview] [--json]
     [--provider <id>] [--model <id>] [--reasoning <level>]

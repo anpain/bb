@@ -12,6 +12,7 @@ import {
   experimental_synchronizeWorkspaces,
   experimental_syncWorkspacePair,
   type WorkspaceSyncBaseline,
+  type WorkspaceSyncProgress,
 } from "@bb/sdk/node";
 
 const sha = (bytes: Buffer | string) =>
@@ -147,6 +148,63 @@ it("publishes read-only Git objects after flushing their open staging handle", a
   expect(await fs.readFile(file)).toEqual(content);
   expect((await fs.stat(file)).mode & 0o222).toBe(0);
   await fs.chmod(file, 0o600);
+});
+
+it("reports aggregate progress across parallel files and commits before counting completion", async () => {
+  const left = await fixture();
+  const right = await fixture();
+  await fs.mkdir(left.root);
+  await fs.writeFile(
+    join(left.root, "large"),
+    Buffer.alloc(WORKSPACE_SYNC_CHUNK_BYTES + 7),
+  );
+  await fs.writeFile(join(left.root, "small"), "small");
+  await fs.writeFile(join(left.root, "empty"), "");
+  const progress: WorkspaceSyncProgress[] = [];
+  const endpoints = {
+    left: { rootPath: left.root, call: left.service },
+    right: { rootPath: right.root, call: right.service },
+  };
+  const result = await experimental_synchronizeWorkspaces({
+    ...endpoints,
+    baseline: {},
+    onProgress: (value) => progress.push(value),
+  });
+  expect(progress[0]).toMatchObject({ stage: "checking", totalFiles: 0 });
+  const copying = progress.filter((value) => value.stage === "copying");
+  expect(copying[0]).toMatchObject({
+    totalFiles: 3,
+    totalBytes: WORKSPACE_SYNC_CHUNK_BYTES + 12,
+    completedFiles: 0,
+    bytes: 0,
+  });
+  for (let index = 1; index < copying.length; index++) {
+    expect(copying[index]!.bytes).toBeGreaterThanOrEqual(
+      copying[index - 1]!.bytes,
+    );
+    expect(copying[index]!.completedFiles).toBeGreaterThanOrEqual(
+      copying[index - 1]!.completedFiles,
+    );
+  }
+  expect(progress.at(-1)).toMatchObject({
+    stage: "complete",
+    totalFiles: 3,
+    completedFiles: 3,
+    bytes: WORKSPACE_SYNC_CHUNK_BYTES + 12,
+  });
+  progress.length = 0;
+  await experimental_synchronizeWorkspaces({
+    ...endpoints,
+    baseline: result.baseline,
+    onProgress: (value) => progress.push(value),
+  });
+  expect(progress.at(-1)).toMatchObject({
+    stage: "complete",
+    totalFiles: 0,
+    completedFiles: 0,
+    bytes: 0,
+    totalBytes: 0,
+  });
 });
 
 it("verifies uploaded bytes, ordering, and cancellation before publishing", async () => {

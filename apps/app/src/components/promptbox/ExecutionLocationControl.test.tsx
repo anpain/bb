@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import {
   cleanup,
+  act,
   fireEvent,
   render,
   screen,
@@ -8,6 +9,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { ServerChoicesState } from "@/hooks/useServerChoices";
+import type { BbDesktopExecutionProgress } from "@bb/desktop-contract";
 import { ExecutionLocationControl } from "./ExecutionLocationControl";
 import { TooltipProvider } from "@bb/shared-ui/tooltip";
 
@@ -15,6 +17,7 @@ const mocks = vi.hoisted(
   (): {
     choices: ServerChoicesState | null;
     add: ReturnType<typeof vi.fn>;
+    progress?: (value: BbDesktopExecutionProgress) => void;
     switchExecution?: (
       id: string,
     ) => Promise<{ ok: true } | { ok: false; message: string }>;
@@ -30,6 +33,14 @@ vi.mock("@/lib/bb-desktop", () => ({
   getBbDesktopInfo: () => ({
     addServer: mocks.add,
     switchExecution: mocks.switchExecution,
+    onExecutionProgress: (
+      listener: (value: BbDesktopExecutionProgress) => void,
+    ) => {
+      mocks.progress = listener;
+      return () => {
+        mocks.progress = undefined;
+      };
+    },
   }),
 }));
 afterEach(() => {
@@ -47,6 +58,93 @@ function renderControl() {
     </div>,
   );
 }
+
+it("shows totals and current file, and reserves 100 percent for completed commits", () => {
+  mocks.choices = {
+    status: "ready",
+    switchTo: vi.fn(),
+    servers: [
+      {
+        id: "builtin",
+        kind: "local",
+        name: "This computer",
+        origin: "http://127.0.0.1:38886",
+        active: true,
+      },
+      {
+        id: "germany",
+        kind: "custom",
+        name: "Germany",
+        origin: "http://127.0.0.1:48886",
+        active: false,
+      },
+    ],
+  };
+  mocks.switchExecution = () => new Promise(() => {});
+  renderControl();
+  fireEvent.click(screen.getByRole("button", { name: "Work on VPS" }));
+  act(() =>
+    mocks.progress?.({
+      phase: "Synchronizing project files",
+      path: null,
+      bytes: 0,
+      totalBytes: 0,
+      stage: "checking",
+      completedFiles: 0,
+      totalFiles: 0,
+    }),
+  );
+  expect(screen.getByText("Checking files…")).toBeDefined();
+  expect(screen.getByRole("progressbar").getAttribute("value")).toBeNull();
+  act(() =>
+    mocks.progress?.({
+      phase: "Synchronizing project files",
+      path: "venv/library.dll",
+      bytes: 1024,
+      totalBytes: 2048,
+      stage: "copying",
+      completedFiles: 1,
+      totalFiles: 4,
+    }),
+  );
+  expect(screen.getByText("50%")).toBeDefined();
+  expect(screen.getByText("1 / 4 files · 1 KiB / 2 KiB")).toBeDefined();
+  expect(screen.getByText("venv/library.dll")).toBeDefined();
+  act(() =>
+    mocks.progress?.({
+      phase: "Synchronizing project files",
+      path: null,
+      bytes: 2048,
+      totalBytes: 2048,
+      stage: "copying",
+      completedFiles: 3,
+      totalFiles: 4,
+    }),
+  );
+  expect(screen.getByText("99%")).toBeDefined();
+  act(() =>
+    mocks.progress?.({
+      phase: "Synchronizing project files",
+      path: null,
+      bytes: 2048,
+      totalBytes: 2048,
+      stage: "complete",
+      completedFiles: 4,
+      totalFiles: 4,
+    }),
+  );
+  expect(screen.getByText("100%")).toBeDefined();
+  act(() =>
+    mocks.progress?.({
+      phase: "Activating native session",
+      path: null,
+      bytes: 0,
+      totalBytes: 0,
+    }),
+  );
+  expect(screen.queryByText("100%")).toBeNull();
+  expect(screen.getByRole("progressbar").getAttribute("value")).toBeNull();
+});
 
 it.each([true, false])(
   "switches the actual server target, local active: %s",

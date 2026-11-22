@@ -43,6 +43,8 @@ export function registerMoveThreadCommand(
             baseUrl: options.toServer,
             timeoutMs: 180_000,
           });
+          let lastProgress = 0;
+          let phase = "";
           const moved = await experimental_moveThread({
             source: { id: getUrl(), sdk: source },
             target: { id: options.toServer, sdk: target },
@@ -53,7 +55,17 @@ export function registerMoveThreadCommand(
             onProgress: options.json
               ? undefined
               : (value) => {
-                  if (value.path === null) console.error(value.phase);
+                  if (
+                    phase === value.phase &&
+                    Date.now() - lastProgress < 1000 &&
+                    value.stage !== "complete"
+                  )
+                    return;
+                  phase = value.phase;
+                  lastProgress = Date.now();
+                  console.error(
+                    `${value.phase}${value.stage ? ` · ${value.stage}` : ""}${value.totalFiles !== undefined ? `: ${value.completedFiles ?? 0}/${value.totalFiles} files, ${value.bytes}/${value.totalBytes} bytes` : ""}${value.path ? ` · ${value.path}` : ""}`,
+                  );
                 },
           });
           if (!outputJson(options, moved))

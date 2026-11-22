@@ -16,6 +16,8 @@ Project commands
     servers must support host protocol 267. Open an SSH forward first when
     needed. --watch repeats after each completed sync with a 10-second pause.
     This copies files only; it does not move chats or start model inference.
+    Progress goes to stderr with the stage, current path, completed/planned files
+    and aggregate bytes. --json keeps only structured final summaries on stdout.
     State defaults to ~/.bb/workspace-sync/<pair-hash>.json on the CLI machine.
     Keep it outside both project folders. Preserve this file and its journal
     between runs: they distinguish changes and deletions from conflicts.
@@ -31,7 +33,9 @@ Project commands
 
     Node SDK: experimental_syncWorkspacePair({ identity, statePath, left, right })
     from @bb/sdk/node. Each endpoint supplies rootPath and call(operation, signal)
-    through sdk.files.experimental_sync({ hostId, operation }, signal). The same
+    through sdk.files.experimental_sync({ hostId, operation }, signal).
+    The helper's onProgress receives WorkspaceSyncProgress with stage, path,
+    bytes, totalBytes, completedFiles and totalFiles for the current remaining plan. The same
     lower-level path is available to plugin callers as bb.sdk.files.experimental_sync.
 
 A project maps to a code repository. All threads belong to a project.

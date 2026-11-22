@@ -2184,6 +2184,7 @@ async function setActiveServerTarget(serverId: string): Promise<void> {
         ]);
         let lastProgress = 0;
         let phase = "";
+        let progressStage: string | undefined;
         const moved = await experimental_moveThread({
           source: { id: previous.id, sdk: source },
           target: { id: serverId, sdk: target },
@@ -2193,8 +2194,14 @@ async function setActiveServerTarget(serverId: string): Promise<void> {
           onProgress: (progress) => {
             if (window === null || window.isDestroyed()) return;
             const now = Date.now();
-            if (phase === progress.phase && now - lastProgress < 100) return;
+            if (
+              phase === progress.phase &&
+              progressStage === progress.stage &&
+              now - lastProgress < 100
+            )
+              return;
             phase = progress.phase;
+            progressStage = progress.stage;
             lastProgress = now;
             window.webContents.send(
               BB_DESKTOP_EXECUTION_PROGRESS_CHANNEL,

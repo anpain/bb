@@ -131,6 +131,7 @@ export type {
   WorkspaceSyncEndpoint,
   WorkspaceSyncBaseline,
   WorkspaceSyncCheckpoint,
+  WorkspaceSyncProgress,
 } from "./workspace-sync.js";
 export { experimental_syncWorkspacePair } from "./workspace-sync-state.js";
 export { experimental_moveThread } from "./thread-transfer.js";

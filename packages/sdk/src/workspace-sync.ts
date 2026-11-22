@@ -18,6 +18,14 @@ export interface WorkspaceSyncCheckpoint {
   path: string;
   entry: WorkspaceSyncEntry | null;
 }
+export interface WorkspaceSyncProgress {
+  stage: "checking" | "directories" | "copying" | "finalizing" | "complete";
+  path: string | null;
+  bytes: number;
+  totalBytes: number;
+  completedFiles: number;
+  totalFiles: number;
+}
 export class WorkspaceSyncConflictError extends Error {
   constructor(readonly paths: readonly string[]) {
     super(
@@ -98,6 +106,7 @@ async function copyFile(
   );
   if (begun.action !== "begin") throw new Error("Unexpected upload response");
   try {
+    progress?.({ path: entry.path, bytes: 0, totalBytes: entry.sizeBytes });
     let offset = 0;
     const hash = createHash("sha256");
     do {
@@ -173,17 +182,21 @@ export async function experimental_synchronizeWorkspaces(args: {
   baseline: Readonly<WorkspaceSyncBaseline>;
   signal?: AbortSignal;
   onCheckpoint?(checkpoint: WorkspaceSyncCheckpoint): Promise<void>;
-  onProgress?(progress: {
-    path: string;
-    bytes: number;
-    totalBytes: number;
-  }): void;
+  onProgress?(progress: WorkspaceSyncProgress): void;
 }): Promise<{
   baseline: WorkspaceSyncBaseline;
   copied: number;
   removed: number;
 }> {
   const signal = args.signal ?? new AbortController().signal;
+  args.onProgress?.({
+    stage: "checking",
+    path: null,
+    bytes: 0,
+    totalBytes: 0,
+    completedFiles: 0,
+    totalFiles: 0,
+  });
   const [left, right] = await Promise.all([
     args.left.call(
       { action: "snapshot", rootPath: args.left.rootPath },
@@ -292,6 +305,23 @@ export async function experimental_synchronizeWorkspaces(args: {
     });
   }
   if (conflicts.size > 0) throw new WorkspaceSyncConflictError([...conflicts]);
+  const totalBytes = files.reduce(
+    (sum, item) => sum + (item.entry?.sizeBytes ?? 0),
+    0,
+  );
+  let bytes = 0;
+  let completedFiles = 0;
+  const offsets = new Map<string, number>();
+  const report = (stage: WorkspaceSyncProgress["stage"], path: string | null) =>
+    args.onProgress?.({
+      stage,
+      path,
+      bytes,
+      totalBytes,
+      completedFiles,
+      totalFiles: files.length,
+    });
+  report("directories", null);
   let checkpointTail = Promise.resolve();
   const checkpoint = async (name: string, entry: WorkspaceSyncEntry | null) => {
     if (entry) baseline[name] = entry;
@@ -312,10 +342,12 @@ export async function experimental_synchronizeWorkspaces(args: {
       if (result.action !== "mkdir")
         throw new Error("Unexpected directory sync response");
       await checkpoint(item.path, { kind: "directory", path: item.path });
+      report("directories", item.path);
     },
   );
   let copied = 0;
   let removed = 0;
+  report("copying", null);
   await parallel(files, signal, async (item) => {
     if (item.entry === null) {
       if (!item.previous) return;
@@ -339,12 +371,20 @@ export async function experimental_synchronizeWorkspaces(args: {
         item.entry,
         item.previous,
         signal,
-        args.onProgress,
+        (value) => {
+          const previous = offsets.get(item.path) ?? 0;
+          bytes += value.bytes - previous;
+          offsets.set(item.path, value.bytes);
+          report("copying", item.path);
+        },
       );
       await checkpoint(item.path, item.entry);
       copied++;
     }
+    completedFiles++;
+    report("copying", item.path);
   });
+  report("finalizing", null);
   for (const item of directories
     .filter((value) => !value.create)
     .sort((one, two) => two.path.length - one.path.length)) {
@@ -355,6 +395,8 @@ export async function experimental_synchronizeWorkspaces(args: {
     if (result.action !== "rmdir" || result.outcome !== "written")
       throw new WorkspaceSyncConflictError([item.path]);
     await checkpoint(item.path, null);
+    report("finalizing", item.path);
   }
+  report("complete", null);
   return { baseline, copied, removed };
 }

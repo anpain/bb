@@ -9,6 +9,7 @@ import {
   experimental_synchronizeWorkspaces,
   type WorkspaceSyncBaseline,
   type WorkspaceSyncEndpoint,
+  type WorkspaceSyncProgress,
 } from "./workspace-sync.js";
 
 export interface ThreadTransferClient {
@@ -28,6 +29,9 @@ export async function experimental_moveThread(args: {
     path: string | null;
     bytes: number;
     totalBytes: number;
+    stage?: WorkspaceSyncProgress["stage"];
+    completedFiles?: number;
+    totalFiles?: number;
   }): void;
 }) {
   const signal = args.signal ?? new AbortController().signal;
@@ -114,6 +118,15 @@ export async function experimental_moveThread(args: {
       targetRoot: string,
       phase: string,
     ) => {
+      args.onProgress?.({
+        phase,
+        path: null,
+        bytes: 0,
+        totalBytes: 0,
+        stage: "checking",
+        completedFiles: 0,
+        totalFiles: 0,
+      });
       const left = endpoint(args.source, source.hostId, sourceRoot);
       const right = endpoint(args.target, target.hostId, targetRoot);
       const [one, two] = await Promise.all([

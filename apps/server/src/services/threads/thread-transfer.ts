@@ -277,7 +277,10 @@ export async function transferThread(
               : project.id,
           sourceProjectId: project.id,
           projectName: project.name,
-          title: thread.title,
+          title:
+            [thread.title, thread.titleFallback].find((value) =>
+              value?.trim(),
+            ) ?? null,
           model: execution?.modelOverride ?? null,
           reasoningLevel: execution?.reasoningLevelOverride ?? null,
           sourceSequence,

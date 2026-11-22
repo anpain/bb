@@ -2,6 +2,10 @@
 
 Fork history for 0.49.0–0.49.12 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
 
+## Unreleased
+
+- Preserve a native chat's visible fallback title when moving it between servers, including chats whose generated title is empty.
+
 ## 0.49.12
 
 - Show transfer progress per stage, with verified file counts, aggregate bytes and the current path. Keep checking and activation indeterminate; report file completion only after commit. The CLI and Node SDK expose the same progress.

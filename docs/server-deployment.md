@@ -168,6 +168,15 @@ currently supports Codex and Claude account pools.
 
 ## Connections and request routing
 
+Mirroring copies `.git` and working files byte for byte; global Git configuration
+is specific to each machine. For a repository shared between Windows and Linux,
+match its effective `core.autocrlf` and `core.eol` settings in repository-local
+configuration before mirroring. For example, when the source uses
+`core.autocrlf=true`, use `git -C <project> config --local core.autocrlf true` in
+both copies. This does not rewrite files or create a commit; it prevents CRLF
+files from appearing modified merely because the other machine has a different
+global Git configuration. Do not reset the project to hide such differences.
+
 ### Import local chat history
 
 In bb Desktop, choose **File → Import chats** and check the Codex or Kimi Code

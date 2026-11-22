@@ -1,10 +1,11 @@
 # Changelog
 
-Fork history for 0.49.0–0.49.12 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
+Fork history for 0.49.0–0.49.13 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
 
-## Unreleased
+## 0.49.13
 
 - Preserve a native chat's visible fallback title when moving it between servers, including chats whose generated title is empty.
+- Document repository-local Git line-ending settings for Windows/Linux mirrors to avoid phantom changes caused by different global configurations.
 
 ## 0.49.12
 

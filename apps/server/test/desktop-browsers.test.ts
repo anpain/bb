@@ -244,6 +244,50 @@ async function withBrowserTest(
 }
 
 describe("desktop browser public API", () => {
+  it("routes computer actions through the owning thread and disables caching of screenshots", async () => {
+    await withBrowserTest(async (test) => {
+      test.intercept((request) =>
+        request.command.type === "desktop.computer.action"
+          ? {
+              ok: true,
+              result: {
+                active: true,
+                window: "Allowed window",
+                expiresAt: Date.now() + 1000,
+                screenshot: null,
+              },
+            }
+          : null,
+      );
+      const response = await test.post("computer", {
+        ...test.scope,
+        input: { action: "status" },
+      });
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(await response.json()).toMatchObject({
+        active: true,
+        window: "Allowed window",
+      });
+      expect(
+        (
+          await test.post("computer", {
+            ...test.scope,
+            threadId: "thr_missing",
+            input: { action: "screenshot" },
+          })
+        ).status,
+      ).toBe(404);
+      expect(
+        (
+          await test.post("computer", {
+            ...test.scope,
+            input: { action: "allow" },
+          })
+        ).status,
+      ).toBe(400);
+    });
+  });
   it("blocks hostile origins and simple requests before any host RPC", async () => {
     await withBrowserTest(async (test) => {
       for (const action of [
@@ -257,6 +301,7 @@ describe("desktop browser public API", () => {
         "reveal",
         "close",
         "capture",
+        "computer",
       ]) {
         const body =
           action === "instances"

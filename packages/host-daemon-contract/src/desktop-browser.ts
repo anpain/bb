@@ -1,5 +1,9 @@
 import { z } from "zod";
 import {
+  desktopComputerActionSchema,
+  desktopComputerResultSchema,
+} from "./desktop-computer.js";
+import {
   desktopBrowserImportOutcomeSchema,
   desktopBrowserImportSelectionSchema,
   desktopBrowserImportSourceSchema,
@@ -59,6 +63,13 @@ export const desktopBrowserNavigationUrlSchema = z
     }
   }, "Expected an HTTP(S) URL or about:blank");
 export const desktopBrowserCommandSchemas = {
+  "desktop.computer.action": z
+    .object({
+      type: z.literal("desktop.computer.action"),
+      ...target,
+      input: desktopComputerActionSchema,
+    })
+    .strict(),
   "desktop.browser.list_instances": z
     .object({ type: z.literal("desktop.browser.list_instances") })
     .strict(),
@@ -119,6 +130,7 @@ export const desktopBrowserCommandSchemas = {
     .strict(),
 };
 export const desktopBrowserCommandSchema = z.discriminatedUnion("type", [
+  desktopBrowserCommandSchemas["desktop.computer.action"],
   desktopBrowserCommandSchemas["desktop.browser.list_instances"],
   desktopBrowserCommandSchemas["desktop.browser.list_tabs"],
   desktopBrowserCommandSchemas["desktop.browser.create_tab"],
@@ -133,6 +145,7 @@ export const desktopBrowserCommandSchema = z.discriminatedUnion("type", [
 ]);
 const ok = z.object({ ok: z.literal(true) });
 export const desktopBrowserResultSchemas = {
+  "desktop.computer.action": desktopComputerResultSchema,
   "desktop.browser.list_instances": z.object({
     instances: z.array(desktopBrowserInstanceSchema).max(100),
   }),

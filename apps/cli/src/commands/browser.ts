@@ -1,5 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { Command } from "commander";
+import { desktopComputerActionSchema } from "@bb/host-daemon-contract";
 import type {
   ExperimentalDesktopBrowserImportOutcome,
   ExperimentalDesktopBrowserImportSources,
@@ -92,6 +93,51 @@ export function registerBrowserCommands(
     .command("browser")
     .description("Experimental built-in desktop browser control");
   const api = () => createCliBbSdk(getUrl()).experimental_desktopBrowsers;
+  scoped(
+    browser
+      .command("computer <action-json>")
+      .description(
+        "Use a Windows window explicitly allowed for this chat in Desktop",
+      ),
+  )
+    .option("--output <path>", "Save a screenshot as a JPEG file")
+    .action(
+      action(
+        async (json: string, options: ScopeOptions & { output?: string }) => {
+          const input = desktopComputerActionSchema.parse(JSON.parse(json));
+          if (input.action === "screenshot" && !options.output)
+            throw new Error("Screenshots require --output <path>");
+          if (input.action !== "screenshot" && options.output)
+            throw new Error("--output is only available for screenshots");
+          const result = await api().experimental_computer({
+            ...scope(options),
+            input,
+          });
+          if (result.screenshot && options.output)
+            await writeFile(
+              options.output,
+              Buffer.from(result.screenshot.base64, "base64"),
+              { flag: "wx", mode: 0o600 },
+            );
+          print(
+            {
+              ...result,
+              screenshot: result.screenshot
+                ? {
+                    width: result.screenshot.width,
+                    height: result.screenshot.height,
+                    path: options.output,
+                  }
+                : null,
+            },
+            options,
+            result.active
+              ? `Computer control: ${result.window}`
+              : "Computer control disabled",
+          );
+        },
+      ),
+    );
   browser
     .command("instances")
     .description("List connected desktop windows on a host")

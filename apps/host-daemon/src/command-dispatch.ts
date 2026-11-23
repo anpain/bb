@@ -602,6 +602,7 @@ const onlineRpcHandlers: OnlineRpcHandlerMap = {
   "desktop.browser.reveal_tab": forwardDesktopBrowserCommand,
   "desktop.browser.close_tab": forwardDesktopBrowserCommand,
   "desktop.browser.capture_tab": forwardDesktopBrowserCommand,
+  "desktop.computer.action": forwardDesktopBrowserCommand,
   "desktop.browser.acquire_control": forwardDesktopBrowserCommand,
   "desktop.browser.open_connection": forwardDesktopBrowserCommand,
   "desktop.browser.release_control": forwardDesktopBrowserCommand,

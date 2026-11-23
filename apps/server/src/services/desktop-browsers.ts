@@ -10,6 +10,7 @@ import {
 } from "@bb/host-daemon-contract";
 import {
   type DesktopBrowserBrokerProofRequest,
+  type ExperimentalDesktopComputerRequest,
   threadTabsSchema,
   type ThreadTab,
   type ExperimentalDesktopBrowserScope,
@@ -36,6 +37,26 @@ interface LeaseEntry {
   lease: ExperimentalDesktopBrowserLease;
   active: boolean;
   timer: ReturnType<typeof setTimeout>;
+}
+
+export async function executeDesktopComputer(
+  deps: WorkSessionDeps,
+  input: ExperimentalDesktopComputerRequest,
+  signal?: AbortSignal,
+) {
+  requirePublicThread(deps.db, input.threadId);
+  requireNonDestroyedHostWithStatus(deps, input.hostId);
+  const result = await callHostOnlineRpc(deps, {
+    hostId: input.hostId,
+    timeoutMs: 30_000,
+    signal,
+    command: {
+      type: "desktop.computer.action",
+      ...scopeCommand(input),
+      input: input.input,
+    },
+  });
+  return result;
 }
 
 const registries = new WeakMap<

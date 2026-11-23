@@ -12,6 +12,8 @@ import { GeneralSettingsSection } from "./SettingsView";
 afterEach(cleanup);
 
 function renderSection(overrides?: {
+  generateExecutionInstructions?: boolean;
+  onGenerateExecutionInstructionsChange?: (enabled: boolean) => void;
   terminalCopyOnSelect?: boolean;
   onTerminalCopyOnSelectChange?: (enabled: boolean) => void;
   generalSettingsDisabled?: boolean;
@@ -20,6 +22,12 @@ function renderSection(overrides?: {
 }) {
   return render(
     <GeneralSettingsSection
+      generateExecutionInstructions={
+        overrides?.generateExecutionInstructions ?? true
+      }
+      onGenerateExecutionInstructionsChange={
+        overrides?.onGenerateExecutionInstructionsChange ?? vi.fn()
+      }
       confirmThreadArchive={true}
       onConfirmThreadArchiveChange={vi.fn()}
       keepHistoryAfterContextClear={false}
@@ -58,6 +66,21 @@ function branchPrefixInput() {
 }
 
 describe("terminal copy-on-select setting", () => {
+  it("allows disabling automatic instruction files while retaining the manual action", () => {
+    const onChange = vi.fn();
+    renderSection({ onGenerateExecutionInstructionsChange: onChange });
+    fireEvent.click(
+      screen.getByRole("switch", { name: "Generate AGENTS.md and CLAUDE.md" }),
+    );
+    expect(onChange).toHaveBeenCalledWith(false);
+    cleanup();
+    renderSection({ generateExecutionInstructions: false });
+    expect(
+      screen
+        .getByRole("switch", { name: "Generate AGENTS.md and CLAUDE.md" })
+        .getAttribute("aria-checked"),
+    ).toBe("false");
+  });
   it("displays the saved value and allows opting out", () => {
     const onChange = vi.fn();
     renderSection({ onTerminalCopyOnSelectChange: onChange });

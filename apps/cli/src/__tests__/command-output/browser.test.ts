@@ -23,6 +23,58 @@ const flags = [
 ];
 describe("browser credential output", () => {
   setupCommandOutputTestEnvironment();
+  it("saves computer screenshots without printing pixels or overwriting an existing file", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bb-computer-cli-"));
+    const output = join(dir, "frame.jpg");
+    const bytes = Buffer.from("unique-frame-bytes");
+    const request = vi.fn(async () => ({
+      active: true,
+      window: "Allowed",
+      expiresAt: Date.now() + 1000,
+      screenshot: {
+        mimeType: "image/jpeg",
+        width: 20,
+        height: 10,
+        base64: bytes.toString("base64"),
+      },
+    }));
+    stubServerApi({ "v1.desktop-browsers.computer.$post": request });
+    const argv = [
+      "browser",
+      "computer",
+      JSON.stringify({ action: "screenshot" }),
+      ...flags,
+      "--output",
+      output,
+      "--json",
+    ];
+    try {
+      await runCommand(argv, (program) =>
+        registerBrowserCommands(program, () => "http://server"),
+      );
+      expect(await readFile(output)).toEqual(bytes);
+      expect(
+        JSON.stringify(collectLogPayloads(vi.mocked(console.log))),
+      ).not.toContain(bytes.toString("base64"));
+      expect(request).toHaveBeenCalledWith({
+        json: {
+          hostId: "host",
+          instanceId: "instance",
+          generation: "generation",
+          threadId: "thread",
+          input: { action: "screenshot" },
+        },
+      });
+      await expect(
+        runCommand(argv, (program) =>
+          registerBrowserCommands(program, () => "http://server"),
+        ),
+      ).rejects.toThrow();
+      expect(await readFile(output)).toEqual(bytes);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
   it("writes a new private file without printing the connection credential", async () => {
     const dir = await mkdtemp(join(tmpdir(), "bb-browser-cli-"));
     const output = join(dir, "connection.json");

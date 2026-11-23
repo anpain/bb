@@ -1,8 +1,18 @@
 # Configuration
 
+`generateExecutionInstructions` (Settings → General, default true) adds the bb
+managed execution/context block to project-root `AGENTS.md` and `CLAUDE.md`
+before a new chat first starts its provider. Turn it off to create no such files.
+Existing user text is preserved; disabling generation does not delete previously
+written instructions. Use the chat menu's Generate AGENTS.md / CLAUDE.md action
+or `bb thread generate-instructions <id>` to generate manually. CLI setting:
+`bb settings general generateExecutionInstructions false`. Runtime host/path
+guidance is still supplied directly to providers when file generation is off.
+
 Desktop's Local / VPS control moves an idle native Codex thread with its project
 when used inside that thread. After a remote switch, linked project folders are
-mirrored with a 10-second pause between completed checks. Desktop stores pair
+mirrored on filesystem events with 250 ms coalescing and a safety check every
+minute. Both servers must support host protocol 270. Desktop stores pair
 identities, hash baselines and recovery journals in its user-data directory's
 `workspace-sync`. Keep these files when moving back. The CLI equivalents use
 `--state` / `--state-dir` and default to `~/.bb/workspace-sync`; state must stay

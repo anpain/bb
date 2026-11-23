@@ -1,5 +1,35 @@
 # Deploy this bb fork on a Linux server
 
+## Updating the server
+
+Updating the Windows application does not update an independent VPS. Desktop
+checks the selected remote server's version after connecting and hourly, using
+this fork's GitHub server feed. It offers the update guide once per server and
+release in the current app session. It never restarts the VPS without an
+explicit server update. The upstream npm version check is not this fork's server
+release channel.
+
+On an existing Linux x64 systemd installation, stop agent work, update this
+repository checkout and run:
+
+```bash
+sudo bash scripts/server/update.sh --node-dir /opt/bb/node-v22.19.0-linux-x64/bin
+```
+
+Use `--prefix`, `--service` and `--port` for a non-default installation. The script
+downloads the verified Linux package from this fork's `desktop-latest` release,
+checks its SHA-256 and size against `server-version-linux-x64.json`, installs in
+a fresh runtime, refuses active/pending chats, backs up bb data, preserves the
+existing service environment and changes only its executable through a systemd
+drop-in. Failed health checks restore the previous executable and bb data.
+It does not update provider CLI packages or copy local PC chats. Keep a separate
+backup of project workspaces and provider accounts. The service user must be
+non-root; Windows/macOS and non-systemd deployments require their own update.
+
+The release also publishes `bb-app-VERSION.tgz` for administrators who deploy
+packages themselves. Desktop, Linux server and enrolled machines should use the
+same fork release when its host protocol changes.
+
 This guide targets Ubuntu/Debian Linux x64 with systemd, an SSH login with sudo,
 and outbound HTTPS access. The server runs bb and provider CLI tools; cloud
 model inference remains at the selected provider. No provider is installed or
@@ -241,7 +271,8 @@ matching Codex provider; the target needs its own signed-in Account Pooler.
 Other providers can use transcript import with a chosen continuation model.
 
 While the remote server is selected, Desktop mirrors the linked project folders
-with a 10-second pause between completed passes. Local bb stays running for
+on filesystem events, coalescing rapid writes for 250 ms. A full safety check
+runs every minute. Both servers must support host protocol 270. Local bb stays running for
 filesystem access; model execution and provider authentication belong to the
 selected execution host. On exit, Desktop attempts one final file sync before
 closing its runtime and SSH tunnel. It does not cancel an agent still working
@@ -262,8 +293,38 @@ its files; run platform-specific checks on the appropriate machine.
 
 The CLI equivalents are `bb project sync <path> --to-server <url> --target-path
 <path> --watch` for files and `bb thread move <id> --to-server <url>` for a native
-Codex handoff. Node SDK callers use `experimental_syncWorkspacePair` and
-`experimental_moveThread` from `@bb/sdk/node`; Desktop uses these same helpers.
+Codex handoff. Node SDK callers use `experimental_syncWorkspacePair`,
+`experimental_watchWorkspacePair` and `experimental_moveThread` from
+`@bb/sdk/node`; Desktop uses these same helpers.
+
+### Control a local Windows application from a VPS chat
+
+Enable Browser Automation on the bb server. Connect the Windows PC as a machine
+to that same server through Settings → Machines; selecting a VPS URL alone does
+not enroll the PC. Keep Desktop running and Windows unlocked. Open the desired
+chat, then choose File → Computer control, select an already-open window and
+allow this chat. The model's `bb_computer` tool can now request screenshots and
+guarded input from that PC while inference and project work remain on the VPS.
+The model can also use request_access with a reason to show a prompt in the
+focused chat on the PC. It cannot approve its own request; choose a window and
+confirm locally, then the model checks status before sending input.
+The local executor sends only the chosen window's images for these requests.
+Screenshot images are model inputs and can consume tokens.
+
+Keep the window visible: the executor refuses covered coordinates and input into
+another foreground window. Native failures revoke access. Minimized, locked or
+elevated applications can reject capture/input. The Stop panel and
+Ctrl+Alt+Shift+F12 revoke access immediately; grants are not persisted, last at
+most 30 minutes and also end on navigation, server change or broker disconnect.
+The API cannot grant access. No public Windows control port is opened: actions
+use the existing authenticated machine/desktop broker. Update the server,
+Windows machine and Desktop together (host protocol 270).
+
+CLI and SDK usage is in `bb guide browser`. Maintainers can verify physical
+mouse input, Unicode typing, keyboard shortcuts, screenshot coordinates and Stop
+using `pnpm exec turbo run smoke:computer-control --filter=@bb/desktop` on Windows.
+It briefly opens its own test window, uses a separate Electron profile and saves
+JPEG/result artifacts under `node_modules/.bb-build-cache/computer-control-smoke`.
 
 ### Codex accounts and conversation continuity
 

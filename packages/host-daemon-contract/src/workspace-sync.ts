@@ -24,6 +24,14 @@ const rootPath = z.string().min(1).max(4096);
 const uploadId = z.string().uuid();
 export const WORKSPACE_SYNC_CHUNK_BYTES = 1024 * 1024;
 export const workspaceSyncOperationSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("mkdir_root"), rootPath }).strict(),
+  z
+    .object({
+      action: z.literal("watch"),
+      rootPath,
+      revision: z.string().uuid().nullable(),
+    })
+    .strict(),
   z
     .object({ action: z.literal("rmdir"), rootPath, path: relativePath })
     .strict(),
@@ -88,6 +96,10 @@ export const workspaceSyncEntrySchema = z.discriminatedUnion("kind", [
 ]);
 export type WorkspaceSyncEntry = z.infer<typeof workspaceSyncEntrySchema>;
 export const workspaceSyncResultSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("mkdir_root"), ok: z.literal(true) }).strict(),
+  z
+    .object({ action: z.literal("watch"), revision: z.string().uuid() })
+    .strict(),
   z
     .object({
       action: z.literal("rmdir"),

@@ -6,6 +6,19 @@ description: Use the Browser Automation BB plugin to inspect and automate persis
 Use `bb browser-automation`. Open one session, retain its session ID, then inspect,
 act, and verify in short scripts.
 
+For native Windows applications, use the `bb_computer` tool after the user has
+allowed one window through Desktop File → Computer control. `hostId: null`
+discovers a grant for this chat. The PC must be connected as a machine to the
+selected server; the model may stay on the VPS.
+To request access, use input { action: "request_access", reason: "..." }; the
+focused Desktop chat shows a local approval prompt. The request does not grant
+access. Wait for status active; do not repeatedly request (one-minute cooldown).
+Inspect a new screenshot before
+every input. Click/scroll coordinates are normalized within that image. Keep the
+chosen window visible; covered points and missing focus reject input. Use stop
+when finished. The tool cannot grant access, open arbitrary programs or run
+scripts. CLI and SDK equivalents are in the core browser guide.
+
 `--machine` accepts an exact host ID or an unambiguous machine name. Exact IDs
 take precedence over names; unknown or ambiguous names fail before opening a session.
 

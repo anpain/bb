@@ -293,7 +293,9 @@ describe("server session ownership", () => {
         exitCode: 0,
         hostId: "desktop-host",
       });
-      expect(h.harness.registrations.agentTools).toEqual([]);
+      expect(
+        h.harness.registrations.agentTools.map((tool) => tool.name),
+      ).toEqual(["bb_computer"]);
     } finally {
       await h.harness.lifecycle.dispose();
     }

@@ -261,6 +261,11 @@ import {
   type DesktopBrowserBroker,
 } from "./desktop-browser-broker.js";
 import { createDesktopBrowserBrokerClient } from "./desktop-browser-broker-client.js";
+import { createDesktopComputerUi } from "./desktop-computer-ui.js";
+import {
+  createRemoteServerUpdateCheck,
+  FORK_SERVER_UPDATE_GUIDE,
+} from "./remote-server-update.js";
 import {
   bbDesktopBrowserTabRefSchema,
   bbDesktopZoomCommandSchema,
@@ -418,6 +423,10 @@ let desktopWindowFactory: DesktopWindowFactory | null = null;
 let desktopBrowserViewManager: DesktopBrowserViewManager | null = null;
 let desktopFindViewManager: DesktopFindViewManager | null = null;
 let desktopBrowserBroker: DesktopBrowserBroker | null = null;
+let desktopComputerUi: ReturnType<typeof createDesktopComputerUi> | null = null;
+let remoteServerUpdateCheck: ReturnType<
+  typeof createRemoteServerUpdateCheck
+> | null = null;
 let desktopBrowserBrokerClient: ReturnType<
   typeof createDesktopBrowserBrokerClient
 > | null = null;
@@ -917,6 +926,32 @@ function refreshApplicationMenu(): void {
     openAbout() {
       void showAboutDialog();
     },
+    computerControl() {
+      const parent = getFocusedApplicationWindow();
+      if (!parent) return;
+      const match =
+        /(?:\/projects\/[^/]+)?\/threads\/(thr_[a-zA-Z0-9_-]+)(?:\/|$)/u.exec(
+          new URL(parent.webContents.getURL()).pathname,
+        );
+      if (!match?.[1]) {
+        void dialog.showMessageBox(parent, {
+          type: "info",
+          message: "Open the chat that should control your PC first.",
+        });
+        return;
+      }
+      if (!desktopBrowserBroker?.getTarget(parent.webContents.id)) {
+        void dialog.showMessageBox(parent, {
+          type: "info",
+          message:
+            "This PC is not connected to the selected bb server as a machine.",
+          detail:
+            "In Settings → Machines, add this Windows PC to the selected server, then try Computer control again. The model can run on the VPS while the local machine executes desktop actions.",
+        });
+        return;
+      }
+      void desktopComputerUi?.open(parent, match[1]);
+    },
     importChats() {
       const parentWindow = getFocusedApplicationWindow();
       if (parentWindow === null) return;
@@ -1209,12 +1244,14 @@ function stopSystemConfigSync(): void {
 }
 
 function startSystemConfigSync(serverUrl: string): void {
+  remoteServerUpdateCheck?.stop();
   systemConfigSync?.stop();
   systemConfigSync = createSystemConfigSync(serverUrl);
   void refreshSystemConfig({ fetchImpl: fetch, serverUrl });
 }
 
 function startRemoteSystemConfigSync(serverUrl: string): void {
+  remoteServerUpdateCheck?.start(serverUrl);
   systemConfigSync?.stop();
   systemConfigSync = createRemoteSystemConfigSync(serverUrl);
 }
@@ -2650,6 +2687,8 @@ function handleBeforeQuit(event: Event): void {
 }
 
 async function finishQuit(): Promise<void> {
+  remoteServerUpdateCheck?.stop();
+  desktopComputerUi?.computer.stop();
   executionSwitchAbort?.abort();
   await executionSwitchCompletion;
   await workspaceMirrors?.stop(true);
@@ -3622,10 +3661,39 @@ async function runDesktopApp(): Promise<void> {
       );
     },
   });
+  desktopComputerUi = createDesktopComputerUi();
+  remoteServerUpdateCheck = createRemoteServerUpdateCheck({
+    currentVersion: app.getVersion(),
+    fetch: (input, init) =>
+      net.fetch(input instanceof URL ? input.toString() : input, init),
+    async notify(update) {
+      const parent = getFocusedApplicationWindow();
+      if (!parent || quitting) return;
+      const result = await dialog.showMessageBox(parent, {
+        type: "info",
+        title: "bb server update available",
+        message: `Update the connected server to bb ${update.latestVersion}`,
+        detail: `Server ${update.serverUrl} is running ${update.currentVersion}. Updating the Windows app does not update this server. The fork's systemd server is updated separately using the verified Linux package, with a backup and an idle-agent check.`,
+        buttons: ["Later", "Server update instructions"],
+        defaultId: 0,
+        cancelId: 0,
+      });
+      if (result.response === 1)
+        await shell.openExternal(FORK_SERVER_UPDATE_GUIDE);
+    },
+  });
   desktopBrowserBroker = createDesktopBrowserBroker({
     manager: desktopBrowserViewManager,
     product: `Chrome/${process.versions.chrome}`,
     browserImport: browserImportService,
+    computer: desktopComputerUi.computer,
+    requestComputerAccess(webContentsId, threadId, reason) {
+      const contents = electronWebContents.fromId(webContentsId);
+      const parent = contents ? BrowserWindow.fromWebContents(contents) : null;
+      if (!parent || parent.isDestroyed())
+        throw new Error("The requesting Desktop window is closed");
+      desktopComputerUi?.request(parent, threadId, reason);
+    },
   });
   ipcMain.handle(
     BB_DESKTOP_BROWSER_LIST_IMPORT_SOURCES_CHANNEL,

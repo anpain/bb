@@ -1,9 +1,12 @@
 import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 import type { Command } from "commander";
-import { createNodeBbSdk, experimental_syncWorkspacePair } from "@bb/sdk/node";
+import {
+  createNodeBbSdk,
+  experimental_syncWorkspacePair,
+  experimental_watchWorkspacePair,
+} from "@bb/sdk/node";
 import { action } from "../action.js";
 import { outputJson } from "./helpers.js";
 
@@ -33,10 +36,7 @@ export function registerProjectSyncCommand(
       "--state <path>",
       "Local synchronization state file, outside both project folders",
     )
-    .option(
-      "--watch",
-      "Continue synchronizing every 10 seconds until interrupted",
-    )
+    .option("--watch", "Synchronize on file changes until interrupted")
     .option("--json", "Print synchronization summaries as JSON")
     .action(
       action(
@@ -89,41 +89,11 @@ export function registerProjectSyncCommand(
           let first = true;
           let lastProgress = 0;
           try {
-            do {
-              const result = await experimental_syncWorkspacePair({
-                identity,
-                statePath,
-                signal: controller.signal,
-                onProgress: options.json
-                  ? undefined
-                  : (value) => {
-                      if (
-                        Date.now() - lastProgress < 1000 &&
-                        value.stage !== "complete"
-                      )
-                        return;
-                      lastProgress = Date.now();
-                      console.error(
-                        `${value.stage}: ${value.completedFiles}/${value.totalFiles} files, ${value.bytes}/${value.totalBytes} bytes${value.path ? ` · ${value.path}` : ""}`,
-                      );
-                    },
-                left: {
-                  rootPath: sourcePath,
-                  call: (operation, signal) =>
-                    source.files.experimental_sync(
-                      { hostId: sourceHost, operation },
-                      signal,
-                    ),
-                },
-                right: {
-                  rootPath: options.targetPath,
-                  call: (operation, signal) =>
-                    target.files.experimental_sync(
-                      { hostId: targetHost, operation },
-                      signal,
-                    ),
-                },
-              });
+            const onResult = (
+              result: Awaited<
+                ReturnType<typeof experimental_syncWorkspacePair>
+              >,
+            ) => {
               const summary = {
                 copied: result.copied,
                 removed: result.removed,
@@ -136,9 +106,44 @@ export function registerProjectSyncCommand(
                   );
               }
               first = false;
-              if (options.watch)
-                await delay(10_000, undefined, { signal: controller.signal });
-            } while (options.watch && !controller.signal.aborted);
+            };
+            const args = {
+              identity,
+              statePath,
+              signal: controller.signal,
+              onProgress: options.json
+                ? undefined
+                : (value) => {
+                    if (
+                      Date.now() - lastProgress < 1000 &&
+                      value.stage !== "complete"
+                    )
+                      return;
+                    lastProgress = Date.now();
+                    console.error(
+                      `${value.stage}: ${value.completedFiles}/${value.totalFiles} files, ${value.bytes}/${value.totalBytes} bytes${value.path ? ` · ${value.path}` : ""}`,
+                    );
+                  },
+              left: {
+                rootPath: sourcePath,
+                call: (operation, signal) =>
+                  source.files.experimental_sync(
+                    { hostId: sourceHost, operation },
+                    signal,
+                  ),
+              },
+              right: {
+                rootPath: options.targetPath,
+                call: (operation, signal) =>
+                  target.files.experimental_sync(
+                    { hostId: targetHost, operation },
+                    signal,
+                  ),
+              },
+            } satisfies Parameters<typeof experimental_syncWorkspacePair>[0];
+            if (options.watch)
+              await experimental_watchWorkspacePair({ ...args, onResult });
+            else onResult(await experimental_syncWorkspacePair(args));
           } catch (error) {
             if (!controller.signal.aborted) throw error;
           } finally {

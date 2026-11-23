@@ -2,7 +2,11 @@ import fs from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { z } from "zod";
-import { experimental_syncWorkspacePair, type BbSdk } from "@bb/sdk/node";
+import {
+  experimental_syncWorkspacePair,
+  experimental_watchWorkspacePair,
+  type BbSdk,
+} from "@bb/sdk/node";
 
 const sideSchema = z
   .object({
@@ -43,61 +47,75 @@ export function createWorkspaceMirrors(options: {
     }
     return mirrors;
   };
-  const run = async (serverId: string, signal: AbortSignal) => {
-    for (const mirror of await load()) {
-      if (
-        mirror.left.serverId !== serverId &&
-        mirror.right.serverId !== serverId
-      )
-        continue;
-      const [left, right] = await Promise.all([
-        options.client(mirror.left.serverId),
-        options.client(mirror.right.serverId),
-      ]);
-      const [leftConfig, rightConfig] = await Promise.all([
-        left.system.config({ signal }),
-        right.system.config({ signal }),
-      ]);
-      if (
-        leftConfig.primaryHostId !== mirror.left.hostId ||
-        rightConfig.primaryHostId !== mirror.right.hostId
-      )
-        throw new Error(
-          "A saved server now identifies a different machine. Synchronization stopped.",
-        );
-      await experimental_syncWorkspacePair({
-        identity: mirror.identity,
-        statePath: join(
-          stateDir,
-          `${createHash("sha256").update(mirror.identity).digest("hex")}.json`,
-        ),
-        signal,
-        left: {
-          rootPath: mirror.left.path,
-          call: (operation, signal) =>
-            left.files.experimental_sync(
-              { hostId: mirror.left.hostId, operation },
-              signal,
+  const run = async (serverId: string, signal: AbortSignal, watch = false) => {
+    const group = new AbortController();
+    signal = AbortSignal.any([signal, group.signal]);
+    let tasks: Promise<void>[] = [];
+    try {
+      tasks = (await load())
+        .filter(
+          (mirror) =>
+            mirror.left.serverId === serverId ||
+            mirror.right.serverId === serverId,
+        )
+        .map(async (mirror) => {
+          const [left, right] = await Promise.all([
+            options.client(mirror.left.serverId),
+            options.client(mirror.right.serverId),
+          ]);
+          const [leftConfig, rightConfig] = await Promise.all([
+            left.system.config({ signal }),
+            right.system.config({ signal }),
+          ]);
+          if (
+            leftConfig.primaryHostId !== mirror.left.hostId ||
+            rightConfig.primaryHostId !== mirror.right.hostId
+          )
+            throw new Error(
+              "A saved server now identifies a different machine. Synchronization stopped.",
+            );
+          await (
+            watch
+              ? experimental_watchWorkspacePair
+              : experimental_syncWorkspacePair
+          )({
+            identity: mirror.identity,
+            statePath: join(
+              stateDir,
+              `${createHash("sha256").update(mirror.identity).digest("hex")}.json`,
             ),
-        },
-        right: {
-          rootPath: mirror.right.path,
-          call: (operation, signal) =>
-            right.files.experimental_sync(
-              { hostId: mirror.right.hostId, operation },
-              signal,
-            ),
-        },
-      });
+            signal,
+            left: {
+              rootPath: mirror.left.path,
+              call: (operation, signal) =>
+                left.files.experimental_sync(
+                  { hostId: mirror.left.hostId, operation },
+                  signal,
+                ),
+            },
+            right: {
+              rootPath: mirror.right.path,
+              call: (operation, signal) =>
+                right.files.experimental_sync(
+                  { hostId: mirror.right.hostId, operation },
+                  signal,
+                ),
+            },
+          });
+        });
+      await Promise.all(tasks);
+    } finally {
+      group.abort();
+      await Promise.allSettled(tasks);
     }
   };
-  const schedule = () => {
+  const schedule = (delay = 0) => {
     if (selected === null || selected === "builtin") return;
     timer = setTimeout(() => {
       timer = null;
       if (selected === null) return;
       const signal = controller.signal;
-      work = run(selected, signal)
+      work = run(selected, signal, true)
         .then(() => {
           reportedError = null;
         })
@@ -112,9 +130,9 @@ export function createWorkspaceMirrors(options: {
         })
         .finally(() => {
           work = null;
-          if (!signal.aborted) schedule();
+          if (!signal.aborted) schedule(5_000);
         });
-    }, 10_000);
+    }, delay);
   };
   return {
     stateDir,

@@ -30,6 +30,7 @@ const hostCommandWakePolicy = {
   "desktop.browser.reveal_tab": "work",
   "desktop.browser.close_tab": "never",
   "desktop.browser.capture_tab": "work",
+  "desktop.computer.action": "never",
   "desktop.browser.acquire_control": "work",
   "desktop.browser.open_connection": "work",
   "desktop.browser.release_control": "never",

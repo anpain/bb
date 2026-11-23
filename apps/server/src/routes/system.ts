@@ -310,6 +310,9 @@ export function registerSystemRoutes(
     const updatedSettings = appSettingsSchema.parse({
       ...settings,
       agentProfiles: settings.agentProfiles ?? current.agentProfiles,
+      generateExecutionInstructions:
+        settings.generateExecutionInstructions ??
+        current.generateExecutionInstructions,
       idleProviderSessionTimeoutMinutes:
         settings.idleProviderSessionTimeoutMinutes === undefined
           ? current.idleProviderSessionTimeoutMinutes

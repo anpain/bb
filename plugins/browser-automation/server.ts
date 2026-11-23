@@ -21,6 +21,7 @@ import {
   type BrowserCliRequest,
 } from "./cli.js";
 import { previewDirective } from "./preview-directive.js";
+import { COMPUTER_TOOL, registerComputerTool } from "./computer.js";
 
 const desktopSchema = z
   .object({
@@ -55,6 +56,7 @@ const keyFor = (threadId: string, sessionId: string) =>
   `sessions/${encodeURIComponent(threadId)}/${sessionId}`;
 
 export default async function browserAutomationPlugin(bb: BbPluginApi) {
+  registerComputerTool(bb);
   const host = bb.hosts.experimental_client({ contract: hostContract });
   const desktop = bb.sdk.experimental_desktopBrowsers;
   const active = new Map<string, RecordEntry>();
@@ -523,7 +525,7 @@ export default async function browserAutomationPlugin(bb: BbPluginApi) {
     }
   }
   bb.agents.configure(() => ({
-    tools: [],
+    tools: [COMPUTER_TOOL],
     skills: ["browser-automation"],
     instructions:
       "When `bb browser-automation open` returns a previewDirective, copy it into your next response exactly once as a standalone line before you continue working. Do not wrap it in backticks or a code fence, and do not invent or edit the session ID. The directive shows the user a live view of that headless browser in BB chat. Desktop sessions return no directive.",

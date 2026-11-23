@@ -11,6 +11,25 @@ const scope = {
   threadId: "thread",
 };
 describe("desktop browser command boundaries", () => {
+  it("accepts scoped computer input but rejects remote grants, scripts and out-of-window coordinates", () => {
+    const command = (input: object) =>
+      desktopBrowserCommandSchema.safeParse({
+        type: "desktop.computer.action",
+        ...scope,
+        input,
+      }).success;
+    expect(command({ action: "click", x: 0.2, y: 0.8, button: "left" })).toBe(
+      true,
+    );
+    for (const input of [
+      { action: "allow", windowId: "123" },
+      { action: "script", code: "anything" },
+      { action: "click", x: 2, y: 0, button: "left" },
+      { action: "key", key: "Alt+Tab" },
+      { action: "key", key: "Win+R" },
+    ])
+      expect(command(input)).toBe(false);
+  });
   it.each(["dia", "zen", `storage-${"a".repeat(64)}`])(
     "accepts %s import discovery and selection across the wire",
     (sourceId) => {

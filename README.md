@@ -9,6 +9,10 @@
 # bb
 
 [Fork releases](https://github.com/anpain/bb/releases/tag/desktop-latest)
+
+Windows and VPS updates are separate. Desktop offers a server update when the
+selected VPS is older. See [updating the server](docs/server-deployment.md#updating-the-server)
+for the verified package, backup and rollback updater.
 [![Join Discord](https://img.shields.io/badge/Discord-Join%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/kvBU6tJhcJ)
 
 bb is an agentic IDE that builds itself. It can control, customize, and automate
@@ -31,7 +35,7 @@ or hand off to another agent.
 This is [anpain/bb](https://github.com/anpain/bb), based on the `privacy-kimi`
 fork. It supports local execution and execution on your Linux server, removes
 bb product telemetry, and adds provider installation and account controls.
-Read the [complete fork changelog for 0.49.0–0.49.13](./CHANGELOG.md#04913).
+Read the [complete fork changelog for 0.49.0–0.49.14](./CHANGELOG.md#04914).
 
 ## Quick start
 

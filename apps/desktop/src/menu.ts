@@ -54,6 +54,7 @@ export interface InstallApplicationMenuArgs {
   toggleBuiltinServer(): void;
   openAbout(): void;
   importChats?: () => void;
+  computerControl?: () => void;
   openNewTab(): void;
   openNewThread(): void;
   openSettings(): void;
@@ -240,6 +241,9 @@ export function buildApplicationMenuTemplate(
           },
           label: NEW_WINDOW_MENU_LABEL,
         },
+        ...(args.computerControl === undefined
+          ? []
+          : [{ label: "Computer control…", click: args.computerControl }]),
         ...(args.importChats === undefined
           ? []
           : [

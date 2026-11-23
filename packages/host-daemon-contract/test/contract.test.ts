@@ -98,6 +98,16 @@ interface OnlineRpcResponseRoundTripCase {
 }
 
 const ONLINE_RPC_RESPONSE_RESULT_FIXTURES: OnlineRpcResponseResultFixtures = {
+  "host.workspace_sync": {
+    action: "watch",
+    revision: "70aaac57-0eee-4b60-8e3d-99c6d980e3c3",
+  },
+  "desktop.computer.action": {
+    active: false,
+    window: null,
+    expiresAt: null,
+    screenshot: null,
+  },
   "environment.hook.run": {},
   "environment.hook.cancel": { status: "terminated" },
   "environment.inspect_cleanup": {
@@ -1068,11 +1078,11 @@ describe("host-daemon command schemas", () => {
   });
 
   it("uses the current host-daemon protocol version", () => {
-    expect(HOST_DAEMON_PROTOCOL_VERSION).toBe(266);
+    expect(HOST_DAEMON_PROTOCOL_VERSION).toBe(270);
     expect(HOST_ARTIFACT_MAX_BYTES).toBe(256 * 1024 * 1024);
   });
 
-  it("accepts only daemons that preserve optional user questions", () => {
+  it("accepts only daemons with the current workspace watch contract", () => {
     expect(contract.isCompatibleHostDaemonProtocolVersion(245)).toBe(false);
     expect(contract.isCompatibleHostDaemonProtocolVersion(246)).toBe(false);
     expect(contract.isCompatibleHostDaemonProtocolVersion(247)).toBe(false);
@@ -1093,7 +1103,11 @@ describe("host-daemon command schemas", () => {
     expect(contract.isCompatibleHostDaemonProtocolVersion(262)).toBe(false);
     expect(contract.isCompatibleHostDaemonProtocolVersion(263)).toBe(false);
     expect(contract.isCompatibleHostDaemonProtocolVersion(264)).toBe(false);
-    expect(contract.isCompatibleHostDaemonProtocolVersion(266)).toBe(true);
+    expect(contract.isCompatibleHostDaemonProtocolVersion(270)).toBe(true);
+    expect(contract.isCompatibleHostDaemonProtocolVersion(269)).toBe(false);
+    expect(contract.isCompatibleHostDaemonProtocolVersion(268)).toBe(false);
+    expect(contract.isCompatibleHostDaemonProtocolVersion(267)).toBe(false);
+    expect(contract.isCompatibleHostDaemonProtocolVersion(266)).toBe(false);
     expect(contract.isCompatibleHostDaemonProtocolVersion(265)).toBe(false);
     expect(contract.hostDaemonSupportsConnectNext(246)).toBe(false);
     expect(contract.hostDaemonSupportsConnectNext(247)).toBe(true);

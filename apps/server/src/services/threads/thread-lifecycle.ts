@@ -1,5 +1,6 @@
 import { advanceEnvironmentProvisioning } from "../environments/environment-engine.js";
 import { revokeThreadDesktopBrowserControl } from "../desktop-browsers.js";
+import { maybeGenerateExecutionInstructions } from "./execution-instructions.js";
 import {
   providerEnvironmentHasPendingWork,
   refreshProviderRetirement,
@@ -1103,6 +1104,7 @@ export async function prepareReadyThreadTurnCommand(
     };
   }
 
+  await maybeGenerateExecutionInstructions(deps, args.thread.id);
   return {
     command: await buildThreadStartCommand(deps, {
       ...args,
@@ -1411,6 +1413,7 @@ async function requestThreadStartOnce(
     return;
   }
 
+  await maybeGenerateExecutionInstructions(deps, args.thread.id);
   const command = await buildThreadStartCommand(deps, {
     ...args,
   });

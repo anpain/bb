@@ -27,6 +27,11 @@
       "passThroughEnv": ["DISPLAY"],
       "outputs": []
     },
+    "@bb/desktop#smoke:computer-control": {
+      "cache": false,
+      "dependsOn": ["topo"],
+      "outputs": []
+    },
     "@bb/desktop#smoke:browser-cdp": {
       "cache": false,
       "dependsOn": ["topo"],
@@ -718,7 +723,11 @@
       "passThroughEnv": ["UPDATE_PARITY_ROW_COUNTS"]
     },
     "test": {
-      "env": ["BB_QUERY_PLAN_EXECUTED", "BB_QUERY_PLAN_REPORT", "VITEST_MAX_WORKERS"],
+      "env": [
+        "BB_QUERY_PLAN_EXECUTED",
+        "BB_QUERY_PLAN_REPORT",
+        "VITEST_MAX_WORKERS"
+      ],
       "dependsOn": ["//#ensure-native-modules", "topo"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/vitest*.ts"],
       "outputs": [".query-plan/**"],
@@ -757,7 +766,12 @@
     // bundling step — so the SDK dist must exist before the suite runs. The
     // marketplace parity suites read apps/web's published JSON schemas.
     "@bb/server#test": {
-      "env": ["BB_CI_TEST_SHARD", "BB_QUERY_PLAN_EXECUTED", "BB_QUERY_PLAN_REPORT", "VITEST_MAX_WORKERS"],
+      "env": [
+        "BB_CI_TEST_SHARD",
+        "BB_QUERY_PLAN_EXECUTED",
+        "BB_QUERY_PLAN_REPORT",
+        "VITEST_MAX_WORKERS"
+      ],
       "outputs": [".query-plan/**"],
       "dependsOn": [
         "@bb/agent-runtime#generate:test-bridges",

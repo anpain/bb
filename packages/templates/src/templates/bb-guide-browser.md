@@ -1,5 +1,38 @@
 # Built-in browser automation
 
+## Windows computer control
+
+`bb browser computer <action-json> --host <id> --instance <id> --generation <id>
+--thread <id> [--output <new-jpeg-path>] [--json]` operates one Windows window
+explicitly allowed for this chat through Desktop File → Computer control. This
+PC must be an enrolled machine on the selected server; the model can run on a
+VPS. Use `bb browser instances --host <id>` to get the instance and generation.
+
+Actions include `{"action":"status"}`, `{"action":"screenshot"}`,
+`{"action":"request_access","reason":"Inspect the project in CorelDRAW"}`,
+`{"action":"click","x":0.5,"y":0.5,"button":"left"}`,
+`{"action":"type","text":"hello"}`, `{"action":"key","key":"Enter"}`,
+`{"action":"scroll","x":0.5,"y":0.5,"steps":-3}` and `{"action":"stop"}`.
+Coordinates are normalized 0..1 within the latest image. Take and inspect a new
+screenshot before every input. Screenshot requires `--output`; existing files
+are never overwritten. Output contains metadata and the saved path, not pixels.
+
+Access cannot be enabled remotely.
+The model can request a local prompt with request_access; focus the owning chat
+in Desktop first. The request returns before approval. Wait for status active;
+never treat a sent request as access granted. Requests are limited to one per
+minute per Desktop. Specify a host when several PCs are connected.
+Access ends after at most 30 minutes, on Stop /
+Ctrl+Alt+Shift+F12, navigation, server switch or broker disconnect. Keep the chosen
+window visible. Covered points, missing focus, held modifiers, locked desktops
+and elevated windows can reject input. Native failures revoke access. Both server
+and machine require host protocol 270. SDK callers use
+`sdk.experimental_desktopBrowsers.experimental_computer({ hostId, instanceId,
+generation, threadId, input })`. Browser Automation's `bb_computer` tool discovers
+the local grant and returns screenshots as images to the model.
+
+## Browser tabs
+
 `bb browser` is the experimental core API for automation integrations controlling BB desktop tabs. The bundled Browser Automation plugin adds its own `bb browser-automation` session commands (see its browser-automation skill); another plugin can use the same core connection independently.
 
 Start with `bb browser instances --host <host-id> --json`. For every tab/control operation provide `--host <host-id> --instance <instance-id> --generation <generation> --thread <thread-id>`. The browser host can differ from the agent host. Never infer an active desktop window.

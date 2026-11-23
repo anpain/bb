@@ -7,6 +7,24 @@ editingNotes: Keep accurate against the server's agent-instructions reader and s
 ---
 Agent configuration
 
+Automatic execution guidance:
+
+  Settings → General → Generate AGENTS.md and CLAUDE.md (default on), or
+  bb settings general generateExecutionInstructions false
+
+  Before the first provider start, bb adds a managed block to both files in the
+  attached project root. It describes execution-host boundaries, PC tools and
+  conditional file synchronization. Existing instructions outside its block are
+  preserved. Duplicate/incomplete markers or concurrent edits stop the write.
+  Disable auto generation to create no files; disabling does not delete existing
+  text. Current host/path is supplied separately at runtime, even with files off.
+
+  Manual: chat menu → Generate AGENTS.md / CLAUDE.md, or
+  bb thread generate-instructions <id> [--json]
+  SDK: sdk.threads.experimental_generateExecutionInstructions({ threadId })
+  Manual generation works with auto generation off and returns both file paths.
+  A project folder must already be attached; this does not call an AI model.
+
 bb reads agent configuration from the app data dir and from a project's .bb/
 directory. These files shape how agents behave in provider-backed threads.
 

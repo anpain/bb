@@ -1,8 +1,16 @@
 # Changelog
 
-Fork history for 0.49.0–0.49.13 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
+Fork history for 0.49.0–0.49.14 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
 
-## Unreleased
+## 0.49.14
+
+- Publish verified Linux server packages and a server update feed. Prompt separately when a connected server is older; include a backup/rollback updater for systemd installations.
+
+- Let agents request local PC-window approval without granting themselves access. Add optional AGENTS.md/CLAUDE.md generation, a manual chat-menu/CLI/SDK action and per-turn execution-host guidance; preserve user content and reject concurrent file edits. Retry transient sync-source changes when temporary files disappear between scanning and copying.
+
+- Add explicit Windows window control from server-side agents through Browser Automation's bb_computer tool. Choose a window in Desktop, inspect screenshots and use guarded mouse/keyboard input. Include Stop and emergency shortcut, temporary chat-bound grants, CLI/SDK support and native Windows smoke verification.
+
+- Synchronize mirrored project files on changes from either machine after a 250 ms coalescing delay, with serialized transfers and a one-minute safety check. Share the event-driven watcher between Desktop, CLI and Node SDK (host protocol 270).
 
 - Fix portable Codex sessions reading the wrong shape of plugin metadata. Use their isolated home when resuming, replace host-specific runtime workspace roots, and activate rollouts in dated session directories.
 

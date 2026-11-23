@@ -1,4 +1,6 @@
 import { refreshProviderRetirement } from "../../services/environments/environment-engine.js";
+import { generateThreadExecutionInstructions } from "../../services/threads/execution-instructions.js";
+import { browserRequestProblem } from "../../browser-request-guard.js";
 import {
   deleteQueuedThreadMessage,
   getEnvironment,
@@ -220,6 +222,14 @@ export function registerThreadActionRoutes(
     onValidationError: (msg) => new ApiError(400, "invalid_request", msg),
   });
   const routes = publicApiRoutes.threads;
+  post(routes.generateExecutionInstructions, async (context) => {
+    const problem = browserRequestProblem(context, deps);
+    if (problem)
+      throw new ApiError(problem.status, "forbidden_origin", problem.error);
+    return context.json(
+      await generateThreadExecutionInstructions(deps, context.req.param("id")),
+    );
+  });
 
   post(routes.send, async (context, payload) => {
     const thread = requirePublicThread(deps.db, context.req.param("id"));

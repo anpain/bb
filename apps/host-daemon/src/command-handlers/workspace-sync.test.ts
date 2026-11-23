@@ -11,12 +11,179 @@ import { createWorkspaceSyncService } from "./workspace-sync.js";
 import {
   experimental_synchronizeWorkspaces,
   experimental_syncWorkspacePair,
+  experimental_watchWorkspacePair,
   type WorkspaceSyncBaseline,
   type WorkspaceSyncProgress,
 } from "@bb/sdk/node";
 
 const sha = (bytes: Buffer | string) =>
   createHash("sha256").update(bytes).digest("hex");
+
+it("watches both project copies, includes ignored files and stops on cancellation", async () => {
+  const { folder, root, service } = await fixture();
+  const other = join(folder, "other");
+  await fs.mkdir(root);
+  await fs.writeFile(join(root, ".gitignore"), "ignored\n");
+  const controller = new AbortController();
+  const endpoint = (rootPath: string) => ({ rootPath, call: service });
+  let passes = 0;
+  const task = experimental_watchWorkspacePair({
+    identity: "watched-pair",
+    statePath: join(folder, "state.json"),
+    left: endpoint(root),
+    right: endpoint(other),
+    signal: controller.signal,
+    onResult: () => {
+      passes++;
+    },
+  });
+  try {
+    await expect.poll(() => passes).toBeGreaterThanOrEqual(2);
+    await fs.writeFile(join(root, "ignored"), "local edit");
+    await expect
+      .poll(() => fs.readFile(join(other, "ignored"), "utf8"))
+      .toBe("local edit");
+    await fs.writeFile(join(other, "remote.txt"), "server edit");
+    await expect
+      .poll(() => fs.readFile(join(root, "remote.txt"), "utf8"))
+      .toBe("server edit");
+    await fs.unlink(join(root, "ignored"));
+    await expect
+      .poll(async () => (await fs.readdir(other)).includes("ignored"))
+      .toBe(false);
+  } finally {
+    controller.abort();
+    await task;
+  }
+});
+
+it("retains watch revisions between requests and cancels an idle long poll", async () => {
+  const { root, run, service } = await fixture();
+  await fs.mkdir(root);
+  const first = await run({ action: "watch", rootPath: root, revision: null });
+  if (first.action !== "watch") throw new Error("Unexpected watch result");
+  await fs.writeFile(join(root, "new.txt"), "saved between requests");
+  await expect
+    .poll(async () => {
+      const next = await run({
+        action: "watch",
+        rootPath: root,
+        revision: null,
+      });
+      if (next.action !== "watch") throw new Error("Unexpected watch result");
+      return next.revision;
+    })
+    .not.toBe(first.revision);
+  const latest = await run({ action: "watch", rootPath: root, revision: null });
+  if (latest.action !== "watch") throw new Error("Unexpected watch result");
+  const controller = new AbortController();
+  const pending = service(
+    { action: "watch", rootPath: root, revision: latest.revision },
+    controller.signal,
+  );
+  const rejected = expect(pending).rejects.toThrow();
+  controller.abort();
+  await rejected;
+});
+it.each(["file", "directory"])(
+  "rescans when a temporary source %s disappears between snapshot and read",
+  async (kind) => {
+    const { folder, root, service } = await fixture();
+    const other = join(folder, "other");
+    await fs.mkdir(root);
+    const temporary =
+      kind === "directory" ? "work-temporary/file.txt" : "temporary.txt";
+    if (kind === "directory") await fs.mkdir(join(root, "work-temporary"));
+    await fs.writeFile(join(root, temporary), "temporary");
+    await fs.writeFile(join(root, "keep.txt"), "keep");
+    const controller = new AbortController();
+    let removed = false;
+    let passes = 0;
+    const task = experimental_watchWorkspacePair({
+      identity: "transient-pair",
+      statePath: join(folder, "state.json"),
+      signal: controller.signal,
+      left: {
+        rootPath: root,
+        call: async (operation, signal) => {
+          if (
+            operation.action === "read" &&
+            operation.path === temporary &&
+            !removed
+          ) {
+            removed = true;
+            if (kind === "directory")
+              await fs.rm(join(root, "work-temporary"), { recursive: true });
+            else await fs.unlink(join(root, temporary));
+          }
+          return service(operation, signal);
+        },
+      },
+      right: { rootPath: other, call: service },
+      onResult: () => {
+        passes++;
+      },
+    });
+    const settled = task.catch((error: unknown) => {
+      controller.abort();
+      throw error;
+    });
+    try {
+      await expect.poll(() => passes).toBeGreaterThan(0);
+      expect(await fs.readFile(join(other, "keep.txt"), "utf8")).toBe("keep");
+      expect(await fs.readdir(other)).not.toContain("temporary.txt");
+      if (kind === "directory")
+        expect(await fs.readdir(other)).not.toContain("work-temporary");
+      expect(removed).toBe(true);
+    } finally {
+      controller.abort();
+      await settled;
+    }
+  },
+);
+
+it("queues edits received during an active transfer instead of losing them", async () => {
+  const { folder, root, service } = await fixture();
+  const other = join(folder, "other");
+  await fs.mkdir(root);
+  const controller = new AbortController();
+  let passes = 0;
+  let injected = false;
+  const task = experimental_watchWorkspacePair({
+    identity: "inflight-pair",
+    statePath: join(folder, "state.json"),
+    left: {
+      rootPath: root,
+      call: async (operation, signal) => {
+        if (
+          operation.action === "read" &&
+          operation.path === "first.txt" &&
+          !injected
+        ) {
+          injected = true;
+          await fs.writeFile(join(root, "second.txt"), "saved while copying");
+        }
+        return service(operation, signal);
+      },
+    },
+    right: { rootPath: other, call: service },
+    signal: controller.signal,
+    onResult: () => {
+      passes++;
+    },
+  });
+  try {
+    await expect.poll(() => passes).toBeGreaterThanOrEqual(2);
+    await fs.writeFile(join(root, "first.txt"), "start transfer");
+    await expect
+      .poll(() => fs.readFile(join(other, "second.txt"), "utf8"))
+      .toBe("saved while copying");
+    expect(injected).toBe(true);
+  } finally {
+    controller.abort();
+    await task;
+  }
+});
 async function fixture() {
   const folder = await fs.mkdtemp(join(tmpdir(), "bb-sync-"));
   onTestFinished(() => fs.rm(folder, { recursive: true, force: true }));

@@ -27,6 +27,7 @@ import type {
   DesktopBrowserViewManager,
 } from "./desktop-browser-view.js";
 import type { BrowserImportService } from "./browser-import/browser-import.js";
+import type { DesktopComputer } from "./desktop-computer.js";
 
 interface InstanceEntry {
   webContentsId: number;
@@ -49,6 +50,12 @@ export function createDesktopBrowserBroker(args: {
   manager: DesktopBrowserViewManager;
   product: string;
   browserImport?: BrowserImportService;
+  computer?: DesktopComputer;
+  requestComputerAccess?(
+    webContentsId: number,
+    threadId: string,
+    reason: string,
+  ): void;
 }) {
   const instances = new Map<string, InstanceEntry>();
   const leases = new Map<string, ControlLease>();
@@ -310,6 +317,7 @@ export function createDesktopBrowserBroker(args: {
       changed();
     },
     releaseWindow(webContentsId: number) {
+      args.computer?.releaseWindow(webContentsId);
       const instance = instanceForWindow(webContentsId);
       if (!instance) return;
       for (const lease of [...leases.values()])
@@ -324,6 +332,7 @@ export function createDesktopBrowserBroker(args: {
       hostId = value;
       snapshots.clear();
       if (value === null) {
+        args.computer?.stop();
         for (const lease of [...leases.values()]) revoke(lease);
         for (const instance of instances.values())
           instance.descriptor.generation = randomUUID();
@@ -331,6 +340,7 @@ export function createDesktopBrowserBroker(args: {
     },
     setServerOrigin(value: string) {
       if (serverOrigin === value) return;
+      args.computer?.stop();
       serverOrigin = value;
       hostId = null;
       for (const lease of [...leases.values()]) revoke(lease);
@@ -392,6 +402,32 @@ export function createDesktopBrowserBroker(args: {
       if (command.type === "desktop.browser.list_instances")
         return { instances: this.listInstances() };
       const instance = requireInstance(command);
+      if (command.type === "desktop.computer.action") {
+        if (!args.computer)
+          throw new Error(
+            "Computer control is unavailable in this desktop build",
+          );
+        if (command.input.action === "request_access") {
+          if (!args.requestComputerAccess)
+            throw new Error("Local computer access requests are unavailable");
+          args.requestComputerAccess(
+            instance.webContentsId,
+            command.threadId,
+            command.input.reason,
+          );
+          return args.computer.execute(
+            {
+              webContentsId: instance.webContentsId,
+              threadId: command.threadId,
+            },
+            { action: "status" },
+          );
+        }
+        return args.computer.execute(
+          { webContentsId: instance.webContentsId, threadId: command.threadId },
+          command.input,
+        );
+      }
       if (command.type === "desktop.browser.list_import_sources") {
         if (!args.browserImport)
           throw new Error("Browser cookie import is unavailable");
@@ -529,6 +565,7 @@ export function createDesktopBrowserBroker(args: {
       }
     },
     dispose() {
+      args.computer?.stop();
       unsubscribeManager();
       for (const lease of [...leases.values()]) revoke(lease);
       listeners.clear();

@@ -698,6 +698,9 @@ export interface ThreadsArea {
   experimental_regenerateTitle(
     args: ThreadActionArgs,
   ): Promise<ThreadMutationResult>;
+  experimental_generateExecutionInstructions(input: {
+    threadId: string;
+  }): Promise<{ files: string[] }>;
   updatePluginMetadata(
     args: ThreadPluginMetadataUpdateArgs,
   ): Promise<ThreadPluginMetadataResult>;
@@ -1319,6 +1322,13 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
           { json: input },
           ...signalRequestArgs(signal),
         ),
+      );
+    },
+    async experimental_generateExecutionInstructions({ threadId }) {
+      return transport.readJson(
+        transport.api.v1.threads[":id"]["execution-instructions"].$post({
+          param: { id: threadId },
+        }),
       );
     },
     async importChat({ signal, ...chat }) {

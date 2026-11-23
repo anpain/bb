@@ -1,11 +1,59 @@
 # APIs To Audit
 
+## Explicit local Windows computer control
+
+`bb.sdk.experimental_desktopBrowsers.experimental_computer({ hostId, instanceId,
+generation, threadId, input })` is the shared path for Browser Automation's
+`bb_computer` tool, `bb browser computer` and Node SDK callers. It uses the
+authenticated desktop broker on an enrolled Windows machine, independently of
+the model's execution host. Host protocol 270 is required. Input is never retried.
+Only Desktop's local File → Computer control picker can grant access to one native
+window and the current chat; the API cannot enable access. A grant lasts at most
+30 minutes and ends on Stop, Ctrl+Alt+Shift+F12, navigation, window closure,
+broker disconnect or server switch. It is not saved. Actions are status,
+screenshot, click, type, key, scroll, stop and request_access. request_access
+requires a reason and only shows a local prompt in the focused owning chat.
+It returns immediately without granting access; callers must check status later.
+Requests are limited to one per minute per Desktop and are never broadcast to
+several candidate machines. Coordinates are normalized within
+the screenshot; a fresh screenshot is required before every input. Native input
+verifies process identity, foreground and point ownership, rejects held modifiers
+and stops access on native failures. The first-party root export
+`internal_DO_NOT_USE_desktopComputerActionSchema` shares the action schema with
+Browser Automation's `computer.ts`; it is not a third-party API. Before
+stabilization, audit DPI and capture bounds across native Windows applications,
+locked/elevated sessions, cancellation, focus changes and sustained remote use.
+Core's grant UI and broker use the same executor; native smoke coverage is
+`smoke:computer-control`.
+
+## Generated execution instructions
+
+`bb.sdk.threads.experimental_generateExecutionInstructions({ threadId })` and
+`bb thread generate-instructions <id>` share the server implementation used by
+the chat menu and automatic generation before the first provider start. It
+creates or updates root AGENTS.md and CLAUDE.md only inside the attached project,
+preserving text outside the bb:execution-context marker block. File writes use
+expected SHA-256 and reject concurrent edits. Duplicate/malformed markers stop
+generation. Settings → General → Generate AGENTS.md and CLAUDE.md controls
+automatic generation (`generateExecutionInstructions`, default true). Manual
+generation works when it is disabled. Current execution host/path and conditional
+sync guidance are injected per runtime separately, avoiding machine-specific
+changes in mirrored project files. Before stabilization, audit preservation of
+mixed line endings, concurrent generators and provider instruction precedence.
+
 ## Workspace and native thread transfer
 
 `bb.sdk.files.experimental_sync({ hostId, operation })` exposes snapshot,
 verified chunk upload, guarded deletion and directory operations through the
 same daemon path used by Desktop mirrors, `bb project sync`, and the Node SDK
 `experimental_synchronizeWorkspaces` / `experimental_syncWorkspacePair` helpers.
+`experimental_watchWorkspacePair` uses the same path for both filesystem watches
+and serialized copies: 250 ms coalescing, a one-minute safety scan and cancellation
+through its signal. The raw `watch` operation accepts a nullable UUID revision;
+null subscribes immediately, otherwise it returns on change or after 15 seconds.
+Revisions survive requests, including changes between polls. Watches expire after
+60 seconds without renewal and are limited to 100 roots per daemon. `mkdir_root`
+creates a validated root; the helper calls it only after verifying an empty baseline.
 Their `onProgress` callback reports `WorkspaceSyncProgress`: stage, current path,
 aggregate bytes/totalBytes and committed completedFiles/totalFiles for the current
 pass. Checking precedes the plan, so its totals are unknown (zero); completion is
@@ -14,7 +62,7 @@ Already synchronized files are excluded from the planned totals. A resumed pass
 reports only its remaining work. `experimental_moveThread` adds the enclosing
 phase and resets totals for each project/session/storage stage.
 It supports full folders including hidden files and Git metadata, with an
-explicit 100000-entry limit and no symlink following. Host protocol 267 is
+explicit 100000-entry limit and no symlink following. Host protocol 270 is
 required. Before stabilization, audit cross-platform path and cancellation
 behavior, sustained large-project performance and concurrent filesystem edits.
 

@@ -129,6 +129,7 @@ export const appSettingsSchema = z
     showDiagnosticEvents: z.boolean(),
     keepHistoryAfterContextClear: z.boolean(),
     summarizeShellCommands: z.boolean(),
+    generateExecutionInstructions: z.boolean().default(true),
     providerOrder: z.array(z.string().min(1)),
     agentProfiles: agentProfilesSchema.default(defaultAgentProfiles),
     defaultProviderId: z.string().min(1).nullable(),
@@ -169,6 +170,7 @@ export const defaultAppSettings: AppSettings = {
   showDiagnosticEvents: false,
   keepHistoryAfterContextClear: false,
   summarizeShellCommands: true,
+  generateExecutionInstructions: true,
   providerOrder: [],
   agentProfiles: defaultAgentProfiles,
   defaultProviderId: null,
@@ -189,6 +191,7 @@ export const disabledProviderIdsSchema = z.array(z.string().min(1));
 
 export const appSettingsUpdateSchema = z.union([
   appSettingsSchema.extend({
+    generateExecutionInstructions: z.boolean().optional(),
     idleProviderSessionTimeoutMinutes:
       idleProviderSessionTimeoutMinutesSchema.optional(),
     terminalCopyOnSelect: z.boolean().optional(),
@@ -202,6 +205,7 @@ export const appSettingsUpdateSchema = z.union([
     earlyAdopter: z.boolean().optional(),
   }),
   appSettingsSchema.omit({ showDiagnosticEvents: true }).extend({
+    generateExecutionInstructions: z.boolean().optional(),
     idleProviderSessionTimeoutMinutes:
       idleProviderSessionTimeoutMinutesSchema.optional(),
     terminalCopyOnSelect: z.boolean().optional(),

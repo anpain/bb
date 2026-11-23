@@ -1660,7 +1660,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
           "Retry failed environment cleanup with recover: true after inspecting processes using the workspace",
         ],
         reference: [
-          "Mirror project files with bb.sdk.files.experimental_sync({ hostId, operation }): snapshot, read, begin/chunk/commit/abort, mkdir, remove and empty-directory rmdir. Chunks are at most 1 MiB; writes verify SHA-256 and expected destination hashes. Conflicts preserve both copies. Symlinks and nonportable paths are rejected; host protocol 267 is required. Core Desktop and bb project sync use this same path.",
+          "Mirror project files with bb.sdk.files.experimental_sync({ hostId, operation }): snapshot, read, begin/chunk/commit/abort, mkdir_root, mkdir, remove and empty-directory rmdir. watch accepts rootPath and a nullable UUID revision: null initializes immediately; otherwise it waits for a change or 15 seconds. Retain the returned revision for the next request. Idle watches expire after 60 seconds, with a limit of 100 roots per daemon. Chunks are at most 1 MiB; writes verify SHA-256 and expected destination hashes. Conflicts preserve both copies. Symlinks and nonportable paths are rejected; host protocol 270 is required. Core Desktop and bb project sync use this same path.",
           "Hand off a top-level idle native Codex thread with bb.sdk.threads.experimental_transfer: export archives the source and returns typed history plus host staging locations; prepare selects a destination; apply restores the same native identity; cancel reopens an unchanged source. The Node SDK experimental_moveThread helper and bb thread move orchestrate this path. This differs from transcript import and never starts model inference.",
           "The first-party host export internal_DO_NOT_USE_nativeSessionTransferHostContract is reserved for core thread transfer and the Codex provider implementation; third-party plugins must not implement or call it.",
           "Node SDK synchronization helpers report WorkspaceSyncProgress through onProgress: stage, current path, aggregate bytes/totalBytes and committed completedFiles/totalFiles. Totals cover remaining work in each pass, excluding unchanged files; checking has unknown totals, and complete follows verified commits and checkpoints. experimental_moveThread adds the enclosing phase and resets totals between stages. Desktop and CLI use these same callbacks.",
@@ -1699,6 +1699,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
           "PluginBbSdk.threads.experimental_listDescendants",
           "PluginBbSdk.threads.experimental_listCascade",
           "PluginBbSdk.threads.experimental_regenerateTitle",
+          "PluginBbSdk.threads.experimental_generateExecutionInstructions",
           "PluginBbSdk.threads.experimental_headState",
         ],
         firstParty: [
@@ -1761,6 +1762,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
           "Open signed-in tabs that belong to a thread",
           "Give an automation tool private control of a tab",
           "Copy a profile's sign-in from another browser",
+          "Use experimental_computer for a Windows window explicitly allowed for this chat in Desktop. Actions are status, request_access (reason required), screenshot, click, type, key, scroll and stop. request_access shows a local prompt in the focused owning chat, at most once per minute, and returns before approval. Wait for status active. Take a new screenshot before every input; coordinates are normalized within that image. Grants are local and last at most 30 minutes. The model may run on another host. The API cannot grant access. Desktop, bb_computer and bb browser computer share the executor. internal_DO_NOT_USE_desktopComputerActionSchema is reserved for first-party Browser Automation.",
         ],
         apiSymbols: [
           "ExperimentalDesktopBrowsersArea",
@@ -1770,6 +1772,9 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
           "ExperimentalDesktopBrowserAcquireInput",
           "ExperimentalDesktopBrowsersArea.listImportSources",
           "ExperimentalDesktopBrowsersArea.importCookies",
+          "ExperimentalDesktopBrowsersArea.experimental_computer",
+          "ExperimentalDesktopComputerRequest",
+          "ExperimentalDesktopComputerResult",
         ],
         firstParty: ["Browser Automation"],
         experimental: true,

@@ -36,6 +36,7 @@ jobs:
           --filter=bb-plugin-bb--provider-usage --output-logs=new-only --
           ExecutionLocationControl.test.tsx server-choice-ipc.test.ts
           chat-import-models.test.ts chat-import-context.test.ts app.test.tsx
+          desktop-computer.test.ts desktop-computer-request.test.ts remote-server-update.test.ts
       - name: Build Windows installer
         run: pnpm exec turbo run desktop:build:win --filter=@bb/desktop --output-logs=new-only
       - name: Launch packaged app and verify renderer and preload

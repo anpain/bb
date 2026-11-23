@@ -11,6 +11,7 @@ import {
 import { CommandDispatchError } from "../command-dispatch-support.js";
 import { isFsErrorWithCode } from "../fs-errors.js";
 import { runInSerialLane } from "../serial-lane.js";
+import { createWorkspaceSyncWatch } from "../workspace-sync-watch.js";
 
 function invalid(message: string): never {
   throw new CommandDispatchError("invalid_path", message);
@@ -78,6 +79,7 @@ async function target(
 }
 
 export function createWorkspaceSyncService(dataDir: string) {
+  const watch = createWorkspaceSyncWatch();
   const hashes = new Map<string, { signature: string; sha256: string }>();
   const lanes = new Map<string, Promise<void>>();
   const uploads = new Map<
@@ -174,6 +176,17 @@ export function createWorkspaceSyncService(dataDir: string) {
     for (const [id, upload] of uploads)
       if (Date.now() - upload.touched > 30 * 60_000) await clean(id);
     switch (operation.action) {
+      case "mkdir_root": {
+        await directory(operation.rootPath, true);
+        return { action: "mkdir_root", ok: true };
+      }
+      case "watch": {
+        const root = await directory(operation.rootPath, false);
+        return {
+          action: "watch",
+          revision: await watch(root, operation.revision, signal),
+        };
+      }
       case "snapshot": {
         const entries: WorkspaceSyncEntry[] = [];
         let root: string;

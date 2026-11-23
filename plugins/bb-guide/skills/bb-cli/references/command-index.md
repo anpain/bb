@@ -338,6 +338,8 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 
 - `bb browser`
 - `bb browser instances`
+- `bb browser computer`
+- `bb thread generate-instructions`
 - `bb browser tabs`
 - `bb browser create`
 - `bb browser acquire`

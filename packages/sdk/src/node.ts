@@ -134,5 +134,6 @@ export type {
   WorkspaceSyncProgress,
 } from "./workspace-sync.js";
 export { experimental_syncWorkspacePair } from "./workspace-sync-state.js";
+export { experimental_watchWorkspacePair } from "./workspace-sync-watch.js";
 export { experimental_moveThread } from "./thread-transfer.js";
 export type { ThreadTransferClient } from "./thread-transfer.js";

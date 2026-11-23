@@ -193,10 +193,14 @@ function GeneralSettingsStory({
 }) {
   const state = useSettingsStoryState();
   const [terminalCopyOnSelect, setTerminalCopyOnSelect] = useState(true);
+  const [generateExecutionInstructions, setGenerateExecutionInstructions] =
+    useState(true);
 
   return (
     <>
       <GeneralSettingsSection
+        generateExecutionInstructions={generateExecutionInstructions}
+        onGenerateExecutionInstructionsChange={setGenerateExecutionInstructions}
         confirmThreadArchive={state.confirmThreadArchive}
         onConfirmThreadArchiveChange={state.setConfirmThreadArchive}
         keepHistoryAfterContextClear={state.keepHistoryAfterContextClear}

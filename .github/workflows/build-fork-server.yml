@@ -6,7 +6,7 @@ on:
     branches: [main, privacy-kimi]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: fork-linux-server-${{ github.ref }}
@@ -26,6 +26,7 @@ jobs:
       - name: Check deployment scripts
         run: |
           bash -n scripts/server/install.sh
+          bash -n scripts/server/update.sh
           node --check scripts/server/verify.mjs
       - uses: actions/setup-node@v4
         with:
@@ -49,11 +50,15 @@ jobs:
           test/public/public-provider-installations.test.ts
           test/public/public-chat-import.test.ts
           test/public/public-thread-transfer.test.ts
+          test/threads/execution-instructions.test.ts
+          test/threads/thread-runtime-config.test.ts
       - name: Test workspace and native session transfer
         run: >-
           pnpm exec turbo run test --filter=@bb/host-daemon --filter=bb-plugin-provider-codex --output-logs=new-only --
           workspace-sync.test.ts native-session-transfer.test.ts
           app-server-launch.test.ts bridge.session-signature.test.ts
+      - name: Test computer access tool
+        run: pnpm exec turbo run test --filter=bb-plugin-browser-automation --output-logs=new-only -- computer.test.ts
       - name: Test Account Pooler routing
         run: >-
           pnpm exec turbo run test --filter=bb-plugin-account-pool --output-logs=new-only --
@@ -77,3 +82,16 @@ jobs:
           name: bb-server-linux-x64
           path: ${{ runner.temp }}/bb-app-*.tgz
           if-no-files-found: error
+      - name: Publish verified Linux server package
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          package=("$RUNNER_TEMP"/bb-app-*.tgz)
+          node scripts/server/create-version-feed.mjs "${package[0]}" "$RUNNER_TEMP/server-version-linux-x64.json" "$GITHUB_SHA"
+          if ! gh release view desktop-latest >/dev/null 2>&1; then
+            gh release create desktop-latest --target "$GITHUB_SHA" --title "BB fork builds" --prerelease --notes $'Verified fork builds.\n\n> AGENT GENERATED'
+          fi
+          gh release upload desktop-latest "${package[0]}" --clobber
+          gh release upload desktop-latest "$RUNNER_TEMP/server-version-linux-x64.json" --clobber

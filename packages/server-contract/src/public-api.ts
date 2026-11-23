@@ -31,6 +31,9 @@ import {
 } from "./api/system.js";
 import {
   desktopBrowserBrokerProofRequestSchema,
+  desktopComputerRequestSchema,
+  type ExperimentalDesktopComputerRequest,
+  type ExperimentalDesktopComputerResult,
   type DesktopBrowserBrokerProofRequest,
   type DesktopBrowserBrokerProof,
   desktopBrowserHostRequestSchema,
@@ -776,6 +779,14 @@ export const publicApiRoutes = {
   },
 
   desktopBrowsers: {
+    computer: defineRoute({
+      path: "/desktop-browsers/computer",
+      method: "post",
+      request: jsonRequest<EmptyInput, ExperimentalDesktopComputerRequest>(
+        desktopComputerRequestSchema,
+      ),
+      response: jsonResponse<ExperimentalDesktopComputerResult>(),
+    }),
     brokerProof: defineRoute({
       path: "/desktop-browsers/broker-proof",
       method: "post",
@@ -1704,6 +1715,12 @@ export const publicApiRoutes = {
       method: "post",
       request: noRequest<PathId>(),
       response: jsonResponse<ThreadResponse>(),
+    }),
+    generateExecutionInstructions: defineRoute({
+      path: "/threads/:id/execution-instructions",
+      method: "post",
+      request: noRequest<PathId>(),
+      response: jsonResponse<{ files: string[] }>(),
     }),
     pinOrder: defineRoute({
       path: "/threads/:id/pin-order",

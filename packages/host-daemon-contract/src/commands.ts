@@ -1366,6 +1366,15 @@ export const hostDaemonCommandRegistry = {
     flushEventsBeforeResult: false,
     envLane: null,
   }),
+  "desktop.computer.action": defineHostDaemonCommandDescriptor({
+    type: "desktop.computer.action",
+    schema: desktopBrowserCommandSchemas["desktop.computer.action"],
+    resultSchema: desktopBrowserResultSchemas["desktop.computer.action"],
+    transport: "onlineRpc",
+    retryable: false,
+    flushEventsBeforeResult: false,
+    envLane: null,
+  }),
   "desktop.browser.acquire_control": defineHostDaemonCommandDescriptor({
     type: "desktop.browser.acquire_control",
     schema: desktopBrowserCommandSchemas["desktop.browser.acquire_control"],

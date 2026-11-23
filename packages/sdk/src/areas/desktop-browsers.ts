@@ -1,5 +1,7 @@
 import type {
   ExperimentalDesktopBrowserHostRequest,
+  ExperimentalDesktopComputerRequest,
+  ExperimentalDesktopComputerResult,
   ExperimentalDesktopBrowserScope,
   ExperimentalDesktopBrowserCreateInput,
   ExperimentalDesktopBrowserAcquireInput,
@@ -16,9 +18,11 @@ import type {
   ExperimentalDesktopBrowserImportSources,
   ExperimentalDesktopBrowserImportOutcome,
 } from "@bb/server-contract";
-import type { CreateSdkAreaArgs } from "./common.js";
+import { signalRequestArgs, type CreateSdkAreaArgs } from "./common.js";
 
 export type {
+  ExperimentalDesktopComputerRequest,
+  ExperimentalDesktopComputerResult,
   ExperimentalDesktopBrowserHostRequest,
   ExperimentalDesktopBrowserScope,
   ExperimentalDesktopBrowserCreateInput,
@@ -38,8 +42,13 @@ export type {
 } from "@bb/server-contract";
 
 export interface ExperimentalDesktopBrowsersArea {
+  experimental_computer(
+    input: ExperimentalDesktopComputerRequest,
+    signal?: AbortSignal,
+  ): Promise<ExperimentalDesktopComputerResult>;
   listInstances(
     input: ExperimentalDesktopBrowserHostRequest,
+    signal?: AbortSignal,
   ): Promise<ExperimentalDesktopBrowserInstances>;
   listTabs(
     input: ExperimentalDesktopBrowserScope,
@@ -82,8 +91,14 @@ export function createDesktopBrowsersArea({
   const listTabs = (input: ExperimentalDesktopBrowserScope) =>
     transport.readJson(api().tabs.$post({ json: input }));
   return {
-    listInstances: (input) =>
-      transport.readJson(api().instances.$post({ json: input })),
+    experimental_computer: (input, signal) =>
+      transport.readJson(
+        api().computer.$post({ json: input }, ...signalRequestArgs(signal)),
+      ),
+    listInstances: (input, signal) =>
+      transport.readJson(
+        api().instances.$post({ json: input }, ...signalRequestArgs(signal)),
+      ),
     listTabs,
     createTab: (input) =>
       transport.readJson(api().create.$post({ json: input })),

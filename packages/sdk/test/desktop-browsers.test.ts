@@ -11,6 +11,31 @@ const scope = {
 afterEach(() => vi.useRealTimers());
 
 describe("desktop browser SDK", () => {
+  it("keeps the computer grant local while forwarding typed scoped actions", async () => {
+    const fetch = vi.fn(
+      async (_url: string | URL | Request, _init?: RequestInit) =>
+        Response.json({
+          active: false,
+          window: null,
+          expiresAt: null,
+          screenshot: null,
+        }),
+    );
+    const sdk = createBbSdk({
+      transport: createHttpTransport({
+        baseUrl: "http://bb.test",
+        runtime: "node",
+        fetch,
+      }),
+    });
+    await sdk.experimental_desktopBrowsers.experimental_computer({
+      ...scope,
+      input: { action: "stop" },
+    });
+    expect(String(fetch.mock.calls[0]?.[0])).toContain(
+      "/desktop-browsers/computer",
+    );
+  });
   it("leaves default policy at the server and keeps scope explicit", async () => {
     const requests: object[] = [];
     const sdk = createBbSdk({

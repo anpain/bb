@@ -424,6 +424,36 @@ export const CORE_THREAD_ACTIONS: readonly PluginThreadActionRegistration<unknow
       }),
     }),
     coreThreadAction({
+      id: "generateExecutionInstructions",
+      group: GROUPS.organize,
+      order: 25,
+      title: "Generate execution instructions",
+      icon: "FileText",
+      item: ({ thread, sdk }) => ({
+        label: "Generate AGENTS.md / CLAUDE.md",
+        icon: "FileText",
+        run: async () => {
+          const toastId = appToast.loading("Generating execution instructions");
+          try {
+            await sdk.threads.experimental_generateExecutionInstructions({
+              threadId: thread.id,
+            });
+            appToast.dismiss(toastId);
+            appToast.success(
+              "Updated AGENTS.md and CLAUDE.md; existing instructions were preserved",
+            );
+          } catch (error) {
+            appToast.dismiss(toastId);
+            showMutationErrorToast({
+              error,
+              fallbackMessage:
+                "Could not generate instructions. Existing files were preserved.",
+            });
+          }
+        },
+      }),
+    }),
+    coreThreadAction({
       id: "archive",
       group: GROUPS.lifecycle,
       title: "Archive",

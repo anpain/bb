@@ -178,6 +178,8 @@ interface GeneralSettingsSectionProps {
   keepHistoryAfterContextClear: boolean;
   onKeepHistoryAfterContextClearChange: (enabled: boolean) => void;
   summarizeShellCommands: boolean;
+  generateExecutionInstructions: boolean;
+  onGenerateExecutionInstructionsChange: (enabled: boolean) => void;
   onSummarizeShellCommandsChange: (enabled: boolean) => void;
   desktopBrowserAvailable: boolean;
   generalSettingsDisabled: boolean;
@@ -870,6 +872,8 @@ export function GeneralSettingsSection({
   keepHistoryAfterContextClear,
   onKeepHistoryAfterContextClearChange,
   summarizeShellCommands,
+  generateExecutionInstructions,
+  onGenerateExecutionInstructionsChange,
   onSummarizeShellCommandsChange,
   desktopBrowserAvailable,
   generalSettingsDisabled,
@@ -978,6 +982,18 @@ export function GeneralSettingsSection({
               disabled={generalSettingsDisabled}
               onCheckedChange={onKeepHistoryAfterContextClearChange}
               aria-label="Show messages from before a context clear"
+            />
+          </SettingsWithControl>
+
+          <SettingsWithControl
+            label="Generate AGENTS.md and CLAUDE.md"
+            description="Add bb execution, PC tools and synchronization guidance to new chats. Existing instructions are preserved. You can also generate it from the chat menu."
+          >
+            <Switch
+              checked={generateExecutionInstructions}
+              disabled={generalSettingsDisabled}
+              onCheckedChange={onGenerateExecutionInstructionsChange}
+              aria-label="Generate AGENTS.md and CLAUDE.md"
             />
           </SettingsWithControl>
 
@@ -1470,6 +1486,14 @@ export function SettingsView() {
             })
           }
           summarizeShellCommands={generalSettings.summarizeShellCommands}
+          generateExecutionInstructions={
+            generalSettings.generateExecutionInstructions
+          }
+          onGenerateExecutionInstructionsChange={(enabled) =>
+            updateGeneralSettingsMutation.mutate({
+              generateExecutionInstructions: enabled,
+            })
+          }
           onSummarizeShellCommandsChange={(enabled) =>
             updateGeneralSettingsMutation.mutate({
               summarizeShellCommands: enabled,

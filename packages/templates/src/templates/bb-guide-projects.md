@@ -13,8 +13,9 @@ Project commands
 
     Mirror the entire folder, including hidden files, uncommitted edits and Git
     metadata, between the current BB_SERVER_URL and another bb server. Both
-    servers must support host protocol 267. Open an SSH forward first when
-    needed. --watch repeats after each completed sync with a 10-second pause.
+    servers must support host protocol 270. Open an SSH forward first when
+    needed. --watch reacts to changes on either machine after a 250 ms coalescing
+    delay, with a full safety check every minute.
     This copies files only; it does not move chats or start model inference.
     Progress goes to stderr with the stage, current path, completed/planned files
     and aggregate bytes. --json keeps only structured final summaries on stdout.
@@ -32,7 +33,10 @@ Project commands
     remain platform-specific even though their files are copied.
 
     Node SDK: experimental_syncWorkspacePair({ identity, statePath, left, right })
-    from @bb/sdk/node. Each endpoint supplies rootPath and call(operation, signal)
+    or experimental_watchWorkspacePair({ identity, statePath, left, right, signal, onResult })
+    from @bb/sdk/node. Watch establishes the initial baseline, then monitors both
+    endpoints, serializes copies and stops when signal is aborted. Each endpoint
+    supplies rootPath and call(operation, signal)
     through sdk.files.experimental_sync({ hostId, operation }, signal).
     The helper's onProgress receives WorkspaceSyncProgress with stage, path,
     bytes, totalBytes, completedFiles and totalFiles for the current remaining plan. The same

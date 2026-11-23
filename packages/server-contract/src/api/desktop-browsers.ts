@@ -3,8 +3,10 @@ import {
   desktopBrowserBrokerProofSchema,
   desktopBrowserImportSelectionSchema,
   desktopBrowserNavigationUrlSchema,
+  desktopComputerActionSchema,
 } from "@bb/host-daemon-contract";
 import { z } from "zod";
+export { desktopComputerActionSchema } from "@bb/host-daemon-contract";
 
 const id = z.string().min(1).max(256);
 
@@ -33,6 +35,14 @@ export const desktopBrowserScopeSchema = desktopBrowserHostRequestSchema
 export const desktopBrowserTabRequestSchema = desktopBrowserScopeSchema
   .extend({ tabId: id })
   .strict();
+export const desktopComputerRequestSchema = desktopBrowserScopeSchema
+  .extend({ input: desktopComputerActionSchema })
+  .strict();
+export type ExperimentalDesktopComputerRequest = z.infer<
+  typeof desktopComputerRequestSchema
+>;
+export type ExperimentalDesktopComputerResult =
+  import("@bb/host-daemon-contract").DesktopComputerResult;
 export const desktopBrowserCreateRequestSchema = desktopBrowserScopeSchema
   .extend({
     url: desktopBrowserNavigationUrlSchema

@@ -13,6 +13,7 @@ export * from "./cli-spec.js";
 export * from "./host-contract.js";
 export type * from "./json-value.js";
 export * from "./rpc-contract.js";
+export { desktopComputerActionSchema as internal_DO_NOT_USE_desktopComputerActionSchema } from "@bb/server-contract";
 export { experimental_THREAD_ACTION_GROUPS } from "./thread-action-groups.js";
 export {
   experimental_THREAD_CONTEXT_SEGMENT_GROUPS,
@@ -21,6 +22,8 @@ export {
 } from "./thread-info-groups.js";
 export type {
   ExperimentalDesktopBrowsersArea,
+  ExperimentalDesktopComputerRequest,
+  ExperimentalDesktopComputerResult,
   ExperimentalDesktopBrowserScope,
   ExperimentalDesktopBrowserLease,
   ExperimentalDesktopBrowserCreateInput,

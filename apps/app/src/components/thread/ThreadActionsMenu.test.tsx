@@ -64,6 +64,7 @@ const sdkThreads = vi.hoisted(() => ({
   update: vi.fn(),
   get: vi.fn(),
   experimental_regenerateTitle: vi.fn(),
+  experimental_generateExecutionInstructions: vi.fn(),
 }));
 const copyToClipboardWithToast = vi.hoisted(() => vi.fn(async () => true));
 
@@ -393,6 +394,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "---",
         "Rename",
         "Regenerate title",
+        "Generate AGENTS.md / CLAUDE.md",
         "Move to section",
         "---",
         "Customize actions",
@@ -411,6 +413,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "---",
         "Rename",
         "Regenerate title",
+        "Generate AGENTS.md / CLAUDE.md",
         "Move to section",
         "---",
         "Customize actions",
@@ -444,6 +447,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "---",
         "Rename",
         "Regenerate title",
+        "Generate AGENTS.md / CLAUDE.md",
         "---",
         "Customize actions",
         "---",
@@ -461,6 +465,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "---",
         "Rename",
         "Regenerate title",
+        "Generate AGENTS.md / CLAUDE.md",
         "---",
         "Customize actions",
         "---",
@@ -486,6 +491,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "---",
         "Rename",
         "Regenerate title",
+        "Generate AGENTS.md / CLAUDE.md",
         "Move to section",
         "---",
         "Customize actions",
@@ -504,6 +510,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "---",
         "Rename",
         "Regenerate title",
+        "Generate AGENTS.md / CLAUDE.md",
         "Move to section",
         "---",
         "Customize actions",
@@ -528,6 +535,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "---",
         "Rename",
         "Regenerate title",
+        "Generate AGENTS.md / CLAUDE.md",
         "Move to section",
         "---",
         "Customize actions",
@@ -546,6 +554,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "---",
         "Rename",
         "Regenerate title",
+        "Generate AGENTS.md / CLAUDE.md",
         "Move to section",
         "---",
         "Customize actions",
@@ -572,6 +581,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "---",
         "Rename",
         "Regenerate title",
+        "Generate AGENTS.md / CLAUDE.md",
         "Move to section",
         "---",
         "Customize actions",
@@ -590,6 +600,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "---",
         "Rename",
         "Regenerate title",
+        "Generate AGENTS.md / CLAUDE.md",
         "Move to section",
         "---",
         "Customize actions",
@@ -643,6 +654,9 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
   });
 
   it("runs each action's effect", async () => {
+    sdkThreads.experimental_generateExecutionInstructions.mockResolvedValue({
+      files: ["/project/AGENTS.md", "/project/CLAUDE.md"],
+    });
     sdkThreads.pin.mockResolvedValue({ ...baseThread, pinnedAt: 9 });
     sdkThreads.experimental_regenerateTitle.mockResolvedValue({
       ...baseThread,
@@ -686,6 +700,17 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
       }),
     );
 
+    await surface.open();
+    fireEvent.click(
+      await screen.findByRole("menuitem", {
+        name: "Generate AGENTS.md / CLAUDE.md",
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        sdkThreads.experimental_generateExecutionInstructions,
+      ).toHaveBeenCalledWith({ threadId: baseThread.id }),
+    );
     await surface.open();
     fireEvent.click(await screen.findByRole("menuitem", { name: "Archive" }));
     await waitFor(() =>
@@ -867,6 +892,7 @@ describe("thread action registrations", () => {
       "bb--core/parentNotifications",
       "bb--core/rename",
       "bb--core/regenerateTitle",
+      "bb--core/generateExecutionInstructions",
       "fixture/move",
       "bb--core/archive",
       "bb--core/delete",

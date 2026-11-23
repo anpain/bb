@@ -1,6 +1,8 @@
 import { registerContextCommand } from "./context.js";
 import { registerSessionStateCommands } from "./session-state.js";
 import { Command } from "commander";
+import { action } from "../../action.js";
+import { createCliBbSdk } from "../../client.js";
 import { registerActionsCommands } from "./actions.js";
 import { registerCountCommand } from "./count.js";
 import { registerInteractionCommands } from "./interactions.js";
@@ -20,6 +22,22 @@ export function registerThreadCommands(
   getUrl: () => string,
 ): void {
   const thread = program.command("thread").description("Manage threads");
+  thread
+    .command("generate-instructions <id>")
+    .description(
+      "Add or update the bb block in AGENTS.md and CLAUDE.md without overwriting other instructions",
+    )
+    .option("--json", "Print generated file paths as JSON")
+    .action(
+      action(async (id: string, options: { json?: boolean }) => {
+        const result = await createCliBbSdk(
+          getUrl(),
+        ).threads.experimental_generateExecutionInstructions({ threadId: id });
+        console.log(
+          options.json ? JSON.stringify(result) : result.files.join("\n"),
+        );
+      }),
+    );
   registerWaitCommand(thread, getUrl);
   registerSpawnCommand(thread, getUrl);
   registerForkCommand(thread, getUrl);

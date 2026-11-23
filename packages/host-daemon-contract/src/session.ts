@@ -512,6 +512,7 @@ const hostDaemonOnlineRpcResponseSuccessSchema = z.discriminatedUnion(
     onlineRpcResponseSuccessSchemaFor("desktop.browser.reveal_tab"),
     onlineRpcResponseSuccessSchemaFor("desktop.browser.close_tab"),
     onlineRpcResponseSuccessSchemaFor("desktop.browser.capture_tab"),
+    onlineRpcResponseSuccessSchemaFor("desktop.computer.action"),
     onlineRpcResponseSuccessSchemaFor("desktop.browser.acquire_control"),
     onlineRpcResponseSuccessSchemaFor("desktop.browser.open_connection"),
     onlineRpcResponseSuccessSchemaFor("desktop.browser.release_control"),

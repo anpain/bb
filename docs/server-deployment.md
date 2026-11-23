@@ -16,7 +16,7 @@ repository checkout and run:
 sudo bash scripts/server/update.sh --node-dir /opt/bb/node-v22.19.0-linux-x64/bin
 ```
 
-Use `--prefix`, `--service` and `--port` for a non-default installation. The script
+Use `--prefix`, `--service`, `--port` and `--daemon-port` for a non-default installation. The script
 downloads the verified Linux package from this fork's `desktop-latest` release,
 checks its SHA-256 and size against `server-version-linux-x64.json`, installs in
 a fresh runtime, refuses active/pending chats, backs up bb data, preserves the

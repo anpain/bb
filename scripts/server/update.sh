@@ -5,13 +5,14 @@ prefix=/srv/bb
 service=bb-fork
 node_dir=/opt/bb/node-v22.19.0-linux-x64/bin
 port=38886
+daemon_port=
 while (($#)); do
   case "$1" in
-    --prefix|--service|--node-dir|--port)
+    --prefix|--service|--node-dir|--port|--daemon-port)
       (($# >= 2)) || exit 2
-      case "$1" in --prefix) prefix=$2;; --service) service=$2;; --node-dir) node_dir=$2;; --port) port=$2;; esac
+      case "$1" in --prefix) prefix=$2;; --service) service=$2;; --node-dir) node_dir=$2;; --port) port=$2;; --daemon-port) daemon_port=$2;; esac
       shift 2;;
-    --help) printf '%s\n' 'sudo bash scripts/server/update.sh [--prefix /srv/bb] [--service bb-fork] [--node-dir /path/to/node/bin] [--port 38886]'; exit 0;;
+    --help) printf '%s\n' 'sudo bash scripts/server/update.sh [--prefix /srv/bb] [--service bb-fork] [--node-dir /path/to/node/bin] [--port 38886] [--daemon-port 38887]'; exit 0;;
     *) printf 'Unknown option: %s\n' "$1" >&2; exit 2;;
   esac
 done
@@ -21,6 +22,8 @@ fail() { printf '%s\n' "$*" >&2; exit 1; }
 case "$prefix" in /|/srv|/opt|/usr|/etc|/var|/root|/home) fail 'Use a dedicated service prefix.';; esac
 [[ $service =~ ^[a-z][a-z0-9-]{1,60}$ && $port =~ ^[0-9]{4,5}$ ]] || fail 'Invalid service or port.'
 [[ $((10#$port)) -ge 1024 && $((10#$port)) -le 65534 ]] || fail 'Use an unprivileged HTTP port below 65535.'
+daemon_port=${daemon_port:-$((10#$port+1))}
+[[ $daemon_port =~ ^[0-9]{4,5}$ && $((10#$daemon_port)) -ge 1024 && $((10#$daemon_port)) -le 65535 && $((10#$daemon_port)) != $((10#$port)) ]] || fail 'Invalid daemon port.'
 [[ -x $node_dir/node && -x $node_dir/npm ]] || fail 'Specify --node-dir with Node.js 22.19+.'
 node_dir=$(realpath -e "$node_dir")
 [[ $node_dir =~ ^/[a-zA-Z0-9._/-]+$ ]] || fail 'Invalid Node directory.'
@@ -45,6 +48,7 @@ printf '%s  %s\n' "${release[2]}" "$temporary/package.tgz" | sha256sum -c -
 idle() {
   curl -fsS --max-time 15 "http://127.0.0.1:$port/api/v1/system/config" | "$node_dir/node" -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>{if(JSON.parse(s).dataDir!==process.argv[1])process.exit(1)})' "$prefix/data"
   curl -fsS --max-time 15 "http://127.0.0.1:$port/api/v1/threads" | "$node_dir/node" -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>{const x=JSON.parse(s);if(!Array.isArray(x)||x.some(t=>!["idle","error"].includes(t.status)))process.exit(1)})'
+  curl -fsS --max-time 15 "http://127.0.0.1:$port/api/v1/threads/running" | "$node_dir/node" -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>{const x=JSON.parse(s);if(!Array.isArray(x)||x.length!==0)process.exit(1)})'
 }
 idle || fail 'The server is unavailable or agents are running. Stop work and retry.'
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
@@ -74,7 +78,7 @@ trap rollback ERR
 systemctl stop "$service.service"
 tar -C "$prefix" -czf "$backup/data.tgz" data
 install -d -m 0755 "$(dirname "$override")"
-printf '[Service]\nExecStart=\nExecStart=%s/node %s/node_modules/bb-app/dist/bb-app.js --data-dir %s/data --server-bind-host 127.0.0.1 --server-port %s --host-daemon-port %s --no-in-app-updates\n' "$node_dir" "$runtime" "$prefix" "$port" "$((10#$port+1))" > "$override"
+printf '[Service]\nExecStart=\nExecStart=%s/node %s/node_modules/bb-app/dist/bb-app.js --data-dir %s/data --server-bind-host 127.0.0.1 --server-port %s --host-daemon-port %s --no-in-app-updates\n' "$node_dir" "$runtime" "$prefix" "$port" "$daemon_port" > "$override"
 chmod 0644 "$override"
 systemctl daemon-reload
 systemctl start "$service.service"

@@ -15,7 +15,10 @@ Project commands
     metadata, between the current BB_SERVER_URL and another bb server. Both
     servers must support host protocol 270. Open an SSH forward first when
     needed. --watch reacts to changes on either machine after a 250 ms coalescing
-    delay, with a full safety check every minute.
+    delay, with a full safety check every minute. A disconnected host or temporary
+    network failure pauses watch mode and retries with a 0.5–5 second backoff.
+    Synchronization resumes from saved checkpoints after reconnection; abort the
+    command to stop waiting. Conflicts and permission errors still stop it.
     This copies files only; it does not move chats or start model inference.
     Progress goes to stderr with the stage, current path, completed/planned files
     and aggregate bytes. --json keeps only structured final summaries on stdout.

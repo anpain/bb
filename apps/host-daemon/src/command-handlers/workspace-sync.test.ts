@@ -12,12 +12,129 @@ import {
   experimental_synchronizeWorkspaces,
   experimental_syncWorkspacePair,
   experimental_watchWorkspacePair,
+  BbHttpError,
   type WorkspaceSyncBaseline,
   type WorkspaceSyncProgress,
 } from "@bb/sdk/node";
 
 const sha = (bytes: Buffer | string) =>
   createHash("sha256").update(bytes).digest("hex");
+
+it.each(["snapshot", "watch", "active watch"])(
+  "recovers from a disconnected host during %s without losing edits",
+  async (action) => {
+    const { folder, root, service } = await fixture();
+    const other = join(folder, "other");
+    await fs.mkdir(root);
+    await fs.writeFile(join(root, "keep.txt"), "original");
+    const controller = new AbortController();
+    let interrupted = false;
+    let recovered = false;
+    const task = experimental_watchWorkspacePair({
+      identity: "reconnected-pair",
+      statePath: join(folder, "state.json"),
+      signal: controller.signal,
+      left: {
+        rootPath: root,
+        call: async (operation, signal) => {
+          if (
+            (operation.action === action ||
+              (action === "active watch" &&
+                operation.action === "watch" &&
+                operation.revision !== null)) &&
+            !interrupted
+          ) {
+            interrupted = true;
+            await fs.writeFile(
+              join(root, "offline.txt"),
+              "saved while reconnecting",
+            );
+            throw new BbHttpError({
+              status: 502,
+              code: "host_unavailable",
+              message: "Host is not connected",
+              body: null,
+            });
+          }
+          if (interrupted) recovered = true;
+          return service(operation, signal);
+        },
+      },
+      right: { rootPath: other, call: service },
+    });
+    const settled = task.catch((error: unknown) => {
+      controller.abort();
+      throw error;
+    });
+    try {
+      await expect.poll(() => recovered).toBe(true);
+      await expect
+        .poll(() => fs.readFile(join(other, "offline.txt"), "utf8"))
+        .toBe("saved while reconnecting");
+      expect(await fs.readFile(join(other, "keep.txt"), "utf8")).toBe(
+        "original",
+      );
+    } finally {
+      controller.abort();
+      await settled;
+    }
+  },
+);
+
+it("cancels a disconnected watcher without waiting for reconnection", async () => {
+  const { folder, root } = await fixture();
+  const controller = new AbortController();
+  let attempts = 0;
+  const endpoint = {
+    rootPath: root,
+    call: async () => {
+      attempts++;
+      throw new BbHttpError({
+        status: 502,
+        code: "host_unavailable",
+        message: "Host is not connected",
+        body: null,
+      });
+    },
+  };
+  const task = experimental_watchWorkspacePair({
+    identity: "offline-pair",
+    statePath: join(folder, "state.json"),
+    left: endpoint,
+    right: { ...endpoint, rootPath: join(folder, "other") },
+    signal: controller.signal,
+  });
+  await expect.poll(() => attempts).toBeGreaterThan(0);
+  controller.abort();
+  await task;
+  const stoppedAt = attempts;
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  expect(attempts).toBe(stoppedAt);
+});
+
+it("does not retry permission errors as a disconnected host", async () => {
+  const { folder, root } = await fixture();
+  const error = new BbHttpError({
+    status: 502,
+    code: "EACCES",
+    message: "Permission denied",
+    body: null,
+  });
+  const endpoint = {
+    rootPath: root,
+    call: async () => {
+      throw error;
+    },
+  };
+  await expect(
+    experimental_watchWorkspacePair({
+      identity: "denied-pair",
+      statePath: join(folder, "state.json"),
+      left: endpoint,
+      right: { ...endpoint, rootPath: join(folder, "other") },
+    }),
+  ).rejects.toBe(error);
+});
 
 it("watches both project copies, includes ignored files and stops on cancellation", async () => {
   const { folder, root, service } = await fixture();

@@ -49,7 +49,9 @@ same daemon path used by Desktop mirrors, `bb project sync`, and the Node SDK
 `experimental_synchronizeWorkspaces` / `experimental_syncWorkspacePair` helpers.
 `experimental_watchWorkspacePair` uses the same path for both filesystem watches
 and serialized copies: 250 ms coalescing, a one-minute safety scan and cancellation
-through its signal. The raw `watch` operation accepts a nullable UUID revision;
+through its signal. Host disconnects and temporary network failures retry with
+an abortable 0.5–5 second backoff and retain checkpoints; conflicts and permission
+errors still reject. The raw `watch` operation accepts a nullable UUID revision;
 null subscribes immediately, otherwise it returns on change or after 15 seconds.
 Revisions survive requests, including changes between polls. Watches expire after
 60 seconds without renewal and are limited to 100 roots per daemon. `mkdir_root`

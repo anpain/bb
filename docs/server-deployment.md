@@ -282,6 +282,10 @@ downloaded on the next connection.
 If a file changed on both machines, synchronization stops without choosing a
 winner. Save the intended contents on both sides and retry using the same
 state. A deleted project root is never treated as deletion of every file.
+In watch mode, a disconnected daemon or temporary network failure pauses copying
+and retries with a 0.5–5 second backoff. Reconnection resumes from the saved
+checkpoints, including edits made while disconnected. Cancelling stops the wait;
+permission errors and file conflicts still stop synchronization.
 Desktop keeps the mapping, hash baseline and recovery journal under its user
 data directory's `workspace-sync`; the CLI defaults to `~/.bb/workspace-sync`.
 Preserve this state when moving back. Replaced/deleted file versions are kept

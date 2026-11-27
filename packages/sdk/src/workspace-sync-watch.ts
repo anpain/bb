@@ -1,5 +1,35 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { experimental_syncWorkspacePair } from "./workspace-sync-state.js";
+import { BbHttpError, BbRequestTimeoutError } from "./response.js";
+
+function connectionInterrupted(error: unknown): boolean {
+  if (error instanceof BbHttpError)
+    return (
+      error.code === "host_unavailable" || error.code === "host_disconnected"
+    );
+  if (error instanceof BbRequestTimeoutError) return true;
+  if (!(error instanceof Error)) return false;
+  if (error.name === "TimeoutError") return true;
+  if (
+    "code" in error &&
+    [
+      "ECONNRESET",
+      "ECONNREFUSED",
+      "ETIMEDOUT",
+      "EPIPE",
+      "ENETUNREACH",
+      "EHOSTUNREACH",
+    ].includes(String(error.code))
+  )
+    return true;
+  return (
+    (error instanceof TypeError &&
+      /^(fetch failed|Failed to fetch)$/u.test(error.message)) ||
+    /^net::ERR_(CONNECTION_|NETWORK_|INTERNET_DISCONNECTED|TIMED_OUT)/u.test(
+      error.message,
+    )
+  );
+}
 
 export async function experimental_watchWorkspacePair(
   args: Parameters<typeof experimental_syncWorkspacePair>[0] & {
@@ -17,10 +47,28 @@ export async function experimental_watchWorkspacePair(
     dirty = true;
     wake?.();
   };
+  const connected = async <T>(operation: () => Promise<T>): Promise<T> => {
+    for (let attempt = 0; ; attempt++) {
+      signal.throwIfAborted();
+      try {
+        return await operation();
+      } catch (error) {
+        if (signal.aborted || !connectionInterrupted(error)) throw error;
+        request();
+        await delay(
+          Math.min(500 * 2 ** Math.min(attempt, 4), 5_000),
+          undefined,
+          { signal },
+        );
+      }
+    }
+  };
   const synchronize = async () => {
     for (let attempt = 0; ; attempt++) {
       try {
-        return await experimental_syncWorkspacePair({ ...args, signal });
+        return await connected(() =>
+          experimental_syncWorkspacePair({ ...args, signal }),
+        );
       } catch (error) {
         const transient =
           error instanceof Error &&
@@ -33,9 +81,11 @@ export async function experimental_watchWorkspacePair(
   };
   const watch = async (endpoint: typeof args.left, revision: string) => {
     while (!signal.aborted) {
-      const next = await endpoint.call(
-        { action: "watch", rootPath: endpoint.rootPath, revision },
-        signal,
+      const next = await connected(() =>
+        endpoint.call(
+          { action: "watch", rootPath: endpoint.rootPath, revision },
+          signal,
+        ),
       );
       if (next.action !== "watch")
         throw new Error(
@@ -75,9 +125,11 @@ export async function experimental_watchWorkspacePair(
     if (Object.keys(initial.baseline).length === 0) {
       await Promise.all(
         [args.left, args.right].map(async (endpoint) => {
-          const result = await endpoint.call(
-            { action: "mkdir_root", rootPath: endpoint.rootPath },
-            signal,
+          const result = await connected(() =>
+            endpoint.call(
+              { action: "mkdir_root", rootPath: endpoint.rootPath },
+              signal,
+            ),
           );
           if (result.action !== "mkdir_root")
             throw new Error(
@@ -88,9 +140,11 @@ export async function experimental_watchWorkspacePair(
     }
     const revisions = await Promise.all(
       [args.left, args.right].map(async (endpoint) => {
-        const result = await endpoint.call(
-          { action: "watch", rootPath: endpoint.rootPath, revision: null },
-          signal,
+        const result = await connected(() =>
+          endpoint.call(
+            { action: "watch", rootPath: endpoint.rootPath, revision: null },
+            signal,
+          ),
         );
         if (result.action !== "watch")
           throw new Error(

@@ -1,6 +1,10 @@
 # Changelog
 
-Fork history for 0.49.0–0.49.14 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
+Fork history for 0.49.0–0.49.15 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
+
+## 0.49.15
+
+- Keep project synchronization waiting through host startup and temporary disconnections instead of reporting that copying stopped. Resume from checkpoints after reconnection, retain offline edits and cancel pending retries on shutdown. Conflicts and permission errors remain explicit failures.
 
 ## 0.49.14
 

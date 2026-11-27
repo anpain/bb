@@ -21,7 +21,6 @@ it("offers the server update separately, once per server and release, without pe
       ),
   );
   const check = createRemoteServerUpdateCheck({
-    currentVersion: "0.49.14",
     fetch,
     notify,
   });
@@ -34,6 +33,8 @@ it("offers the server update separately, once per server and release, without pe
   });
   await vi.advanceTimersByTimeAsync(60 * 60_000);
   expect(notify).toHaveBeenCalledTimes(1);
+  await check.checkNow();
+  expect(notify).toHaveBeenCalledTimes(2);
   expect(fetch.mock.calls.every(([, init]) => init?.method === undefined)).toBe(
     true,
   );
@@ -47,7 +48,6 @@ it("does not announce an old server after the user has switched targets", async 
   });
   const notify = vi.fn(async () => {});
   const check = createRemoteServerUpdateCheck({
-    currentVersion: "0.49.14",
     fetch: async () => pending,
     notify,
   });
@@ -57,4 +57,19 @@ it("does not announce an old server after the user has switched targets", async 
   resolve?.(Response.json({ currentVersion: "0.49.13" }));
   await vi.advanceTimersByTimeAsync(1);
   expect(notify).not.toHaveBeenCalled();
+});
+it("does not offer a desktop-only version without a published server package", async () => {
+  vi.useFakeTimers();
+  const notify = vi.fn(async () => {});
+  const check = createRemoteServerUpdateCheck({
+    fetch: async (url) =>
+      String(url).includes("system/version")
+        ? Response.json({ currentVersion: "0.49.14" })
+        : new Response("Unavailable", { status: 503 }),
+    notify,
+  });
+  check.start("http://127.0.0.1:48886");
+  await vi.advanceTimersByTimeAsync(10_000);
+  expect(notify).not.toHaveBeenCalled();
+  check.stop();
 });

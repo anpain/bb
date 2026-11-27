@@ -126,6 +126,7 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 
 - `bb updates`
 - `bb updates status`
+- `bb updates server`
 - `bb updates apply`
 - `bb updates app`
 - `bb updates app status`

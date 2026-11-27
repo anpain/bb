@@ -38,6 +38,7 @@
   },
   "types": "./src/node.ts",
   "scripts": {
+    "generate:server-updater": "node scripts/generate-server-updater.mjs",
     "build": "node ../../scripts/build-package.mjs",
     "clean": "rimraf dist tsconfig.tsbuildinfo",
     "typecheck": "tsrs --noEmit",

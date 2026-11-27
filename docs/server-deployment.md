@@ -4,10 +4,16 @@
 
 Updating the Windows application does not update an independent VPS. Desktop
 checks the selected remote server's version after connecting and hourly, using
-this fork's GitHub server feed. It offers the update guide once per server and
-release in the current app session. It never restarts the VPS without an
-explicit server update. The upstream npm version check is not this fork's server
+this fork's GitHub server feed. Choose **Update server** to run the bundled
+updater over the SSH connection saved in **Server → Edit Server**. It requires
+passwordless sudo, Linux x64, systemd and the `bb-fork` service. The progress window
+reports installation, backup and verification. Closing it does not cancel the
+independent systemd update task. Active agents block the update. Without a saved
+SSH connection, Desktop explains how to configure it. The upstream npm version check is not this fork's server
 release channel.
+Use **Check for updates** to check the selected server again after dismissing
+the prompt or resolving an update error. Desktop offers only a published Linux
+package; a newer Windows build alone does not trigger a server update offer.
 
 On an existing Linux x64 systemd installation, stop agent work, update this
 repository checkout and run:
@@ -25,6 +31,15 @@ drop-in. Failed health checks restore the previous executable and bb data.
 It does not update provider CLI packages or copy local PC chats. Keep a separate
 backup of project workspaces and provider accounts. The service user must be
 non-root; Windows/macOS and non-systemd deployments require their own update.
+
+The CLI uses the same implementation as Desktop:
+`bb --url http://127.0.0.1:48886 updates server --ssh user@host --key ~/.ssh/id_ed25519 --yes`.
+Use `--port` for the remote HTTP port, `--service` for another systemd unit and
+`--json` for the result. Node callers use `experimental_getServerRelease` and
+`experimental_updateRemoteServer({ serverUrl, ssh: { target, identityFile, remotePort }, version, service, signal, onProgress })`
+from `@bb/sdk/node`. Cancelling the client stops monitoring; an already started
+server task continues independently. Its unit name is included in errors for
+inspection through `journalctl -u <unit>`.
 
 The release also publishes `bb-app-VERSION.tgz` for administrators who deploy
 packages themselves. Desktop, Linux server and enrolled machines should use the

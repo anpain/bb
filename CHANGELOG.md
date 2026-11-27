@@ -1,6 +1,10 @@
 # Changelog
 
-Fork history for 0.49.0–0.49.15 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
+Fork history for 0.49.0–0.49.16 is listed below, newest first. The 0.49.0 section also retains the upstream release notes.
+
+## 0.49.16
+
+- Update Linux systemd servers directly from Desktop using the saved SSH connection, with progress, active-agent checks, verified packages, backup and rollback. Share the updater with the Node SDK and `bb updates server`. Only offer published server releases; refuse overlapping updates and never restore an incomplete backup.
 
 ## 0.49.15
 

@@ -5,6 +5,10 @@ import {
   type UpdateState,
 } from "@bb/domain/update-state";
 import { BbHttpError } from "@bb/sdk";
+import {
+  experimental_getServerRelease,
+  experimental_updateRemoteServer,
+} from "@bb/sdk/node";
 import type {
   HostProviderCliStatusResponse,
   SystemAppUpdateResult,
@@ -666,6 +670,51 @@ export function registerUpdatesCommands(
     .command("updates")
     .description("Inspect and apply bb and provider CLI updates");
   registerAppUpdateCommands(updates, getUrl);
+  updates
+    .command("server")
+    .description(
+      "Update the connected Linux systemd server over SSH with backup and rollback",
+    )
+    .requiredOption("--ssh <user@host>", "SSH host or saved SSH profile")
+    .option("--key <path>", "Absolute SSH identity file or ~/")
+    .option("--port <port>", "Remote bb HTTP port", "38886")
+    .option("--service <name>", "systemd service name", "bb-fork")
+    .option("--yes", "Confirm server restart without prompting")
+    .option("--json", "Print JSON result; progress goes to stderr")
+    .action(
+      action(
+        async (opts: {
+          ssh: string;
+          key?: string;
+          port: string;
+          service: string;
+          yes?: boolean;
+          json?: boolean;
+        }) => {
+          if (
+            !opts.yes &&
+            !(await confirmDestructiveAction(
+              "Update the remote server with backup and restart?",
+            ))
+          )
+            return;
+          const release = await experimental_getServerRelease();
+          const result = await experimental_updateRemoteServer({
+            serverUrl: getUrl(),
+            ssh: {
+              target: opts.ssh,
+              identityFile: opts.key ?? null,
+              remotePort: Number(opts.port),
+            },
+            service: opts.service,
+            version: release.version,
+            onProgress: (message) => process.stderr.write(`${message}\n`),
+          });
+          if (!outputJson(opts, result))
+            console.log(`Server updated to bb ${result.version}.`);
+        },
+      ),
+    );
 
   updates
     .command("status", { isDefault: true })

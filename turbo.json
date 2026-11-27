@@ -501,6 +501,17 @@
         "@bb/templates#generate:plugin-scaffold"
       ]
     },
+    "@bb/sdk#topo": {
+      "dependsOn": ["^topo", "@bb/sdk#generate:server-updater"]
+    },
+    "@bb/sdk#generate:server-updater": {
+      "dependsOn": [],
+      "inputs": [
+        "scripts/generate-server-updater.mjs",
+        "$TURBO_ROOT$/scripts/server/update.sh"
+      ],
+      "outputs": ["src/generated/server-updater.generated.ts"]
+    },
     "@bb/process-utils#topo": {
       "dependsOn": ["^topo", "@bb/process-utils#generate:profile-worker"]
     },

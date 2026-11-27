@@ -1,5 +1,15 @@
 # APIs To Audit
 
+## SSH server updates from Node clients
+
+`experimental_getServerRelease` and `experimental_updateRemoteServer` from
+`@bb/sdk/node` are used by Desktop's update button and `bb updates server`.
+They validate the fork feed, refuse active agents and run the bundled systemd
+updater over a caller-supplied SSH connection with strict host-key checking.
+Cancellation stops client monitoring, not a detached server task. Stabilization
+requires compatibility tests for supported Linux installations, recovery after
+client reconnect and custom systemd layouts. No daemon wire fields are changed.
+
 ## Explicit local Windows computer control
 
 `bb.sdk.experimental_desktopBrowsers.experimental_computer({ hostId, instanceId,

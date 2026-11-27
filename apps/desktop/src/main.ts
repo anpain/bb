@@ -262,10 +262,8 @@ import {
 } from "./desktop-browser-broker.js";
 import { createDesktopBrowserBrokerClient } from "./desktop-browser-broker-client.js";
 import { createDesktopComputerUi } from "./desktop-computer-ui.js";
-import {
-  createRemoteServerUpdateCheck,
-  FORK_SERVER_UPDATE_GUIDE,
-} from "./remote-server-update.js";
+import { createRemoteServerUpdateCheck } from "./remote-server-update.js";
+import { updateRemoteServerFromDesktop } from "./remote-server-update-ui.js";
 import {
   bbDesktopBrowserTabRefSchema,
   bbDesktopZoomCommandSchema,
@@ -2716,6 +2714,7 @@ async function finishQuit(): Promise<void> {
 }
 
 async function checkDesktopUpdates(): Promise<void> {
+  await remoteServerUpdateCheck?.checkNow();
   await Promise.all([
     desktopUpdateService?.checkForUpdates(),
     desktopAutoUpdateService?.checkForUpdates(),
@@ -3663,23 +3662,33 @@ async function runDesktopApp(): Promise<void> {
   });
   desktopComputerUi = createDesktopComputerUi();
   remoteServerUpdateCheck = createRemoteServerUpdateCheck({
-    currentVersion: app.getVersion(),
     fetch: (input, init) =>
       net.fetch(input instanceof URL ? input.toString() : input, init),
     async notify(update) {
       const parent = getFocusedApplicationWindow();
       if (!parent || quitting) return;
+      const ssh =
+        serverTargetStore?.getCustomServerSsh(update.serverUrl) ?? null;
       const result = await dialog.showMessageBox(parent, {
         type: "info",
         title: "bb server update available",
         message: `Update the connected server to bb ${update.latestVersion}`,
-        detail: `Server ${update.serverUrl} is running ${update.currentVersion}. Updating the Windows app does not update this server. The fork's systemd server is updated separately using the verified Linux package, with a backup and an idle-agent check.`,
-        buttons: ["Later", "Server update instructions"],
+        detail: `Server ${update.serverUrl} is running ${update.currentVersion}. Update over the saved SSH connection with a verified Linux package and a backup before restart. Running agents block the update. Closing the progress window does not cancel a server task already started.`,
+        buttons: ["Later", ssh ? "Update server" : "Configure SSH"],
         defaultId: 0,
         cancelId: 0,
       });
-      if (result.response === 1)
-        await shell.openExternal(FORK_SERVER_UPDATE_GUIDE);
+      if (result.response === 1) {
+        if (ssh) await updateRemoteServerFromDesktop(parent, update, ssh);
+        else
+          await dialog.showMessageBox(parent, {
+            type: "info",
+            message:
+              "Save the server's SSH connection in Server → Edit Server, then reconnect.",
+            detail:
+              "Automatic server updates use that SSH user and key. Linux systemd and passwordless sudo are required.",
+          });
+      }
     },
   });
   desktopBrowserBroker = createDesktopBrowserBroker({

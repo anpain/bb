@@ -1,8 +1,6 @@
 import semver from "semver";
 import { z } from "zod";
 
-export const FORK_SERVER_UPDATE_GUIDE =
-  "https://github.com/anpain/bb/blob/main/docs/server-deployment.md#updating-the-server";
 const versionSchema = z.object({
   currentVersion: z.string().refine((value) => semver.valid(value) !== null),
 });
@@ -24,7 +22,6 @@ const feedSchema = z.object({
 
 export function createRemoteServerUpdateCheck(options: {
   fetch: typeof fetch;
-  currentVersion: string;
   notify(input: {
     serverUrl: string;
     currentVersion: string;
@@ -35,15 +32,21 @@ export function createRemoteServerUpdateCheck(options: {
   let controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | null = null;
   let interval: ReturnType<typeof setInterval> | null = null;
+  let checkCurrent: (() => Promise<void>) | null = null;
   const stop = () => {
     controller.abort();
     if (timer) clearTimeout(timer);
     if (interval) clearInterval(interval);
     timer = null;
     interval = null;
+    checkCurrent = null;
   };
   return {
     stop,
+    async checkNow() {
+      announced.clear();
+      await checkCurrent?.();
+    },
     start(serverUrl: string) {
       stop();
       controller = new AbortController();
@@ -65,7 +68,7 @@ export function createRemoteServerUpdateCheck(options: {
           const version = versionSchema.parse(
             await response.json(),
           ).currentVersion;
-          let latest = options.currentVersion;
+          let latest: string | null = null;
           try {
             const feed = await options.fetch(
               "https://github.com/anpain/bb/releases/download/desktop-latest/server-version-linux-x64.json",
@@ -73,13 +76,14 @@ export function createRemoteServerUpdateCheck(options: {
             );
             if (feed.ok) {
               const candidate = feedSchema.parse(await feed.json()).version;
-              if (semver.gt(candidate, latest)) latest = candidate;
+              latest = candidate;
             }
           } catch {
             if (signal.aborted) return;
           }
           if (
             signal.aborted ||
+            latest === null ||
             !semver.valid(latest) ||
             !semver.gt(latest, version)
           )
@@ -105,6 +109,7 @@ export function createRemoteServerUpdateCheck(options: {
       }, 60 * 60_000);
       timer.unref();
       interval.unref();
+      checkCurrent = check;
     },
   };
 }

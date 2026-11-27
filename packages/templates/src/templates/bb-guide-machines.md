@@ -144,6 +144,19 @@ CLI counterpart of Settings → Updates.
                                           hour and install once no thread has run
                                           for 15 minutes
   bb updates app dismiss                  Mark the last update result as seen
+  bb updates server --ssh <user@host>      Update a Linux x64 systemd VPS using the fork release
+    --key <path>                          SSH identity file (absolute path or ~/)
+    --port <port>                         Remote HTTP port (default 38886)
+    --service <name>                      systemd service (default bb-fork)
+    --yes                                 Confirm backup and restart without prompting
+    --json                                Print JSON result; progress goes to stderr
+
+Server updates require passwordless sudo and a reachable selected BB_SERVER_URL
+(open the saved SSH forward first). The updater refuses active agents, verifies
+the package hash, backs up data and rolls back failed startup. A detached systemd
+task continues if the CLI disconnects; cancellation stops monitoring, not that task.
+Desktop's Update server button uses the same Node SDK experimental_updateRemoteServer
+helper. It uses the SSH connection saved in Server → Edit Server.
 
 `--when-idle`, `cancel`, and `auto on|off` need the `updateWhenIdle` experiment (on for early
 adopters; `bb settings experiment updateWhenIdle true`); while it is off they
